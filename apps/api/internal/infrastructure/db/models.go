@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
 )
 
 type UserRole string
@@ -143,6 +144,62 @@ type ContextRecord struct {
 	Version   int32           `json:"version"`
 	CreatedAt time.Time       `json:"created_at"`
 	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+type Event struct {
+	ID                 uuid.UUID       `json:"id"`
+	TenantID           uuid.UUID       `json:"tenant_id"`
+	EventID            string          `json:"event_id"`
+	Type               string          `json:"type"`
+	Source             string          `json:"source"`
+	AggregateID        sql.NullString  `json:"aggregate_id"`
+	WorkflowInstanceID uuid.NullUUID   `json:"workflow_instance_id"`
+	Sequence           int64           `json:"sequence"`
+	Timestamp          time.Time       `json:"timestamp"`
+	Payload            json.RawMessage `json:"payload"`
+	CorrelationID      sql.NullString  `json:"correlation_id"`
+	CausationID        sql.NullString  `json:"causation_id"`
+	IdempotencyKey     sql.NullString  `json:"idempotency_key"`
+	CreatedAt          time.Time       `json:"created_at"`
+}
+
+type EventInbox struct {
+	ID             uuid.UUID       `json:"id"`
+	TenantID       uuid.UUID       `json:"tenant_id"`
+	IdempotencyKey string          `json:"idempotency_key"`
+	EventType      string          `json:"event_type"`
+	Source         string          `json:"source"`
+	Payload        json.RawMessage `json:"payload"`
+	Status         string          `json:"status"`
+	AttemptCount   int32           `json:"attempt_count"`
+	ReceivedAt     time.Time       `json:"received_at"`
+	ProcessedAt    sql.NullTime    `json:"processed_at"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+type EventOutbox struct {
+	ID           uuid.UUID       `json:"id"`
+	TenantID     uuid.UUID       `json:"tenant_id"`
+	EventID      uuid.NullUUID   `json:"event_id"`
+	Payload      json.RawMessage `json:"payload"`
+	Topic        string          `json:"topic"`
+	Status       string          `json:"status"`
+	AttemptCount int32           `json:"attempt_count"`
+	PublishedAt  sql.NullTime    `json:"published_at"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+}
+
+type IdempotencyRecord struct {
+	ID             uuid.UUID             `json:"id"`
+	TenantID       uuid.UUID             `json:"tenant_id"`
+	IdempotencyKey string                `json:"idempotency_key"`
+	Scope          string                `json:"scope"`
+	ResultStatus   string                `json:"result_status"`
+	Payload        pqtype.NullRawMessage `json:"payload"`
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at"`
 }
 
 type MemoryReference struct {

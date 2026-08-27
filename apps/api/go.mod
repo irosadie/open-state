@@ -10,6 +10,8 @@ require (
 	golang.org/x/crypto v0.38.0
 )
 
+require github.com/sqlc-dev/pqtype v0.3.0
+
 require (
 	github.com/irosadie/open-state/go-shared v0.0.0
 	github.com/jackc/pgpassfile v1.0.0 // indirect
