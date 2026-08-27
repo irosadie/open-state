@@ -4827,24 +4827,32 @@ This lets enterprise users replace infrastructure.
 
 ---
 
-# 170. LLM Provider Abstraction
+# 170. LLM Integration Boundary (3rd-Party via MCP)
 
-Do not hardcode one LLM vendor into the domain engine.
-
-Use:
-
-```text
-LLMProvider
-```
-
-with:
+The platform does **not** call an LLM internally. In the primary architecture,
+the **LLM is a 3rd-party system** (owned by the customer/client) that consumes the
+platform's **MCP server** as its integration surface.
 
 ```text
-generate
-structured_generate
+3rd-party LLM (customer-owned)
+    ↓  invokes MCP tools
+MCP Server (platform output)
+    ↓
+State Orchestrator
 ```
 
-The application can support multiple providers.
+Consequences:
+
+* The platform exposes a **stable MCP tool contract** (`resolve_intent`,
+  `get_active_workflow`, `get_context`, `invoke_capability`, ...) that any
+  LLM/RAG client can call.
+* Intent classification, entity extraction, event proposal, and response
+  generation are performed by the **3rd-party LLM**, not the platform.
+* The platform does **not** hardcode or manage an internal LLM provider; it
+  remains LLM-agnostic by exposing MCP rather than consuming an LLM SDK.
+* A future `LLMProvider` abstraction (platform-initiated LLM calls) is **out of
+  scope** unless a built-in LLM feature is later required; it is not part of the
+  current architecture.
 
 ---
 

@@ -256,20 +256,32 @@ Docs: <https://graphify.net/>
 
 ## MCP Integration
 
-OpenState exposes a **MCP server (HTTP/SSE)** so your LLM / RAG can connect and
-query / drive workflow state. Tools include:
+OpenState's **output** is an **MCP server (HTTP/SSE)** that a **3rd-party LLM /
+RAG** (owned by the customer) calls to query and drive workflow state:
 
-- `get_active_workflow` — conversation → intent → workflow + current state
-- `get_current_state` — state id, purpose, instructions, allowed events
+```text
+3rd-party LLM (customer-owned)
+    ↓ invokes MCP tools
+MCP Server (OpenState output)
+    ↓
+State Orchestrator
+```
+
+The platform does not call an LLM internally — intent classification, entity
+extraction, and response generation are done by the 3rd-party LLM via these
+tools:
+
+- `resolve_intent` — conversation → intent → workflow + current state
+- `get_active_workflow` — active workflow + current state + allowed events
 - `get_context` — available + missing context (PII-redacted)
 - `get_allowed_capabilities` — authorized capabilities per state
 - `propose_event` — LLM suggests, engine validates & transitions
-- `execute_capability` — authorized capability execution
+- `invoke_capability` — authorized capability execution
 - `start_workflow`, `suspend_workflow`, `resume_workflow`, `cancel_workflow`
 - `get_workflow_instances`, `get_history`, `replay_workflow`
 
 > The full MCP tool contract is tracked in the GitHub issue
-> "[MCP & Integration] Server MCP + LLM provider + capability".
+> "[MCP & Integration] Server MCP + capability".
 
 ## Example Workflows
 
@@ -296,7 +308,7 @@ Tracked as GitHub issues (per PRD phases):
 
 1. **Runtime Engine** — state machine, guard evaluation, context store
 2. **Data & Persistence** — PostgreSQL schema + repository abstraction
-3. **MCP & Integration** — MCP server, LLM provider abstraction, capability
+3. **MCP & Integration** — MCP server, capability execution, RAG integration
 4. **Frontend** — State Builder production + Admin Console
 5. **Security & Ops** — multi-tenant, RBAC, audit, observability, deployment
 6. **Quality** — example workflows, testing, documentation
