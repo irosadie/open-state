@@ -9,6 +9,7 @@ base executor; this proposal adds these reliability behaviors.
 ## What Changes
 
 - **Suspension/resume**: `SuspendWorkflow(instanceId)` and
+  `ResumeWorkflow(instanceId)` scoped per (tenant, project);
   `ResumeWorkflow(instanceId)` on the engine; instance status gains
   `SUSPENDED`; preserves state, context, history, version (PRD §43).
 - **Mid-flow interruption**: `product.change_requested`-style events allowed to

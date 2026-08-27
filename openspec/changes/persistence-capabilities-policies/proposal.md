@@ -2,7 +2,7 @@
 
 Epic **#3 (Data & Persistence)** requires the Capability Registry and Policy storage to be persistent (PRD 59-64, 3.13, 18). This is the fifth persistence slice: **capabilities, capability bindings, and policies** — behind `ICapabilityRepository` and a pgx adapter.
 
-Capabilities are logical operations (PRD 3.11, 16) referenced by states; the registry maps logical capability → provider (MCP/INTERNAL/HTTP, PRD 59). Bindings scope a capability's availability at tenant/workflow/state level with most-restrictive-wins resolution (PRD 60). Policies hold runtime/security/business constraints (PRD 3.13). Secrets are never stored here — only `credential_reference` (PRD 61).
+Capabilities are logical operations (PRD 3.11, 16) referenced by states; the registry maps logical capability → provider (MCP/INTERNAL/HTTP, PRD 59). Bindings scope a capability's availability at tenant/project/workflow/state level with most-restrictive-wins resolution (PRD 60). Policies hold runtime/security/business constraints (PRD 3.13). Secrets are never stored here — only `credential_reference` (PRD 61).
 
 ## What Changes
 

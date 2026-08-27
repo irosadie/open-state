@@ -22,7 +22,7 @@ It ties together the slices delivered in `persistence-workflow-definitions`, `pe
 ### New Capabilities
 
 - `backend/persistence/audit`: append-only, tenant-isolated audit trail behind `IAuditRepository`.
-- `backend/persistence/postgres-adapter`: the composed `PostgresAdapter` exposing all repository interfaces under one pgx-backed port, with centralized tenant scoping (ADR-001).
+- `backend/persistence/postgres-adapter`: the composed `PostgresAdapter` exposing all repository interfaces under one pgx-backed port, with centralized tenant+project scoping (ADR-001).
 
 ### Modified Capabilities
 

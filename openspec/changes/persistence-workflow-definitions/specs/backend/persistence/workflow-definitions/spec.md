@@ -1,25 +1,37 @@
 ## Purpose
 
-Provides persistent, versioned, tenant-isolated storage of workflow definitions in PostgreSQL behind the `IWorkflowRepository` interface, so workflow authoring data survives restarts (PRD 128) and remains the source of truth (ADR-001).
+Provides persistent, versioned, tenant+project-isolated storage of workflow definitions in PostgreSQL behind the `IWorkflowRepository` interface, so workflow authoring data survives restarts (PRD 128) and remains the source of truth (ADR-001). Hierarchy: `Tenant → Project → Intent → Workflow → State`.
 
 ## ADDED Requirements
 
+### Requirement: Project table
+The system SHALL persist projects (business areas) scoped to a tenant.
+
+- `projects.id` SHALL be a UUID primary key.
+- `projects.tenant_id` SHALL be a required UUID identifying the owning tenant (PRD 4).
+- `projects.slug` SHALL be required and unique per tenant (PRD 3.1.1).
+
+#### Scenario: Create a project
+- **WHEN** a project is created for a tenant
+- **THEN** a row is inserted into `projects` with a unique `(tenant_id, slug)`.
+
 ### Requirement: Workflow root table
-The system SHALL persist workflow definition roots in a `workflows` table with tenant isolation.
+The system SHALL persist workflow definition roots in a `workflows` table with tenant+project isolation.
 
 - `workflows.id` SHALL be a UUID primary key.
 - `workflows.tenant_id` SHALL be a required UUID identifying the owning tenant (PRD 4).
-- `workflows.slug` SHALL be required and SHALL be unique per tenant (PRD 5).
+- `workflows.project_id` SHALL be a required UUID identifying the owning project (PRD 3.1.1).
+- `workflows.slug` SHALL be required and SHALL be unique per `(tenant_id, project_id)` (PRD 5).
 - `workflows.status` SHALL be a VARCHAR storing one of `DRAFT`, `VALIDATING`, `VALID`, `PUBLISHED`, `ARCHIVED` (PRD 9).
 - `workflows.version` SHALL be a non-negative integer used for optimistic locking (PRD 31).
 - `workflows.current_version` SHALL track the current published version number.
 
 #### Scenario: Create a draft workflow
-- **WHEN** a workflow definition is created for a tenant
-- **THEN** a row is inserted into `workflows` with `status='DRAFT'`, `version=0`, and a unique `(tenant_id, slug)`.
+- **WHEN** a workflow definition is created for a tenant within a project
+- **THEN** a row is inserted into `workflows` with `status='DRAFT'`, `version=0`, and a unique `(tenant_id, project_id, slug)`.
 
-#### Scenario: Slug uniqueness within a tenant
-- **WHEN** two workflows share the same `slug` for the same `tenant_id`
+#### Scenario: Slug uniqueness within a project
+- **WHEN** two workflows share the same `slug` for the same `(tenant_id, project_id)`
 - **THEN** the second insert SHALL be rejected.
 
 #### Scenario: Optimistic-lock update succeeds
@@ -75,13 +87,13 @@ The system SHALL persist transitions and guards relationally.
 ### Requirement: Repository interface
 The system SHALL expose workflow-definition persistence through an `IWorkflowRepository` interface in `internal/domain/repositories/`.
 
-- Every query method SHALL require an explicit `tenantID string` parameter (PRD 4, 96).
+- Every query method SHALL require explicit `tenantID string` and `projectID string` parameters (PRD 4, 96, 3.1.1).
 - The interface SHALL declare methods to create/find a workflow, create a version, list versions, and query states/transitions/guards.
 - The interface SHALL operate on domain entities (DB-agnostic) rather than sqlc rows (ADR-001).
 
-#### Scenario: Repository methods are tenant-scoped
-- **WHEN** any `IWorkflowRepository` method is called with a `tenantID`
-- **THEN** the returned rows SHALL all belong to that tenant.
+#### Scenario: Repository methods are tenant+project-scoped
+- **WHEN** any `IWorkflowRepository` method is called with `tenantID` and `projectID`
+- **THEN** the returned rows SHALL all belong to that tenant and project.
 
 ### Requirement: PostgreSQL adapter
 The system SHALL implement `IWorkflowRepository` with a pgx adapter backed by sqlc-generated queries in `apps/api/internal/infrastructure/database/pgx_workflow_repository.go`.

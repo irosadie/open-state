@@ -2,7 +2,7 @@
 
 Epic **#3 (Data & Persistence)** requires the event model to be the durable driver of state transitions (PRD 27-32) with reliable delivery and replay (PRD 51-52, 65-66). This is the third persistence slice: the **event system** — `events` (immutable history), `event_inbox` (inbound dedup, PRD 66), `event_outbox` (reliable emit, PRD 65), and `idempotency_records` (PRD 30).
 
-Events must survive restarts (PRD 128), be ordered per workflow instance (PRD 32), carry tenant + correlation/causation (PRD 27), and be deduplicated (PRD 30, 66). Outbox/inbox guarantee atomic consistency with DB state changes (PRD 65-66).
+Events must survive restarts (PRD 128), be ordered per workflow instance (PRD 32), carry tenant + project + correlation/causation (PRD 27), and be deduplicated (PRD 30, 66). Outbox/inbox guarantee atomic consistency with DB state changes (PRD 65-66).
 
 ## What Changes
 

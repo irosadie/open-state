@@ -7,7 +7,9 @@ Workflows are *definitions* (authoring artifacts), distinct from *runtime instan
 ## What Changes
 
 - **NEW** — `apps/api/db/migrations/00002_workflows.sql` goose migration creating:
-  - `workflows` — tenant-scoped definition root (PRD 4, 96), `slug` unique per tenant (PRD 5), lifecycle `status`, optimistic `version` (PRD 31).
+  - `projects` — tenant-scoped business area (PRD 3.1.1); slug unique per tenant.
+  - `workflows` — project-scoped definition root (PRD 4, 96), `slug` unique per
+    (tenant, project) (PRD 5, 3.1.1), lifecycle `status`, optimistic `version` (PRD 31).
   - `workflow_versions` — immutable published snapshots (PRD 3.3, 9, 55); stores the full `WorkflowDefinition` as `JSONB` (PRD 68).
   - `states` — relational, queryable view of definition nodes (PRD 12, 14), immutable per version.
   - `transitions` — relational transitions (PRD 33, 34), immutable per version.

@@ -10,7 +10,7 @@ context" behavior (PRD §37) and the MCP `get_context` tool later (Epic #4).
 
 - **New Go package** `apps/api/internal/domain/engine/context.go` — context
   resolver (domain-pure).
-- **Context hierarchy**: tenant → conversation → workflow → state → turn →
+- **Context hierarchy**: tenant → project → conversation → workflow → state → turn →
   RAG → MCP results (PRD §23).
 - **Available vs missing**: computes `missing_context` from a state's
   `requiredContext` (PRD §36).

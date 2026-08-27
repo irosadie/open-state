@@ -13,8 +13,10 @@ Without this, nothing else (MCP, LLM integration, Admin console) can be built.
 ## What Changes
 
 - **New Go package** `apps/api/internal/domain/engine/` — the domain core.
-- **Domain entities**: `Workflow`, `State`, `Transition`, `Event`, `Guard`,
-  `WorkflowInstance`, `StateInstance`, `Policy`, `Capability`.
+- **Domain entities**: `Tenant`, `Project`, `Workflow`, `State`, `Transition`,
+  `Event`, `Guard`, `WorkflowInstance`, `StateInstance`, `Policy`, `Capability`.
+- **Domain hierarchy**: `Tenant → Project → Intent → Workflow → State`
+  (Project = business area; Intent scoped per project; workflow owned by intent).
 - **State machine executor**: `process(event)` → validate → guard eval →
   transition → snapshot (PRD §152).
 - **Guard evaluator**: deterministic, JSON-based operators (`==`, `!=`, `>`,
@@ -22,10 +24,11 @@ Without this, nothing else (MCP, LLM integration, Admin console) can be built.
 - **Lifecycles**: workflow
   (`CREATED→RUNNING→WAITING→COMPLETED/CANCELLED/FAILED/EXPIRED`) and state
   (`ENTERING→ACTIVE→WAITING→EXITING→COMPLETED`) (PRD §10, §11).
-- **Intent resolution**: conversation → intent → workflow → initial state
-  (PRD §40.1).
-- **Repository ports (interfaces)**: `WorkflowRepo`, `InstanceRepo`,
-  `EventRepo` — defined here (domain), implemented by PostgresAdapter in Epic #3.
+- **Intent resolution**: (project, conversation) → intent → workflow →
+  initial state (PRD §40.1).
+- **Repository ports (interfaces)**: `ProjectRepo`, `WorkflowRepo`,
+  `InstanceRepo`, `EventRepo` — defined here (domain), implemented by
+  PostgresAdapter in Epic #3; all scoped by (tenant, project).
 - **Unit tests** — deterministic, no LLM/DB (PRD §126).
 
 ## Capabilities

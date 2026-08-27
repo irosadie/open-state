@@ -2,7 +2,7 @@
 
 Epic **#3 (Data & Persistence)** requires runtime context and persistent memory to survive restarts and be queryable (PRD 128). This is the fourth persistence slice: **context records and memory references** (PRD 23-24, 43.2).
 
-The platform distinguishes *persistent memory* (customer/user domain, survives workflow expiry, PRD 24) from *workflow data* (state data tied to an instance, PRD 24, 131). `context_records` stores key/value runtime context scoped to an entity (tenant/conversation/workflow instance/state instance), while `memory_references` models persistent memory with explicit references, so deleting workflow state never deletes user memory (PRD 24, 43.2).
+The platform distinguishes *persistent memory* (customer/user domain, survives workflow expiry, PRD 24) from *workflow data* (state data tied to an instance, PRD 24, 131). `context_records` stores key/value runtime context scoped to an entity (tenant/project/conversation/workflow instance/state instance), while `memory_references` models persistent memory with explicit references, so deleting workflow state never deletes user memory (PRD 24, 43.2).
 
 ## What Changes
 

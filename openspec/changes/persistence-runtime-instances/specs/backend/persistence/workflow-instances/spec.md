@@ -1,6 +1,6 @@
 ## Purpose
 
-Provides persistent, tenant-isolated storage of running workflow instances and their state instances in PostgreSQL behind the `IInstanceRepository` interface, so runtime execution survives restarts (PRD 128), is reproducible against a pinned version (PRD 58), and is concurrency-safe via optimistic locking (PRD 31).
+Provides persistent, tenant+project-isolated storage of running workflow instances and their state instances in PostgreSQL behind the `IInstanceRepository` interface, so runtime execution survives restarts (PRD 128), is reproducible against a pinned version (PRD 58), and is concurrency-safe via optimistic locking (PRD 31).
 
 ## ADDED Requirements
 
