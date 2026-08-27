@@ -1,0 +1,40 @@
+{
+  "/": {
+    "get": {
+      "tags": ["System"],
+      "summary": "Get starter app info",
+      "description": "Returns baseline information about the API scaffold.",
+      "responses": {
+        "200": {
+          "description": "Application info loaded",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppInfoResponse"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "/health": {
+    "get": {
+      "tags": ["System"],
+      "summary": "Get API health status",
+      "description": "Returns a simple health check payload for the API scaffold.",
+      "responses": {
+        "200": {
+          "description": "Health status loaded",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthResponse"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

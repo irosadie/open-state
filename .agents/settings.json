@@ -1,0 +1,62 @@
+{
+  "$schema": "Project-specific configuration for agents. Update this file when copying to another project.",
+
+  "project": {
+    "name": "vibecoding-starter",
+    "description": "Public monorepo starter for vibe coding workflow",
+    "version": "0.1.0"
+  },
+
+  "repo": {
+    "owner": "",
+    "name": "vibecoding-starter"
+  },
+
+  "stack": {
+    "frontend": "Next.js (App Router)",
+    "backend": "Go (Echo + sqlc + goose)",
+    "worker": "Go (asynq)",
+    "language": "TypeScript (frontend), Go (backend/worker)",
+    "styling": "Tailwind CSS",
+    "packageManager": "bun"
+  },
+
+  "branch": {
+    "main": "main",
+    "format": "<type>/<issue-id>-<short-description>",
+    "types": ["feature", "bugfix", "hotfix", "chore"],
+    "examples": [
+      "feature/GH-42-user-profile",
+      "bugfix/GH-56-fix-pagination",
+      "hotfix/GH-89-critical-auth"
+    ]
+  },
+
+  "paths": {
+    "guides": ".agents/guides",
+    "examples": ".agents/examples",
+    "skills": ".agents/skills"
+  },
+
+  "onboarding": {
+    "startCommands": [
+      "mulai",
+      "start",
+      "mulai vibe coding",
+      "start vibe coding",
+      "mulai dulu",
+      "yuk mulai"
+    ],
+    "statusScript": "scripts/start-session.mjs",
+    "mcpConfigPath": ".mcp.json",
+    "preferredNextSteps": [
+      "setup-mcp",
+      "resume-last-task",
+      "openspec-propose"
+    ]
+  },
+
+  "mcp": {
+    "required": ["github"]
+  }
+}

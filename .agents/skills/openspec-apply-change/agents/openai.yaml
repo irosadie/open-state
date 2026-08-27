@@ -1,0 +1,6 @@
+interface:
+  display_name: "Openspec Apply Change"
+  short_description: "Implement tasks from an OpenSpec change. Use when the user wants to start implem"
+  default_prompt: "Use $openspec-apply-change. Read .agents/skills/openspec-apply-change/SKILL.md for full instructions."
+policy:
+  allow_implicit_invocation: false

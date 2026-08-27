@@ -1,0 +1,6 @@
+interface:
+  display_name: "Openspec Sync Specs"
+  short_description: "Sync delta specs from a change to main specs. Use when the user wants to update "
+  default_prompt: "Use $openspec-sync-specs. Read .agents/skills/openspec-sync-specs/SKILL.md for full instructions."
+policy:
+  allow_implicit_invocation: false

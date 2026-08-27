@@ -1,0 +1,39 @@
+name: Skills Hygiene
+
+on:
+  pull_request:
+    paths:
+      - '.agents/**'
+      - '.claude/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'package.json'
+      - '.github/workflows/skills-hygiene.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.agents/**'
+      - '.claude/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'package.json'
+      - '.github/workflows/skills-hygiene.yml'
+
+jobs:
+  validate-skills:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate skill metadata and wrappers
+        run: node .agents/scripts/validate-skills.mjs

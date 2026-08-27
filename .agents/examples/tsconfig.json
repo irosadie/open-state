@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "jsx": "preserve",
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "$/*": ["../../apps/web/*"],
+      "@vibecoding-starter/schemas": ["../../packages/schemas/index.ts"],
+      "@vibecoding-starter/schemas/*": ["../../packages/schemas/*"],
+      "@vibecoding-starter/types": ["../../packages/types/index.ts"],
+      "@vibecoding-starter/types/*": ["../../packages/types/*"],
+      "@vibecoding-starter/utils": ["../../packages/utils/index.ts"],
+      "@vibecoding-starter/utils/*": ["../../packages/utils/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}

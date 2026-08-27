@@ -1,0 +1,16 @@
+{
+  "name": "@vibecoding-starter/api",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "go run ./cmd/server/main.go",
+    "build": "go build -o dist/server ./cmd/server/main.go",
+    "start": "./dist/server",
+    "lint": "go vet ./...",
+    "test": "go test ./...",
+    "test:smoke": "go test ./... -run TestSmoke",
+    "db:migrate": "goose -dir db/migrations postgres \"$DATABASE_URL\" up",
+    "db:migrate:down": "goose -dir db/migrations postgres \"$DATABASE_URL\" down",
+    "sqlc:generate": "sqlc generate"
+  }
+}

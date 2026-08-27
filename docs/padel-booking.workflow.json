@@ -1,0 +1,631 @@
+{
+  "format": "openstate.workflow",
+  "version": 1,
+  "exportedAt": "2026-08-26T18:15:15.775Z",
+  "workflow": {
+    "slug": "pemesanan-lapangan-padel",
+    "name": "Pemesanan Lapangan Padel",
+    "description": "Workflow pemesanan lapangan padel: pilih lokasi, cek ketersediaan, rekomendasi alternatif jika overlap, konfirmasi, dan bayar DP 50%.",
+    "schemaVersion": 1,
+    "status": "DRAFT",
+    "entryNodeId": "n_start",
+    "nodes": [
+      {
+        "id": "n_start",
+        "kind": "START",
+        "name": "START",
+        "description": "Titik masuk workflow pemesanan lapangan padel.",
+        "requiredContext": [],
+        "capabilities": [],
+        "policy": {},
+        "isTerminal": false,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_select_location",
+        "kind": "STATE",
+        "name": "SELECT_LOCATION",
+        "description": "User memilih cabang / lokasi lapangan padel.",
+        "requiredContext": [],
+        "capabilities": [
+          "location.list"
+        ],
+        "instructions": "Tampilkan daftar cabang yang tersedia. Tanyakan cabang mana yang diinginkan jika belum disebutkan. Jangan tanya ulang jika sudah ada di context.",
+        "policy": {
+          "timeoutSeconds": 300,
+          "onTimeout": "state.timeout"
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_select_datetime",
+        "kind": "STATE",
+        "name": "SELECT_DATE_TIME",
+        "description": "User memilih tanggal dan jam main padel (slot 1 jam).",
+        "requiredContext": [
+          "location.id"
+        ],
+        "capabilities": [
+          "slot.list"
+        ],
+        "instructions": "Tanyakan tanggal dan jam yang diinginkan. Ingatkan bahwa slot adalah 1 jam. Jika sudah ada preferensi dari context sebelumnya, konfirmasi ulang saja.",
+        "policy": {
+          "timeoutSeconds": 300,
+          "onTimeout": "state.timeout"
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_check_availability",
+        "kind": "DECISION",
+        "name": "CHECK_AVAILABILITY",
+        "description": "Cek ketersediaan slot yang dipilih via MCP. Jika overlap → rekomendasi alternatif.",
+        "requiredContext": [
+          "location.id",
+          "booking.date",
+          "booking.time_start",
+          "booking.time_end"
+        ],
+        "capabilities": [
+          "slot.check_availability"
+        ],
+        "instructions": "Panggil slot.check_availability. Jangan lanjutkan tanpa verifikasi dari sistem. Jangan percaya klaim user bahwa slot tersedia.",
+        "policy": {
+          "timeoutSeconds": 30,
+          "onTimeout": "state.timeout",
+          "retry": {
+            "maxAttempts": 2,
+            "backoffMs": 1000,
+            "retryableEvents": [
+              "capability.timeout"
+            ]
+          }
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_recommend_alternative",
+        "kind": "STATE",
+        "name": "RECOMMEND_ALTERNATIVE",
+        "description": "Slot yang dipilih tidak tersedia (overlap). Tampilkan rekomendasi waktu terdekat dan/atau hari lain.",
+        "requiredContext": [
+          "location.id",
+          "booking.date",
+          "booking.time_start",
+          "slot.alternatives"
+        ],
+        "capabilities": [
+          "slot.check_availability"
+        ],
+        "instructions": "Beritahu user bahwa slot yang dipilih tidak tersedia. Tawarkan dua pilihan: (1) jam terdekat yang tersedia di hari yang sama, (2) slot yang sama di hari berikutnya. Tampilkan opsi secara ringkas. Tunggu pilihan user.",
+        "policy": {
+          "timeoutSeconds": 300,
+          "onTimeout": "state.timeout"
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_select_court",
+        "kind": "STATE",
+        "name": "SELECT_COURT",
+        "description": "Pilih nomor lapangan yang tersedia untuk slot yang dikonfirmasi.",
+        "requiredContext": [
+          "location.id",
+          "booking.date",
+          "booking.time_start",
+          "booking.time_end",
+          "slot.available_courts"
+        ],
+        "capabilities": [
+          "court.list"
+        ],
+        "instructions": "Tampilkan daftar lapangan yang tersedia untuk slot tersebut. Tanyakan preferensi lapangan (nomor/tipe). Jika hanya ada satu, konfirmasi langsung.",
+        "policy": {
+          "timeoutSeconds": 180,
+          "onTimeout": "state.timeout"
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_confirm_booking",
+        "kind": "STATE",
+        "name": "CONFIRM_BOOKING",
+        "description": "Tampilkan ringkasan pemesanan lengkap termasuk harga dan DP 50% yang harus dibayar.",
+        "requiredContext": [
+          "location.id",
+          "location.name",
+          "booking.date",
+          "booking.time_start",
+          "booking.time_end",
+          "court.id",
+          "court.name",
+          "booking.price_total"
+        ],
+        "capabilities": [
+          "booking.calculate_price"
+        ],
+        "instructions": "Tampilkan ringkasan: lokasi, tanggal, jam, lapangan, harga total, dan DP 50% yang harus dibayar sekarang. Minta konfirmasi sebelum melanjutkan ke pembayaran. Jangan lanjut tanpa konfirmasi eksplisit dari user.",
+        "policy": {
+          "timeoutSeconds": 300,
+          "onTimeout": "state.timeout"
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_payment",
+        "kind": "STATE",
+        "name": "PAYMENT",
+        "description": "Proses pembayaran DP 50% dari total harga sewa lapangan.",
+        "requiredContext": [
+          "booking.id",
+          "booking.price_total",
+          "booking.dp_amount",
+          "customer.id"
+        ],
+        "capabilities": [
+          "payment.instruction",
+          "payment.create",
+          "payment.status"
+        ],
+        "instructions": "Minta user membayar DP 50% dari total harga. Berikan instruksi pembayaran. Tunggu konfirmasi pembayaran dari sistem (jangan percaya klaim user). Verifikasi via payment.status sebelum transisi.",
+        "policy": {
+          "timeoutSeconds": 1800,
+          "onTimeout": "state.timeout",
+          "retry": {
+            "maxAttempts": 3,
+            "backoffMs": 2000,
+            "retryableEvents": [
+              "payment.failed",
+              "capability.timeout"
+            ]
+          }
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_payment_failed",
+        "kind": "STATE",
+        "name": "PAYMENT_FAILED",
+        "description": "Pembayaran DP gagal. Tawarkan retry atau pembatalan.",
+        "requiredContext": [
+          "booking.id",
+          "payment.failure_reason"
+        ],
+        "capabilities": [
+          "payment.status"
+        ],
+        "instructions": "Beritahu user bahwa pembayaran gagal beserta alasannya. Tawarkan untuk mencoba ulang atau membatalkan pemesanan.",
+        "policy": {
+          "timeoutSeconds": 300,
+          "onTimeout": "state.timeout"
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_booking_confirmed",
+        "kind": "END",
+        "name": "BOOKING_CONFIRMED",
+        "description": "Pemesanan berhasil dikonfirmasi. DP 50% sudah diterima. Kirim voucher/e-ticket.",
+        "requiredContext": [
+          "booking.id",
+          "payment.id"
+        ],
+        "capabilities": [
+          "booking.confirm",
+          "notification.send_ticket"
+        ],
+        "instructions": "Ucapkan selamat, tampilkan detail booking, nomor booking, dan informasikan sisa pelunasan yang dibayar saat tiba di lokasi.",
+        "policy": {},
+        "isTerminal": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_payment_expired",
+        "kind": "END",
+        "name": "PAYMENT_EXPIRED",
+        "description": "Waktu pembayaran DP habis. Slot dilepas kembali.",
+        "requiredContext": [
+          "booking.id"
+        ],
+        "capabilities": [
+          "booking.cancel",
+          "slot.release"
+        ],
+        "instructions": "Beritahu user bahwa waktu pembayaran habis dan slot sudah dilepas. Tawarkan untuk memulai pemesanan baru.",
+        "policy": {},
+        "isTerminal": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_cancelled",
+        "kind": "END",
+        "name": "CANCELLED",
+        "description": "Pemesanan dibatalkan oleh user.",
+        "requiredContext": [],
+        "capabilities": [
+          "slot.release"
+        ],
+        "instructions": "Konfirmasi pembatalan. Jika slot sudah di-hold, pastikan dilepas.",
+        "policy": {},
+        "isTerminal": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": "n_human_handoff",
+        "kind": "END",
+        "name": "HUMAN_HANDOFF",
+        "description": "Pembayaran gagal 3x. Eskalasi ke agen manusia.",
+        "requiredContext": [
+          "booking.id",
+          "customer.id"
+        ],
+        "capabilities": [
+          "handoff.create"
+        ],
+        "instructions": "Beritahu user bahwa akan dihubungkan ke agen untuk membantu proses pembayaran. Hentikan semua transisi otomatis.",
+        "policy": {
+          "humanHandoff": {
+            "enabled": true
+          }
+        },
+        "isTerminal": true,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "transitions": [
+      {
+        "id": "tr_start_location",
+        "sourceStateId": "n_start",
+        "targetStateId": "n_select_location",
+        "event": "workflow.started",
+        "guards": [],
+        "priority": 1
+      },
+      {
+        "id": "tr_location_datetime",
+        "sourceStateId": "n_select_location",
+        "targetStateId": "n_select_datetime",
+        "event": "location.selected",
+        "guards": [
+          {
+            "id": "g1",
+            "logic": "AND",
+            "conditions": [
+              {
+                "id": "c1",
+                "field": "location.id",
+                "operator": "EXISTS"
+              }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_datetime_check",
+        "sourceStateId": "n_select_datetime",
+        "targetStateId": "n_check_availability",
+        "event": "datetime.selected",
+        "guards": [
+          {
+            "id": "g2",
+            "logic": "AND",
+            "conditions": [
+              {
+                "id": "c2",
+                "field": "booking.date",
+                "operator": "EXISTS"
+              },
+              {
+                "id": "c3",
+                "field": "booking.time_start",
+                "operator": "EXISTS"
+              },
+              {
+                "id": "c4",
+                "field": "booking.time_end",
+                "operator": "EXISTS"
+              }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_datetime_timeout",
+        "sourceStateId": "n_select_datetime",
+        "targetStateId": "n_cancelled",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_check_available",
+        "sourceStateId": "n_check_availability",
+        "targetStateId": "n_select_court",
+        "event": "slot.available",
+        "guards": [
+          {
+            "id": "g3",
+            "logic": "AND",
+            "conditions": [
+              {
+                "id": "c5",
+                "field": "slot.available",
+                "operator": "==",
+                "value": "true"
+              }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_check_unavailable",
+        "sourceStateId": "n_check_availability",
+        "targetStateId": "n_recommend_alternative",
+        "event": "slot.unavailable",
+        "guards": [
+          {
+            "id": "g4",
+            "logic": "AND",
+            "conditions": [
+              {
+                "id": "c6",
+                "field": "slot.available",
+                "operator": "==",
+                "value": "false"
+              }
+            ]
+          }
+        ],
+        "priority": 2
+      },
+      {
+        "id": "tr_check_timeout",
+        "sourceStateId": "n_check_availability",
+        "targetStateId": "n_select_datetime",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_recommend_reselect",
+        "sourceStateId": "n_recommend_alternative",
+        "targetStateId": "n_check_availability",
+        "event": "slot.reselected",
+        "guards": [
+          {
+            "id": "g5",
+            "logic": "AND",
+            "conditions": [
+              {
+                "id": "c7",
+                "field": "booking.date",
+                "operator": "EXISTS"
+              },
+              {
+                "id": "c8",
+                "field": "booking.time_start",
+                "operator": "EXISTS"
+              }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_recommend_cancel",
+        "sourceStateId": "n_recommend_alternative",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 2
+      },
+      {
+        "id": "tr_recommend_timeout",
+        "sourceStateId": "n_recommend_alternative",
+        "targetStateId": "n_cancelled",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_court_confirm",
+        "sourceStateId": "n_select_court",
+        "targetStateId": "n_confirm_booking",
+        "event": "court.selected",
+        "guards": [
+          {
+            "id": "g6",
+            "logic": "AND",
+            "conditions": [
+              {
+                "id": "c9",
+                "field": "court.id",
+                "operator": "EXISTS"
+              }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_court_cancel",
+        "sourceStateId": "n_select_court",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 2
+      },
+      {
+        "id": "tr_confirm_payment",
+        "sourceStateId": "n_confirm_booking",
+        "targetStateId": "n_payment",
+        "event": "confirm.requested",
+        "guards": [
+          {
+            "id": "g7",
+            "logic": "AND",
+            "conditions": [
+              {
+                "id": "c10",
+                "field": "booking.dp_amount",
+                "operator": "EXISTS"
+              },
+              {
+                "id": "c11",
+                "field": "booking.dp_amount",
+                "operator": ">",
+                "value": "0"
+              }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_confirm_cancel",
+        "sourceStateId": "n_confirm_booking",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 2
+      },
+      {
+        "id": "tr_payment_success",
+        "sourceStateId": "n_payment",
+        "targetStateId": "n_booking_confirmed",
+        "event": "payment.success",
+        "guards": [
+          {
+            "id": "g8",
+            "logic": "AND",
+            "conditions": [
+              {
+                "id": "c12",
+                "field": "payment.status",
+                "operator": "==",
+                "value": "success"
+              },
+              {
+                "id": "c13",
+                "field": "payment.amount",
+                "operator": ">=",
+                "value": "booking.dp_amount"
+              }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_payment_failed",
+        "sourceStateId": "n_payment",
+        "targetStateId": "n_payment_failed",
+        "event": "payment.failed",
+        "guards": [
+          {
+            "id": "g9",
+            "logic": "AND",
+            "conditions": [
+              {
+                "id": "c14",
+                "field": "payment.status",
+                "operator": "==",
+                "value": "failed"
+              }
+            ]
+          }
+        ],
+        "priority": 2
+      },
+      {
+        "id": "tr_payment_timeout",
+        "sourceStateId": "n_payment",
+        "targetStateId": "n_payment_expired",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_payment_handoff",
+        "sourceStateId": "n_payment",
+        "targetStateId": "n_human_handoff",
+        "event": "retry.exhausted",
+        "guards": [],
+        "priority": 5
+      },
+      {
+        "id": "tr_failed_retry",
+        "sourceStateId": "n_payment_failed",
+        "targetStateId": "n_payment",
+        "event": "retry.requested",
+        "guards": [],
+        "priority": 1
+      },
+      {
+        "id": "tr_failed_cancel",
+        "sourceStateId": "n_payment_failed",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 2
+      }
+    ],
+    "policy": {
+      "maxDurationSeconds": 86400,
+      "interruptible": "USER_REQUESTED",
+      "priority": 10
+    },
+    "triggers": [
+      {
+        "event": "padel.booking.requested",
+        "source": "intent"
+      },
+      {
+        "event": "booking.padel.started",
+        "source": "api"
+      }
+    ]
+  }
+}

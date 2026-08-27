@@ -1,0 +1,49 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "files": {
+    "ignore": [
+      "**/node_modules",
+      "**/dist",
+      "**/.next",
+      "**/.turbo",
+      "**/coverage",
+      "**/.DS_Store",
+      "apps/api/prisma/**",
+      "apps/api/internal/infrastructure/db/**",
+      "apps/web/auth.ts",
+      "apps/web/components/map/map.tsx",
+      "packages/schemas/**/*.d.ts",
+      "packages/schemas/**/*.js",
+      "packages/schemas/**/*.js.map",
+      ".agents/examples/**"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noExplicitAny": "error",
+        "noConsole": "error"
+      },
+      "style": {
+        "useConst": "error"
+      },
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "asNeeded"
+    }
+  }
+}

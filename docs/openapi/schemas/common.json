@@ -1,0 +1,40 @@
+{
+  "ApiError": {
+    "type": "object",
+    "required": ["code", "message"],
+    "properties": {
+      "code": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string"
+      },
+      "details": {}
+    }
+  },
+  "ErrorResponse": {
+    "type": "object",
+    "required": ["success", "errors"],
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "enum": [false]
+      },
+      "message": {
+        "type": "string"
+      },
+      "errors": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ApiError"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply min-h-screen bg-slate-100 text-slate-900;
+}
+
+/* ------------------------------------------------------------------ */
+/* Custom scrollbar — thin, subtle, rounded                            */
+/* ------------------------------------------------------------------ */
+.sb-scroll {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgb(148 163 184 / 0.55) transparent; /* Firefox */
+  scrollbar-gutter: stable;
+}
+
+.sb-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sb-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sb-scroll::-webkit-scrollbar-thumb {
+  background: rgb(148 163 184 / 0.55);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.sb-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(100 116 139 / 0.7);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.sb-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}

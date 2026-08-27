@@ -1,0 +1,6 @@
+interface:
+  display_name: "Openspec Explore"
+  short_description: "Enter explore mode - a thinking partner for exploring ideas, investigating probl"
+  default_prompt: "Use $openspec-explore. Read .agents/skills/openspec-explore/SKILL.md for full instructions."
+policy:
+  allow_implicit_invocation: false

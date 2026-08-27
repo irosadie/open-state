@@ -1,0 +1,6 @@
+interface:
+  display_name: "Openspec Propose"
+  short_description: "Propose a new change with all artifacts generated in one step. Use when the user"
+  default_prompt: "Use $openspec-propose. Read .agents/skills/openspec-propose/SKILL.md for full instructions."
+policy:
+  allow_implicit_invocation: false

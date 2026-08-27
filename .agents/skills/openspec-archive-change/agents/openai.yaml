@@ -1,0 +1,6 @@
+interface:
+  display_name: "Openspec Archive Change"
+  short_description: "Archive a completed change in the experimental workflow. Use when the user wants"
+  default_prompt: "Use $openspec-archive-change. Read .agents/skills/openspec-archive-change/SKILL.md for full instructions."
+policy:
+  allow_implicit_invocation: false

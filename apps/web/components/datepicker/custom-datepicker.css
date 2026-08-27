@@ -1,0 +1,10 @@
+.react-date-picker__wrapper {
+  border: none !important;
+}
+.react-date-picker__inputGroup {
+  padding: 0px !important;
+}
+.react-date-picker__button:enabled {
+  cursor: pointer;
+  margin: 0 0 0 4px !important;
+}

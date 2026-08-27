@@ -1,0 +1,152 @@
+{
+  "$schema": "Registry of all available skills in this project.",
+  "skills": [
+    {
+      "name": "web-api-integrated",
+      "description": "Integrate API endpoints into the frontend with Zod schemas, response types, constants, and react-query hooks. Use when implementing endpoints from an API contract, Postman, or Swagger.",
+      "scope": "frontend",
+      "path": ".agents/skills/web-api-integrated",
+      "whenToUse": "Integrate API endpoint to frontend with schema, types, constants, and hooks"
+    },
+    {
+      "name": "web-bugfix",
+      "description": "Fix frontend bugs with minimum-touch changes, keep other surfaces stable, and sync schema, types, hooks, constants, tests, and related docs when impacted.",
+      "scope": "frontend",
+      "path": ".agents/skills/web-bugfix",
+      "whenToUse": "Fix frontend bug with minimal touch and sync impacted contracts"
+    },
+    {
+      "name": "web-code-review",
+      "description": "Review frontend code with a firm senior-lead standard, focusing on bugs, regressions, architecture risks, and test gaps in apps/web and the shared contracts the frontend depends on.",
+      "scope": "frontend",
+      "path": ".agents/skills/web-code-review",
+      "whenToUse": "Review frontend code strictly before merge or during quality audit"
+    },
+    {
+      "name": "web-seo-geo-friendly",
+      "description": "Optimize public Next.js App Router pages for SEO and GEO (Generative Engine Optimization). Use when the user explicitly requests SEO/GEO optimization on public pages.",
+      "scope": "frontend",
+      "path": ".agents/skills/web-seo-geo-friendly",
+      "whenToUse": "SEO and GEO optimization for public Next.js pages"
+    },
+    {
+      "name": "web-slicing",
+      "description": "Convert screenshot/Figma designs into pixel-perfect frontend UI with reusable components. Use when the task focuses on visual and layout implementation.",
+      "scope": "frontend",
+      "path": ".agents/skills/web-slicing",
+      "whenToUse": "Implement UI from design, screenshot, or Figma"
+    },
+    {
+      "name": "api-bugfix",
+      "description": "Fix backend bugs with minimal touch, keep other layers stable, then sync DTO, OpenAPI, shared types, tests, and related docs when behavior is affected.",
+      "scope": "backend",
+      "path": ".agents/skills/api-bugfix",
+      "whenToUse": "Fix backend bug with minimal touch and sync impacted contracts"
+    },
+    {
+      "name": "api-code-review",
+      "description": "Review backend code with a senior lead standard, focused on bugs, regressions, contract drift, clean architecture risks, and test gaps in apps/api and related shared contracts.",
+      "scope": "backend",
+      "path": ".agents/skills/api-code-review",
+      "whenToUse": "Review backend code strictly before merge or during quality audit"
+    },
+    {
+      "name": "api-feature",
+      "description": "Implement new backend features following Clean Architecture. Use for tasks involving new endpoints, use cases, entities, repositories, or application-layer changes.",
+      "scope": "backend",
+      "path": ".agents/skills/api-feature",
+      "whenToUse": "Implement new backend feature following Clean Architecture"
+    },
+    {
+      "name": "db-sqlc-schema",
+      "description": "Write or modify SQL migration files (goose) and sqlc query files, then regenerate Go code. Use for database model, relation, index, enum changes, or schema-to-domain-layer sync.",
+      "scope": "backend",
+      "path": ".agents/skills/db-sqlc-schema",
+      "whenToUse": "Changes to goose migrations, sqlc queries, and PostgreSQL schema validation"
+    },
+    {
+      "name": "docs-openapi",
+      "description": "Write or update OpenAPI documentation in split-per-feature format under `docs/openapi`. Use when endpoints, request/response schemas, or API contracts change.",
+      "scope": "docs",
+      "path": ".agents/skills/docs-openapi",
+      "whenToUse": "Write or update split OpenAPI documentation per feature"
+    },
+    {
+      "name": "ops-docker",
+      "description": "Write or modify Dockerfiles for this backend so it is ready to deploy on Linux. Use for tasks involving containerization, image optimization, or build/runtime issues in containers. Docker Compose is managed by the server — do not touch it.",
+      "scope": "ops",
+      "path": ".agents/skills/ops-docker",
+      "whenToUse": "Write or modify backend Dockerfile for Linux deployment"
+    },
+    {
+      "name": "ops-mcp-setup",
+      "description": "Configure the GitHub MCP server in this project so the agent can interact with the repository. Use on first-time project setup or when MCP is not yet connected.",
+      "scope": "ops",
+      "path": ".agents/skills/ops-mcp-setup",
+      "whenToUse": "Setup GitHub MCP for this repo's workflow"
+    },
+    {
+      "name": "flow-session-start",
+      "description": "Handle Start or Mulai commands for repo onboarding: check MCP, registry, memory, and work status then direct user to the appropriate next step.",
+      "scope": "flow",
+      "path": ".agents/skills/flow-session-start",
+      "whenToUse": "Handle Start/Mulai command for repo onboarding"
+    },
+    {
+      "name": "meta-skill-hygiene",
+      "description": "Audit, sync, and maintain skill metadata consistency across this repo. Use when skills, the registry, Claude wrappers, or agent metadata change.",
+      "scope": "meta",
+      "path": ".agents/skills/meta-skill-hygiene",
+      "whenToUse": "Audit and maintain skill metadata consistency"
+    },
+    {
+      "name": "skill-add-example",
+      "description": "Add real code examples to .agents/examples/ so other skills can reference them. Use when a new pattern needs to be standardized as a template or agent reference.",
+      "scope": "meta",
+      "path": ".agents/skills/skill-add-example",
+      "whenToUse": "Add reusable example code for other skills"
+    },
+    {
+      "name": "skill-creator",
+      "description": "Create a new skill from scratch with full structure — SKILL.md, references, templates, openai.yaml, Claude wrapper, and registration in manifest + AGENTS.md + CLAUDE.md.",
+      "scope": "meta",
+      "path": ".agents/skills/skill-creator",
+      "whenToUse": "Create or update skills with consistent format"
+    },
+    {
+      "name": "openspec-apply-change",
+      "description": "Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks.",
+      "scope": "openspec",
+      "path": ".agents/skills/openspec-apply-change",
+      "whenToUse": "Implement tasks from an active OpenSpec change"
+    },
+    {
+      "name": "openspec-archive-change",
+      "description": "Archive a completed change in the experimental workflow. Use when the user wants to finalize and archive a change after implementation is complete.",
+      "scope": "openspec",
+      "path": ".agents/skills/openspec-archive-change",
+      "whenToUse": "Archive a completed OpenSpec change"
+    },
+    {
+      "name": "openspec-explore",
+      "description": "Enter explore mode - a thinking partner for exploring ideas, investigating problems, and clarifying requirements. Use when the user wants to think through something before or during a change.",
+      "scope": "openspec",
+      "path": ".agents/skills/openspec-explore",
+      "whenToUse": "Explore and think through ideas before committing to a change"
+    },
+    {
+      "name": "openspec-propose",
+      "description": "Propose a new change with all artifacts generated in one step. Use when the user wants to quickly describe what they want to build and get a complete proposal with design, specs, and tasks ready for implementation.",
+      "scope": "openspec",
+      "path": ".agents/skills/openspec-propose",
+      "whenToUse": "Start a new feature — turn an idea into proposal + specs + design + tasks"
+    },
+    {
+      "name": "openspec-sync-specs",
+      "description": "Sync delta specs from a change to main specs. Use when the user wants to update main specs with changes from a delta spec, without archiving the change.",
+      "scope": "openspec",
+      "path": ".agents/skills/openspec-sync-specs",
+      "whenToUse": "Sync delta specs to main specs"
+    }
+  ]
+}

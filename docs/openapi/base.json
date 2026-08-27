@@ -1,0 +1,24 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Vibecoding Starter API",
+    "version": "0.1.0",
+    "description": "Baseline API scaffold for the vibecoding starter monorepo."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8020",
+      "description": "Local development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "System",
+      "description": "Baseline system endpoints for starter health and app info."
+    }
+  ],
+  "paths": {},
+  "components": {
+    "schemas": {}
+  }
+}

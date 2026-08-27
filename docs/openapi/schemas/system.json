@@ -1,0 +1,62 @@
+{
+  "AppInfo": {
+    "type": "object",
+    "required": ["name", "message"],
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      }
+    }
+  },
+  "Health": {
+    "type": "object",
+    "required": ["status", "service", "timestamp"],
+    "properties": {
+      "status": {
+        "type": "string"
+      },
+      "service": {
+        "type": "string"
+      },
+      "timestamp": {
+        "type": "string",
+        "format": "date-time"
+      }
+    }
+  },
+  "AppInfoResponse": {
+    "type": "object",
+    "required": ["success", "message", "data"],
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "enum": [true]
+      },
+      "message": {
+        "type": "string"
+      },
+      "data": {
+        "$ref": "#/components/schemas/AppInfo"
+      }
+    }
+  },
+  "HealthResponse": {
+    "type": "object",
+    "required": ["success", "message", "data"],
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "enum": [true]
+      },
+      "message": {
+        "type": "string"
+      },
+      "data": {
+        "$ref": "#/components/schemas/Health"
+      }
+    }
+  }
+}

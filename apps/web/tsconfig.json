@@ -1,0 +1,30 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["node", "vitest/globals"],
+    "allowJs": false,
+    "incremental": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "noEmit": true,
+    "ignoreDeprecations": "5.0",
+    "baseUrl": ".",
+    "paths": {
+      "$/*": ["./*"],
+      "@vibecoding-starter/schemas": ["../../packages/schemas/index.ts"],
+      "@vibecoding-starter/schemas/*": ["../../packages/schemas/*"],
+      "@vibecoding-starter/types": ["../../packages/types/index.ts"],
+      "@vibecoding-starter/types/*": ["../../packages/types/*"],
+      "@vibecoding-starter/utils": ["../../packages/utils/index.ts"],
+      "@vibecoding-starter/utils/*": ["../../packages/utils/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", "next-env.d.ts", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "**/_docs/**", "../../.agents/examples/**"]
+}

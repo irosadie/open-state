@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/opencode-ai/opencode/main/opencode-schema.json",
+  "contextPaths": [
+    "opencode.md",
+    ".agents/AGENTS.md",
+    ".agents/settings.json"
+  ],
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"],
+      "type": "stdio"
+    }
+  },
+  "lsp": {
+    "typescript": {
+      "command": "typescript-language-server",
+      "args": ["--stdio"]
+    }
+  }
+}
