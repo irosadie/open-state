@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a3d58;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#1f8fca;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#16a34a;stop-opacity:1"/>
+      <stop offset="50%" style="stop-color:#f39e1a;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#d83838;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- decorative nodes -->
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="3">
+    <rect x="80" y="80" width="150" height="90" rx="45" transform="rotate(0 155 125)"/>
+    <rect x="300" y="250" width="160" height="110" rx="10"/>
+    <rect x="540" y="130" width="160" height="110" rx="10"/>
+    <polygon points="620,430 690,380 760,430 690,480"/>
+    <rect x="900" y="330" width="150" height="90" rx="45"/>
+  </g>
+
+  <!-- connecting lines -->
+  <g stroke="#ffffff" stroke-opacity="0.2" stroke-width="3" fill="none">
+    <line x1="155" y1="215" x2="380" y2="250"/>
+    <line x1="380" y1="305" x2="620" y2="260"/>
+    <line x1="540" y1="240" x2="620" y2="405"/>
+    <line x1="760" y1="430" x2="975" y2="375"/>
+  </g>
+
+  <!-- title -->
+  <text x="600" y="120" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="bold" fill="#ffffff" text-anchor="middle" letter-spacing="2">OpenState</text>
+  <text x="600" y="175" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#b3dff4" text-anchor="middle" letter-spacing="1">Enterprise Conversation State Orchestration Platform</text>
+
+  <!-- accent line -->
+  <rect x="420" y="200" width="360" height="6" rx="3" fill="url(#accent)"/>
+
+  <!-- tagline -->
+  <text x="600" y="560" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="#ffffff" text-anchor="middle" font-style="italic">LLM suggests · State Engine decides · MCP executes · RAG informs · PostgreSQL remembers</text>
+
+  <!-- feature chips -->
+  <g font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#e0f1fa">
+    <text x="600" y="240" text-anchor="middle">Multi-tenant &nbsp;·&nbsp; Versioned workflows &nbsp;·&nbsp; Deterministic guards</text>
+    <text x="600" y="280" text-anchor="middle">State Builder (visual) &nbsp;·&nbsp; MCP + RAG integration &nbsp;·&nbsp; LLM context compilation</text>
+  </g>
+</svg>

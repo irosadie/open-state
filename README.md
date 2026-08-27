@@ -2,6 +2,20 @@
 
 > **The LLM can suggest. The State Engine decides. The MCP executes. The RAG informs. PostgreSQL remembers.**
 
+<div align="center">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://golang.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+
+**Multi-tenant · Versioned workflow engine · LLM-driven conversations · MCP + RAG integrated**
+
+![OpenState Banner](./docs/assets/og-image.svg)
+
+</div>
+
 OpenState is an open-source, enterprise-grade platform for defining, publishing,
 executing, observing, and versioning **conversation state** and **business
 workflows**. It sits between the user's conversation and external AI/tooling
@@ -198,6 +212,10 @@ Load them in the State Builder via the "Examples" dropdown.
   specification (source of truth)
 - **Architecture Decision Records**: [`docs/adr/`](./docs/adr/)
 - **Operations**: [`docs/OPERATION.md`](./docs/OPERATION.md)
+- **Changelog**: [`CHANGELOG.md`](./CHANGELOG.md)
+- **Contributing**: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- **Security**: [`SECURITY.md`](./SECURITY.md)
+- **Code of Conduct**: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
 
 ## Roadmap
 
