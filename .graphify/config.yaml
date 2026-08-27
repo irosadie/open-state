@@ -1,0 +1,50 @@
+# Graphify project configuration
+# Graphify builds a queryable knowledge graph of the codebase
+# (code, docs, diagrams) for AI coding assistants.
+# Docs: https://graphify.net/
+
+# Root path to analyze
+root: ./
+
+# Input types to include
+include:
+  - source: true          # .go, .ts, .tsx, etc.
+  - markdown: true        # README, docs, PRD
+  - diagrams: true        # svg/png diagrams
+  - pdf: false            # research papers (disable unless needed)
+
+# Languages for Tree-sitter static analysis (local, no LLM)
+languages:
+  - go
+  - typescript
+  - javascript
+  - markdown
+  - yaml
+  - json
+  - svg
+
+# Paths to ignore
+ignore:
+  - node_modules
+  - .next
+  - .git
+  - dist
+  - coverage
+  - "*.lock"
+
+# Output artifacts
+output:
+  graph_html: docs/assets/graph.html
+  graph_json: docs/assets/graph.json
+  report: docs/assets/GRAPH_REPORT.md
+
+# Semantic extraction (LLM-driven; only semantic descriptions sent, never raw source)
+semantic:
+  enabled: true
+  model_env: GRAPHIFY_MODEL  # e.g. OPENAI_API_KEY / ANTHROPIC_API_KEY
+
+# Export formats
+export:
+  - html
+  - json
+  - obsidian

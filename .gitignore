@@ -21,8 +21,13 @@ coverage
 # macOS
 .DS_Store
 
-# Serena cache
-.serena/
+# Serena — keep config, ignore runtime state/cache
+.serena/*
+!.serena/config.yaml
+
+# Graphify — keep config, ignore large build artifacts by default
+.graphify/*
+!.graphify/config.yaml
 
 # vscode
 .vscode/

@@ -1,0 +1,33 @@
+# Serena project configuration
+# Serena is a semantic code retrieval/editing MCP toolkit ("the IDE for your agent").
+# This file configures Serena for the OpenState monorepo.
+# Docs: https://github.com/oraios/serena
+
+# Language backend (languageserver is free/open-source; JetBrains is a paid plugin)
+backend: languageserver
+
+# Languages enabled for semantic analysis
+# (a subset of the >40 supported; adjust as the codebase grows)
+languages:
+  - go
+  - typescript
+  - javascript
+  - markdown
+  - yaml
+  - json
+
+# Tool groups to expose to the agent
+tools:
+  retrieval: true
+  editing: true
+  refactoring: true
+  memory: true
+  basic: false # disable basic file/shell tools; the host harness provides them
+
+# Memory system (shared knowledge across sessions)
+memory:
+  enabled: true
+
+# Per-project scope: confine Serena to the repo root
+workspace:
+  root: ./

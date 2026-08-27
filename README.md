@@ -181,6 +181,53 @@ Open:
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3020` | Web app base URL |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8020` | Backend base URL |
 
+## Developer Tooling
+
+The repository ships with configuration for the following agent tooling. They are
+**developer tools**, not runtime dependencies — install them in your own
+environment as needed.
+
+### OpenSpec (spec-driven planning)
+
+OpenSpec is used for lightweight, spec-driven feature planning. Configuration
+lives in [`openspec/`](./openspec).
+
+```bash
+npm install -g @fission-ai/openspec@latest
+openspec validate
+```
+
+- Specs: `openspec/specs/`
+- Proposed changes: `openspec/changes/`
+- Skills: `.agents/skills/openspec-*`
+
+### Serena (semantic code retrieval / editing)
+
+Serena is an MCP toolkit that gives the agent IDE-level symbol understanding
+of the codebase. Configuration lives in [`.serena/`](./.serena).
+
+```bash
+# prerequisite: uv
+uv tool install -p 3.13 serena-agent
+serena init
+```
+
+Connect `serena` to your MCP client (Claude Code, Codex, OpenCode, etc.) per
+the [Serena docs](https://github.com/oraios/serena).
+
+### Graphify (knowledge graph)
+
+Graphify builds a queryable knowledge graph of the codebase (code + docs +
+diagrams) for the agent. Configuration lives in [`.graphify/`](./.graphify).
+
+```bash
+# requires Python 3.12 and uv; run from the Graphify repo root
+uv sync --extra dev --extra cloud --no-editable --reinstall-package private-context-mcp
+uv run --no-sync private-context doctor
+```
+
+Docs: <https://graphify.net/>
+
 ## MCP Integration
 
 OpenState exposes a **MCP server (HTTP/SSE)** so your LLM / RAG can connect and

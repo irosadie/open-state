@@ -1,20 +1,44 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+# Project context — ditampilkan ke AI saat membuat artifact OpenSpec.
+context: |
+  # OpenState
+  Open-source enterprise **Conversation State Orchestration Platform**.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  ## Core principle
+  > The LLM can suggest. The State Engine decides. The MCP executes.
+  > The RAG informs. PostgreSQL remembers.
+  LLM TIDAK pernah menjadi source of truth untuk workflow state.
+
+  ## Tech stack
+  - Frontend: Next.js (App Router) + React Flow + Zustand + TanStack Query
+  - Backend: Go (Echo) Clean Architecture + sqlc + goose + pgx
+  - Worker: Go (asynq) + Redis
+  - Monorepo: Turborepo + bun
+  - Database: PostgreSQL (primary), repositori abstraction untuk adapter lain
+
+  ## Arsitektur
+  - Modular monolith (PRD 175) — 1 binary Go, batas internal bersih
+  - Domain / Application / Infrastructure / Interfaces
+  - MCP server HTTP/SSE untuk integrasi LLM/RAG
+  - LLM multi-provider abstraction
+
+  ## Domain model
+  - Workflow, State, Transition, Guard, Event, WorkflowInstance, StateInstance
+  - IntentRegistry: conversation → intent → workflow → state
+  - Capability Registry: logical capability → MCP provider
+  - Context: tenant → conversation → workflow → state → turn
+
+  ## Konvensi
+  - Conventional commits
+  - Frontend lint: Biome (no any, no console.*)
+  - Backend: go vet, idiomatic Go
+  - Source of truth: MAIN_PRD.md
+
+# Per-artifact rules (opsional)
+rules:
+  proposal:
+    - Keep proposals focused and reference PRD sections where relevant
+    - Always include a "Non-goals" section
+  tasks:
+    - Break tasks into chunks of max 2 hours
