@@ -1,0 +1,34 @@
+# Multi-stage build for the OpenState MCP server (apps/api/cmd/mcp-server).
+# Follows ops-docker conventions: builder + minimal alpine runner, non-root user.
+
+# --- Stage 1: builder ---
+FROM golang:1.26-alpine AS builder
+
+WORKDIR /app
+
+# Copy go workspace files (go.work + go-shared + api module)
+COPY go.work go.work.sum* ./
+COPY packages/go-shared/ ./packages/go-shared/
+COPY apps/api/ ./apps/api/
+
+# Build the MCP server binary
+WORKDIR /app/apps/api
+RUN go build -o /bin/mcp-server ./cmd/mcp-server/main.go
+
+# --- Stage 2: runner ---
+FROM alpine:3.20
+
+RUN apk --no-cache add ca-certificates tzdata
+
+# Run as non-root
+RUN addgroup -S openstate && adduser -S openstate -G openstate
+USER openstate
+
+WORKDIR /app
+COPY --from=builder /bin/mcp-server .
+
+ENV MCP_PORT=8030
+
+EXPOSE 8030
+
+CMD ["./mcp-server"]
