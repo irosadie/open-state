@@ -2,14 +2,14 @@
   "$schema": "Project-specific configuration for agents. Update this file when copying to another project.",
 
   "project": {
-    "name": "vibecoding-starter",
-    "description": "Public monorepo starter for vibe coding workflow",
+    "name": "openstate",
+    "description": "Open-source enterprise Conversation State Orchestration Platform",
     "version": "0.1.0"
   },
 
   "repo": {
-    "owner": "",
-    "name": "vibecoding-starter"
+    "owner": "irosadie",
+    "name": "open-state"
   },
 
   "stack": {
@@ -40,13 +40,9 @@
 
   "onboarding": {
     "startCommands": [
-      "mulai",
-      "start",
-      "mulai vibe coding",
-      "start vibe coding",
-      "mulai dulu",
-      "yuk mulai"
-    ],
+            "start",
+            "start vibe coding",
+                ],
     "statusScript": "scripts/start-session.mjs",
     "mcpConfigPath": ".mcp.json",
     "preferredNextSteps": [

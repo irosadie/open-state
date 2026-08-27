@@ -35,7 +35,7 @@ You have access to these tools' functions. Use them when appropriate for better 
 ## Monorepo Structure
 
 ```
-vibecoding-starter/
+open-state/
 ├── apps/
 │   ├── web/      → Next.js frontend (App Router)
 │   ├── api/      → Go backend (Echo + sqlc + goose, Clean Architecture)
@@ -125,7 +125,6 @@ vibecoding-starter/
 | `docs-openapi` | Docs | Write or update split OpenAPI documentation per feature |
 | `ops-docker` | Ops | Write or modify backend Dockerfile for Linux deployment |
 | `ops-mcp-setup` | Ops | Setup GitHub MCP for this repo's workflow |
-| `flow-session-start` | Flow | Handle Start/Mulai command for repo onboarding |
 | `meta-skill-hygiene` | Meta | Audit and maintain skill metadata consistency |
 | `skill-add-example` | Meta | Add reusable example code for other skills |
 | `skill-creator` | Meta | Create or update skills with consistent format |
@@ -169,8 +168,6 @@ For feature work, bug fixes with business logic impact, or refactoring: **always
 
 If the user only types:
 - `Start`
-- `Mulai`
-- `Mulai Vibe Coding`
 - or similar start session variants
 
 then **MUST** treat it as an onboarding session, not a direct implementation task.
@@ -267,8 +264,8 @@ export const statuses = ['ACTIVE', 'INACTIVE', 'ON_PROGRESS'] as const
 export type Status = (typeof statuses)[number]
 ```
 
-- **FE schema/form**: import `as const` array + `z.enum()` from `@vibecoding-starter/schemas`
-- **FE types**: import type from `@vibecoding-starter/schemas`
+- **FE schema/form**: import `as const` array + `z.enum()` from `@openstate/schemas`
+- **FE types**: import type from `@openstate/schemas`
 
 **Backend (Go)** — declare as typed Go constants in the domain layer:
 
@@ -281,7 +278,7 @@ const (
 )
 ```
 
-- **Go entity/DTO**: use typed Go constants — never import from `@vibecoding-starter/schemas`
+- **Go entity/DTO**: use typed Go constants — never import from `@openstate/schemas`
 - **DB**: use `VARCHAR` column, validated via Go typed constant at application layer
 
 ### Simplicity First
@@ -428,7 +425,6 @@ packages/go-shared/  → Shared Go module (DomainError) — used by apps/api + a
 - For skill `docs-openapi`: `.agents/skills/docs-openapi/SKILL.md`
 - For skill `ops-docker`: `.agents/skills/ops-docker/SKILL.md`
 - For skill `ops-mcp-setup`: `.agents/skills/ops-mcp-setup/SKILL.md`
-- For skill `flow-session-start`: `.agents/skills/flow-session-start/SKILL.md`
 - For skill `meta-skill-hygiene`: `.agents/skills/meta-skill-hygiene/SKILL.md`
 - For skill `skill-add-example`: `.agents/skills/skill-add-example/SKILL.md`
 - For skill `skill-creator`: `.agents/skills/skill-creator/SKILL.md`
