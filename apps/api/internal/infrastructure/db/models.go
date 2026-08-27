@@ -99,6 +99,20 @@ func (ns NullUserStatus) Value() (driver.Value, error) {
 	return string(ns.UserStatus), nil
 }
 
+type AuditLog struct {
+	ID            uuid.UUID             `json:"id"`
+	TenantID      uuid.UUID             `json:"tenant_id"`
+	Actor         string                `json:"actor"`
+	Action        string                `json:"action"`
+	ResourceType  string                `json:"resource_type"`
+	ResourceID    string                `json:"resource_id"`
+	Before        pqtype.NullRawMessage `json:"before"`
+	After         pqtype.NullRawMessage `json:"after"`
+	CorrelationID sql.NullString        `json:"correlation_id"`
+	OccurredAt    time.Time             `json:"occurred_at"`
+	CreatedAt     time.Time             `json:"created_at"`
+}
+
 type AuthSession struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"user_id"`

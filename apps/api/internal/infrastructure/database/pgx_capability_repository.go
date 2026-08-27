@@ -18,7 +18,14 @@ type PgxCapabilityRepository struct {
 // NewPgxCapabilityRepository returns a PostgreSQL-backed ICapabilityRepository.
 func NewPgxCapabilityRepository(pool *pgxpool.Pool) repositories.ICapabilityRepository {
 	sqlDB := stdlib.OpenDBFromPool(pool)
-	return &PgxCapabilityRepository{queries: db.New(sqlDB)}
+	return newPgxCapabilityRepository(db.New(sqlDB))
+}
+
+// newPgxCapabilityRepository builds an ICapabilityRepository from a sqlc queries
+// handle. It enables the composed PostgresAdapter to bind this repository to a
+// shared transaction via WithTx.
+func newPgxCapabilityRepository(q *db.Queries) repositories.ICapabilityRepository {
+	return &PgxCapabilityRepository{queries: q}
 }
 
 func (r *PgxCapabilityRepository) Create(ctx context.Context, tenantID, name string, description *string, providerType entities.ProviderType, providerID *string, inputSchema, outputSchema []byte, version int, credentialReference *string) (*entities.Capability, error) {
@@ -72,6 +79,52 @@ func (r *PgxCapabilityRepository) ListByTenant(ctx context.Context, tenantID str
 		out = append(out, *mapCapability(row))
 	}
 	return out, nil
+}
+
+func (r *PgxCapabilityRepository) ListByTenantFiltered(ctx context.Context, tenantID string, providerType entities.ProviderType, capStatus entities.CapabilityStatus) ([]entities.Capability, error) {
+	rows, err := r.queries.ListCapabilitiesByTenantFiltered(ctx, db.ListCapabilitiesByTenantFilteredParams{
+		TenantID: mustUUID(tenantID),
+		Column2:  string(providerType),
+		Column3:  string(capStatus),
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]entities.Capability, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, *mapCapability(row))
+	}
+	return out, nil
+}
+
+func (r *PgxCapabilityRepository) Update(ctx context.Context, tenantID, id string, description *string, providerType entities.ProviderType, providerID *string, inputSchema, outputSchema []byte, status entities.CapabilityStatus, version int, credentialReference *string) (*entities.Capability, error) {
+	row, err := r.queries.UpdateCapability(ctx, db.UpdateCapabilityParams{
+		ID:                  mustUUID(id),
+		TenantID:            mustUUID(tenantID),
+		Description:         nullString(description),
+		ProviderType:        string(providerType),
+		ProviderID:          nullString(providerID),
+		InputSchema:         inputSchema,
+		OutputSchema:        outputSchema,
+		Status:              string(status),
+		Version:             int32(version),
+		CredentialReference: nullString(credentialReference),
+	})
+	if err != nil {
+		return nil, mapNotFound(err, "capability")
+	}
+	return mapCapability(row), nil
+}
+
+func (r *PgxCapabilityRepository) Disable(ctx context.Context, tenantID, id string) (*entities.Capability, error) {
+	row, err := r.queries.DisableCapability(ctx, db.DisableCapabilityParams{
+		ID:       mustUUID(id),
+		TenantID: mustUUID(tenantID),
+	})
+	if err != nil {
+		return nil, mapNotFound(err, "capability")
+	}
+	return mapCapability(row), nil
 }
 
 func (r *PgxCapabilityRepository) UpdateStatus(ctx context.Context, tenantID, id string, status entities.CapabilityStatus) (*entities.Capability, error) {
@@ -129,6 +182,17 @@ func (r *PgxCapabilityRepository) ListBindingsByScope(ctx context.Context, tenan
 		out = append(out, *mapCapabilityBinding(row))
 	}
 	return out, nil
+}
+
+func (r *PgxCapabilityRepository) Unbind(ctx context.Context, tenantID, bindingID string) error {
+	_, err := r.queries.DeleteBinding(ctx, db.DeleteBindingParams{
+		ID:       mustUUID(bindingID),
+		TenantID: mustUUID(tenantID),
+	})
+	if err != nil {
+		return mapNotFound(err, "binding")
+	}
+	return nil
 }
 
 func (r *PgxCapabilityRepository) UpsertPolicy(ctx context.Context, tenantID string, scopeType entities.PolicyScopeType, scopeID, policyType string, content []byte) (*entities.Policy, error) {

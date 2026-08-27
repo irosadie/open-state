@@ -21,6 +21,34 @@ FROM capabilities
 WHERE tenant_id = $1
 ORDER BY created_at DESC;
 
+-- name: ListCapabilitiesByTenantFiltered :many
+SELECT id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+FROM capabilities
+WHERE tenant_id = $1
+  AND ($2::VARCHAR = '' OR provider_type = $2)
+  AND ($3::VARCHAR = '' OR status = $3)
+ORDER BY created_at DESC;
+
+-- name: UpdateCapability :one
+UPDATE capabilities
+SET description = $3,
+    provider_type = $4,
+    provider_id = $5,
+    input_schema = $6,
+    output_schema = $7,
+    status = $8,
+    version = $9,
+    credential_reference = $10,
+    updated_at = NOW()
+WHERE id = $1 AND tenant_id = $2
+RETURNING id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at;
+
+-- name: DisableCapability :one
+UPDATE capabilities
+SET status = 'DISABLED', updated_at = NOW()
+WHERE id = $1 AND tenant_id = $2
+RETURNING id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at;
+
 -- name: UpdateCapabilityStatus :one
 UPDATE capabilities
 SET status = $3, updated_at = NOW()
@@ -43,6 +71,11 @@ SELECT id, tenant_id, capability_id, scope_type, scope_id, permission, created_a
 FROM capability_bindings
 WHERE scope_type = $1 AND scope_id = $2 AND tenant_id = $3
 ORDER BY capability_id ASC;
+
+-- name: DeleteBinding :one
+DELETE FROM capability_bindings
+WHERE id = $1 AND tenant_id = $2
+RETURNING id, tenant_id, capability_id, scope_type, scope_id, permission, created_at, updated_at;
 
 -- name: UpsertPolicy :one
 INSERT INTO policies (tenant_id, scope_type, scope_id, type, content)

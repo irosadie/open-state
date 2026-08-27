@@ -53,7 +53,14 @@ func (f *fakeCapabilityRepo) ListByTenant(_ context.Context, _ string) ([]entiti
 	}
 	return out, nil
 }
+func (f *fakeCapabilityRepo) ListByTenantFiltered(_ context.Context, _ string, _ entities.ProviderType, _ entities.CapabilityStatus) ([]entities.Capability, error) {
+	return f.ListByTenant(context.Background(), "")
+}
+func (f *fakeCapabilityRepo) Update(_ context.Context, _ string, _ string, _ *string, _ entities.ProviderType, _ *string, _, _ []byte, _ entities.CapabilityStatus, _ int, _ *string) (*entities.Capability, error) {
+	return nil, nil
+}
 func (f *fakeCapabilityRepo) UpdateStatus(_ context.Context, _, _ string, _ entities.CapabilityStatus) (*entities.Capability, error) { return nil, nil }
+func (f *fakeCapabilityRepo) Disable(_ context.Context, _, _ string) (*entities.Capability, error)                                { return nil, nil }
 func (f *fakeCapabilityRepo) Bind(_ context.Context, _, _ string, st entities.BindingScopeType, _ string, perm entities.BindingPermission) (*entities.CapabilityBinding, error) {
 	f.bindings = append(f.bindings, entities.CapabilityBinding{ScopeType: st, Permission: perm})
 	return nil, nil
@@ -62,6 +69,7 @@ func (f *fakeCapabilityRepo) ListBindingsByCapability(_ context.Context, _, _ st
 func (f *fakeCapabilityRepo) ListBindingsByScope(_ context.Context, _ string, _ entities.BindingScopeType, _ string) ([]entities.CapabilityBinding, error) {
 	return f.bindings, nil
 }
+func (f *fakeCapabilityRepo) Unbind(_ context.Context, _, _ string) error { return nil }
 func (f *fakeCapabilityRepo) UpsertPolicy(_ context.Context, _ string, _ entities.PolicyScopeType, _, _ string, _ []byte) (*entities.Policy, error) { return nil, nil }
 func (f *fakeCapabilityRepo) FindPolicyByType(_ context.Context, _ string, _ entities.PolicyScopeType, _, _ string) (*entities.Policy, error)       { return nil, nil }
 func (f *fakeCapabilityRepo) ListPoliciesByScope(_ context.Context, _ string, _ entities.PolicyScopeType, _ string) ([]entities.Policy, error)     { return nil, nil }

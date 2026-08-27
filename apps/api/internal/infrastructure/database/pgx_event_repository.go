@@ -20,7 +20,14 @@ type PgxEventRepository struct {
 // NewPgxEventRepository returns a PostgreSQL-backed IEventRepository.
 func NewPgxEventRepository(pool *pgxpool.Pool) repositories.IEventRepository {
 	sqlDB := stdlib.OpenDBFromPool(pool)
-	return &PgxEventRepository{queries: db.New(sqlDB)}
+	return newPgxEventRepository(db.New(sqlDB))
+}
+
+// newPgxEventRepository builds an IEventRepository from a sqlc queries handle.
+// It enables the composed PostgresAdapter to bind this repository to a shared
+// transaction via WithTx.
+func newPgxEventRepository(q *db.Queries) repositories.IEventRepository {
+	return &PgxEventRepository{queries: q}
 }
 
 func (r *PgxEventRepository) Append(ctx context.Context, tenantID string, input repositories.AppendEventInput) (*entities.Event, error) {

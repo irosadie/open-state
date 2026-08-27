@@ -100,6 +100,66 @@ func (q *Queries) CreateCapability(ctx context.Context, arg CreateCapabilityPara
 	return i, err
 }
 
+const deleteBinding = `-- name: DeleteBinding :one
+DELETE FROM capability_bindings
+WHERE id = $1 AND tenant_id = $2
+RETURNING id, tenant_id, capability_id, scope_type, scope_id, permission, created_at, updated_at
+`
+
+type DeleteBindingParams struct {
+	ID       uuid.UUID `json:"id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) DeleteBinding(ctx context.Context, arg DeleteBindingParams) (CapabilityBinding, error) {
+	row := q.db.QueryRowContext(ctx, deleteBinding, arg.ID, arg.TenantID)
+	var i CapabilityBinding
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CapabilityID,
+		&i.ScopeType,
+		&i.ScopeID,
+		&i.Permission,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const disableCapability = `-- name: DisableCapability :one
+UPDATE capabilities
+SET status = 'DISABLED', updated_at = NOW()
+WHERE id = $1 AND tenant_id = $2
+RETURNING id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+`
+
+type DisableCapabilityParams struct {
+	ID       uuid.UUID `json:"id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) DisableCapability(ctx context.Context, arg DisableCapabilityParams) (Capability, error) {
+	row := q.db.QueryRowContext(ctx, disableCapability, arg.ID, arg.TenantID)
+	var i Capability
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Name,
+		&i.Description,
+		&i.ProviderType,
+		&i.ProviderID,
+		&i.InputSchema,
+		&i.OutputSchema,
+		&i.Status,
+		&i.Version,
+		&i.CredentialReference,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const findCapabilityByID = `-- name: FindCapabilityByID :one
 SELECT id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
 FROM capabilities
@@ -334,6 +394,58 @@ func (q *Queries) ListCapabilitiesByTenant(ctx context.Context, tenantID uuid.UU
 	return items, nil
 }
 
+const listCapabilitiesByTenantFiltered = `-- name: ListCapabilitiesByTenantFiltered :many
+SELECT id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+FROM capabilities
+WHERE tenant_id = $1
+  AND ($2::VARCHAR = '' OR provider_type = $2)
+  AND ($3::VARCHAR = '' OR status = $3)
+ORDER BY created_at DESC
+`
+
+type ListCapabilitiesByTenantFilteredParams struct {
+	TenantID uuid.UUID `json:"tenant_id"`
+	Column2  string    `json:"column_2"`
+	Column3  string    `json:"column_3"`
+}
+
+func (q *Queries) ListCapabilitiesByTenantFiltered(ctx context.Context, arg ListCapabilitiesByTenantFilteredParams) ([]Capability, error) {
+	rows, err := q.db.QueryContext(ctx, listCapabilitiesByTenantFiltered, arg.TenantID, arg.Column2, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Capability
+	for rows.Next() {
+		var i Capability
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Name,
+			&i.Description,
+			&i.ProviderType,
+			&i.ProviderID,
+			&i.InputSchema,
+			&i.OutputSchema,
+			&i.Status,
+			&i.Version,
+			&i.CredentialReference,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPoliciesByScope = `-- name: ListPoliciesByScope :many
 SELECT id, tenant_id, scope_type, scope_id, type, content, created_at, updated_at
 FROM policies
@@ -377,6 +489,66 @@ func (q *Queries) ListPoliciesByScope(ctx context.Context, arg ListPoliciesBySco
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateCapability = `-- name: UpdateCapability :one
+UPDATE capabilities
+SET description = $3,
+    provider_type = $4,
+    provider_id = $5,
+    input_schema = $6,
+    output_schema = $7,
+    status = $8,
+    version = $9,
+    credential_reference = $10,
+    updated_at = NOW()
+WHERE id = $1 AND tenant_id = $2
+RETURNING id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+`
+
+type UpdateCapabilityParams struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+}
+
+func (q *Queries) UpdateCapability(ctx context.Context, arg UpdateCapabilityParams) (Capability, error) {
+	row := q.db.QueryRowContext(ctx, updateCapability,
+		arg.ID,
+		arg.TenantID,
+		arg.Description,
+		arg.ProviderType,
+		arg.ProviderID,
+		arg.InputSchema,
+		arg.OutputSchema,
+		arg.Status,
+		arg.Version,
+		arg.CredentialReference,
+	)
+	var i Capability
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Name,
+		&i.Description,
+		&i.ProviderType,
+		&i.ProviderID,
+		&i.InputSchema,
+		&i.OutputSchema,
+		&i.Status,
+		&i.Version,
+		&i.CredentialReference,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const updateCapabilityStatus = `-- name: UpdateCapabilityStatus :one

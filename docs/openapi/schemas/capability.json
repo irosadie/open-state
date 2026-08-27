@@ -1,0 +1,136 @@
+{
+  "Capability": {
+    "type": "object",
+    "required": ["id", "tenantId", "name", "providerType", "status", "version", "createdAt", "updatedAt"],
+    "properties": {
+      "id": { "type": "string" },
+      "tenantId": { "type": "string" },
+      "name": { "type": "string", "description": "Logical capability, e.g. payment.create" },
+      "description": { "type": ["string", "null"] },
+      "providerType": { "type": "string", "enum": ["MCP", "INTERNAL", "HTTP", "FUTURE"] },
+      "providerId": { "type": ["string", "null"] },
+      "inputSchema": {},
+      "outputSchema": {},
+      "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "DISABLED"] },
+      "version": { "type": "integer" },
+      "credentialReference": {
+        "type": ["string", "null"],
+        "description": "Reference to a stored credential. Secret values are NEVER returned."
+      },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "CreateCapabilityRequest": {
+    "type": "object",
+    "required": ["name", "providerType"],
+    "properties": {
+      "name": { "type": "string" },
+      "description": { "type": "string" },
+      "providerType": { "type": "string", "enum": ["MCP", "INTERNAL", "HTTP", "FUTURE"] },
+      "providerId": { "type": "string" },
+      "inputSchema": {},
+      "outputSchema": {},
+      "version": { "type": "integer", "default": 1 },
+      "credentialReference": { "type": "string" }
+    }
+  },
+  "UpdateCapabilityRequest": {
+    "type": "object",
+    "properties": {
+      "description": { "type": "string" },
+      "providerType": { "type": "string", "enum": ["MCP", "INTERNAL", "HTTP", "FUTURE"] },
+      "providerId": { "type": "string" },
+      "inputSchema": {},
+      "outputSchema": {},
+      "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "DISABLED"] },
+      "version": { "type": "integer", "default": 1 },
+      "credentialReference": { "type": "string" }
+    }
+  },
+  "CapabilityBinding": {
+    "type": "object",
+    "required": ["id", "tenantId", "capabilityId", "scopeType", "scopeId", "permission"],
+    "properties": {
+      "id": { "type": "string" },
+      "tenantId": { "type": "string" },
+      "capabilityId": { "type": "string" },
+      "scopeType": { "type": "string", "enum": ["TENANT", "WORKFLOW", "STATE"] },
+      "scopeId": { "type": "string" },
+      "permission": { "type": "string", "enum": ["ALLOW", "DENY"] },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "CreateBindingRequest": {
+    "type": "object",
+    "required": ["scopeType", "scopeId"],
+    "properties": {
+      "scopeType": { "type": "string", "enum": ["TENANT", "WORKFLOW", "STATE"] },
+      "scopeId": { "type": "string" },
+      "permission": { "type": "string", "enum": ["ALLOW", "DENY"], "default": "ALLOW" }
+    }
+  },
+  "TestInvocationRequest": {
+    "type": "object",
+    "required": ["payload"],
+    "properties": {
+      "payload": { "type": "object" },
+      "scopeId": { "type": "string", "description": "Optional workflow/state scope for binding resolution" }
+    }
+  },
+  "InvocationResult": {
+    "type": "object",
+    "required": ["data", "fromMock"],
+    "properties": {
+      "data": { "type": "object" },
+      "fromMock": { "type": "boolean", "description": "True when executed via the mock/sandbox provider" },
+      "durationMs": { "type": "integer" },
+      "event": { "type": ["string", "null"], "description": "Deterministic capability event code" }
+    }
+  },
+  "CapabilityError": {
+    "type": "object",
+    "required": ["code", "message"],
+    "properties": {
+      "code": { "type": "string" },
+      "message": { "type": "string" },
+      "kind": { "type": "string", "enum": ["TIMEOUT", "UNAUTHORIZED", "VALIDATION", "UNAVAILABLE", "BUSINESS", "EXTERNAL", "INTERNAL"] }
+    }
+  },
+  "ValidationError": {
+    "type": "object",
+    "required": ["error"],
+    "properties": {
+      "error": { "type": "string" }
+    }
+  },
+  "NotFoundError": {
+    "type": "object",
+    "required": ["error"],
+    "properties": {
+      "error": { "type": "string" }
+    }
+  },
+  "ConflictError": {
+    "type": "object",
+    "required": ["error"],
+    "properties": {
+      "error": { "type": "string" }
+    }
+  },
+  "UnauthorizedError": {
+    "type": "object",
+    "required": ["error"],
+    "properties": {
+      "error": { "type": "string" }
+    }
+  },
+  "ForbiddenError": {
+    "type": "object",
+    "required": ["error"],
+    "properties": {
+      "error": { "type": "string" }
+    }
+  }
+}

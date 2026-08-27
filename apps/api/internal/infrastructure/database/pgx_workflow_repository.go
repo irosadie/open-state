@@ -27,7 +27,15 @@ type PgxWorkflowRepository struct {
 // NewPgxWorkflowRepository returns a PostgreSQL-backed IWorkflowRepository.
 func NewPgxWorkflowRepository(pool *pgxpool.Pool) repositories.IWorkflowRepository {
 	sqlDB := stdlib.OpenDBFromPool(pool)
-	return &PgxWorkflowRepository{queries: db.New(sqlDB), db: sqlDB}
+	return newPgxWorkflowRepository(db.New(sqlDB), sqlDB)
+}
+
+// newPgxWorkflowRepository builds an IWorkflowRepository from a sqlc queries
+// handle and the underlying *sql.DB (used for the repo's own standalone
+// transactions). It enables the composed PostgresAdapter to bind this repository
+// to a shared transaction via WithTx.
+func newPgxWorkflowRepository(q *db.Queries, sqlDB *sql.DB) repositories.IWorkflowRepository {
+	return &PgxWorkflowRepository{queries: q, db: sqlDB}
 }
 
 func (r *PgxWorkflowRepository) Create(ctx context.Context, tenantID, projectID, slug, name string, description *string) (*entities.Workflow, error) {

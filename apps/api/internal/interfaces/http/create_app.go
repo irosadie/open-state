@@ -13,6 +13,7 @@ import (
 func CreateApp(
 	authCtrl *controllers.AuthController,
 	systemCtrl *controllers.SystemController,
+	capabilityCtrl *controllers.CapabilityController,
 	repo repositories.IAuthRepository,
 	tokenSvc services.TokenService,
 ) *echo.Echo {
@@ -29,6 +30,7 @@ func CreateApp(
 	// Routes
 	routes.RegisterSystemRoutes(e, systemCtrl)
 	routes.RegisterAuthRoutes(e, authCtrl, repo, tokenSvc)
+	routes.RegisterCapabilityRoutes(e, capabilityCtrl, repo, tokenSvc)
 
 	return e
 }

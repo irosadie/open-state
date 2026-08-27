@@ -1,0 +1,385 @@
+{
+  "/capabilities": {
+    "get": {
+      "tags": ["Capability"],
+      "summary": "List capabilities",
+      "description": "Returns the tenant-scoped capability registry, optionally filtered by provider type and status.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "providerType",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": ["MCP", "INTERNAL", "HTTP", "FUTURE"]
+          }
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE", "DISABLED"]
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Tenant capability registry",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/Capability" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "422": { "$ref": "#/components/schemas/CapabilityError" }
+      }
+    },
+    "post": {
+      "tags": ["Capability"],
+      "summary": "Register a capability",
+      "description": "Registers a capability scoped to the tenant. Secrets are never accepted or returned; only credential_reference.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/CreateCapabilityRequest" }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Capability created",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": { "$ref": "#/components/schemas/Capability" }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "409": { "$ref": "#/components/schemas/ConflictError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    }
+  },
+  "/capabilities/{id}": {
+    "get": {
+      "tags": ["Capability"],
+      "summary": "Get a capability",
+      "description": "Returns a single tenant-scoped capability.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Capability found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": { "$ref": "#/components/schemas/Capability" }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    },
+    "patch": {
+      "tags": ["Capability"],
+      "summary": "Update a capability",
+      "description": "Updates mutable fields of a tenant-scoped capability.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/UpdateCapabilityRequest" }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Capability updated",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": { "$ref": "#/components/schemas/Capability" }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    },
+    "delete": {
+      "tags": ["Capability"],
+      "summary": "Disable a capability",
+      "description": "Disables (removes) a tenant-scoped capability and its bindings.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Capability disabled",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    }
+  },
+  "/capabilities/{id}/bindings": {
+    "get": {
+      "tags": ["Capability"],
+      "summary": "List bindings for a capability",
+      "description": "Returns the tenant-scoped bindings of a capability.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Capability bindings",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/CapabilityBinding" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    },
+    "post": {
+      "tags": ["Capability"],
+      "summary": "Create a binding",
+      "description": "Binds a capability to a tenant/workflow/state scope with an allow/deny permission.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/CreateBindingRequest" }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Binding created",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": { "$ref": "#/components/schemas/CapabilityBinding" }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "409": { "$ref": "#/components/schemas/ConflictError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    }
+  },
+  "/capabilities/{id}/test": {
+    "post": {
+      "tags": ["Capability"],
+      "summary": "Test-invoke a capability",
+      "description": "Runs a capability through the security chain in mock/sandbox mode and returns the normalized result. Never triggers live external side effects.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/TestInvocationRequest" }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Mock invocation result",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": { "$ref": "#/components/schemas/InvocationResult" }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    }
+  },
+  "/bindings/{id}": {
+    "delete": {
+      "tags": ["Capability"],
+      "summary": "Remove a binding",
+      "description": "Removes a tenant-scoped capability binding.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Binding removed",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    }
+  }
+}

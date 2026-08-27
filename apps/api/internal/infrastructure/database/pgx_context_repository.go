@@ -18,7 +18,14 @@ type PgxContextRepository struct {
 // NewPgxContextRepository returns a PostgreSQL-backed IContextRepository.
 func NewPgxContextRepository(pool *pgxpool.Pool) repositories.IContextRepository {
 	sqlDB := stdlib.OpenDBFromPool(pool)
-	return &PgxContextRepository{queries: db.New(sqlDB)}
+	return newPgxContextRepository(db.New(sqlDB))
+}
+
+// newPgxContextRepository builds an IContextRepository from a sqlc queries handle.
+// It enables the composed PostgresAdapter to bind this repository to a shared
+// transaction via WithTx.
+func newPgxContextRepository(q *db.Queries) repositories.IContextRepository {
+	return &PgxContextRepository{queries: q}
 }
 
 func (r *PgxContextRepository) UpsertContext(ctx context.Context, tenantID string, scopeType entities.ContextScopeType, scopeID, key string, value []byte, expectedVersion int) (*entities.ContextRecord, error) {

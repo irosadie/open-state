@@ -6,6 +6,7 @@ import (
 
 	"github.com/irosadie/open-state/api/internal/application/services"
 	usecases "github.com/irosadie/open-state/api/internal/application/use-cases"
+	infracap "github.com/irosadie/open-state/api/internal/infrastructure/capability"
 	"github.com/irosadie/open-state/api/internal/infrastructure/config"
 	infradb "github.com/irosadie/open-state/api/internal/infrastructure/database"
 	infrasvc "github.com/irosadie/open-state/api/internal/infrastructure/services"
@@ -28,9 +29,16 @@ func main() {
 
 	// Infrastructure
 	authRepo := infradb.NewPgxAuthRepository(pool)
+	// Composed persistence port (ADR-001): the single pgx-backed adapter exposing
+	// all six repository interfaces (workflow, instance, event, context,
+	// capability, audit). Application/engine services depend on these interfaces;
+	// the adapter is the portability seam. Constructed here to establish the
+	// dependency wiring and consumed by subsequent slices.
+	adapter := infradb.NewPostgresAdapter(pool)
 	tokenSvc := infrasvc.NewJwtTokenService(cfg.JWTSecret)
 	storageSvc := infrasvc.NewLocalStorageService()
 	_ = storageSvc
+	_ = adapter
 
 	// Use cases
 	registerUC := usecases.NewRegisterUserUseCase(authRepo, tokenSvc)
@@ -40,15 +48,19 @@ func main() {
 	healthUC := usecases.NewGetHealthUseCase()
 	appInfoUC := usecases.NewGetAppInfoUseCase()
 
+	// Capability admin service (tenant-scoped registry + bindings + sandbox test)
+	capSvc := services.NewCapabilityService(adapter.Capabilities(), infracap.MockProviderResolver{}, infracap.JSONSchemaValidator{})
+
 	// Services
 	authSvc := services.NewAuthService(registerUC, loginUC, logoutUC, getMeUC)
 
 	// Controllers
 	authCtrl := controllers.NewAuthController(authSvc)
 	systemCtrl := controllers.NewSystemController(healthUC, appInfoUC)
+	capCtrl := controllers.NewCapabilityController(capSvc)
 
 	// Echo app
-	e := http.CreateApp(authCtrl, systemCtrl, authRepo, tokenSvc)
+	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, authRepo, tokenSvc)
 
 	log.Printf("starting server on :%s", cfg.Port)
 	if err := e.Start(":" + cfg.Port); err != nil {

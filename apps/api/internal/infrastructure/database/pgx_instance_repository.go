@@ -23,7 +23,15 @@ type PgxInstanceRepository struct {
 // NewPgxInstanceRepository returns a PostgreSQL-backed IInstanceRepository.
 func NewPgxInstanceRepository(pool *pgxpool.Pool) repositories.IInstanceRepository {
 	sqlDB := stdlib.OpenDBFromPool(pool)
-	return &PgxInstanceRepository{queries: db.New(sqlDB), db: sqlDB}
+	return newPgxInstanceRepository(db.New(sqlDB), sqlDB)
+}
+
+// newPgxInstanceRepository builds an IInstanceRepository from a sqlc queries
+// handle and the underlying *sql.DB (used for the repo's own standalone
+// transactions). It enables the composed PostgresAdapter to bind this repository
+// to a shared transaction via WithTx.
+func newPgxInstanceRepository(q *db.Queries, sqlDB *sql.DB) repositories.IInstanceRepository {
+	return &PgxInstanceRepository{queries: q, db: sqlDB}
 }
 
 func (r *PgxInstanceRepository) Create(ctx context.Context, tenantID string, input repositories.CreateWorkflowInstanceInput) (*entities.WorkflowInstance, error) {
