@@ -3,7 +3,7 @@
 import {
   type CurrencyFormatProps,
   currencyFormat as currencyFormatFn,
-} from "@vibecoding-starter/utils/currency-format"
+} from "@openstate/utils/currency-format"
 import type React from "react"
 import { type ChangeEvent, type FC, Fragment, useEffect, useState } from "react"
 import { Input, type InputProps } from "../input"

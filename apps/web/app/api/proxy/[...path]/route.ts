@@ -1,6 +1,6 @@
 import { authConfig } from "$/configs/auth"
 import { serverAuthConfig } from "$/configs/auth-server"
-import type { AuthTokensResponse } from "@vibecoding-starter/types"
+import type { AuthTokensResponse } from "@openstate/types"
 import axios, { type AxiosError } from "axios"
 import { encode, getToken } from "next-auth/jwt"
 import { NextResponse } from "next/server"

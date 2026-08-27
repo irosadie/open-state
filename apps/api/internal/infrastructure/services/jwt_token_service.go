@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/vibecoding-starter/api/internal/domain/services"
+	"github.com/irosadie/open-state/api/internal/domain/services"
 	"golang.org/x/crypto/sha3"
 	"encoding/hex"
 )

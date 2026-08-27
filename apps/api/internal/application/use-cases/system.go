@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/vibecoding-starter/api/internal/application/dtos"
+	"github.com/irosadie/open-state/api/internal/application/dtos"
 )
 
 type GetHealthUseCase struct{}
@@ -29,7 +29,7 @@ func (uc *GetAppInfoUseCase) Execute(_ context.Context) *dtos.AppInfoDTO {
 		env = "development"
 	}
 	return &dtos.AppInfoDTO{
-		Name:    "vibecoding-starter",
+		Name:    "openstate",
 		Version: "0.1.0",
 		Env:     env,
 	}

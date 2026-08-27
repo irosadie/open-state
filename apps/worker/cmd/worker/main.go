@@ -4,8 +4,8 @@ import (
 	"log"
 
 	"github.com/hibiken/asynq"
-	"github.com/vibecoding-starter/worker/internal/application/use-cases"
-	"github.com/vibecoding-starter/worker/internal/infrastructure/queue"
+	"github.com/irosadie/open-state/worker/internal/application/use-cases"
+	"github.com/irosadie/open-state/worker/internal/infrastructure/queue"
 )
 
 func main() {

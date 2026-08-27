@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/vibecoding-starter/api/internal/domain/entities"
-	"github.com/vibecoding-starter/api/internal/domain/repositories"
-	"github.com/vibecoding-starter/api/internal/infrastructure/db"
+	"github.com/irosadie/open-state/api/internal/domain/entities"
+	"github.com/irosadie/open-state/api/internal/domain/repositories"
+	"github.com/irosadie/open-state/api/internal/infrastructure/db"
 )
 
 type PgxAuthRepository struct {

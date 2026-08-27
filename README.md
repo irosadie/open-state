@@ -74,8 +74,7 @@ well-defined contracts.
 
 - **Multi-tenant** — tenant isolation at API, service, repository, cache,
   event, and capability layers
-- **Multiple workflows per tenant** — unlimited workflows (ORDER, BOOKING,
-  KONSULTASI, etc.)
+- **Multiple workflows per tenant** —   unlimited workflows (ORDER, BOOKING, CONSULTATION, etc.)
 - **Workflow versioning** — immutable published versions, rollback for new
   instances
 - **State Builder** — visual drag-and-drop flowchart editor (React Flow)
@@ -251,7 +250,7 @@ query / drive workflow state. Tools include:
 - `get_workflow_instances`, `get_history`, `replay_workflow`
 
 > The full MCP tool contract is tracked in the GitHub issue
-> "[MCP & Integrasi] Server MCP + LLM provider + capability".
+> "[MCP & Integration] Server MCP + LLM provider + capability".
 
 ## Example Workflows
 

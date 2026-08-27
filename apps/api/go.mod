@@ -1,4 +1,4 @@
-module github.com/vibecoding-starter/api
+module github.com/irosadie/open-state/api
 
 go 1.26
 
@@ -7,11 +7,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/labstack/echo/v4 v4.13.4
-	github.com/vibecoding-starter/go-shared v0.0.0
 	golang.org/x/crypto v0.38.0
 )
 
 require (
+	github.com/irosadie/open-state/go-shared v0.0.0
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
@@ -27,4 +27,4 @@ require (
 	golang.org/x/time v0.11.0 // indirect
 )
 
-replace github.com/vibecoding-starter/go-shared => ../../packages/go-shared
+replace github.com/irosadie/open-state/go-shared => ../../packages/go-shared

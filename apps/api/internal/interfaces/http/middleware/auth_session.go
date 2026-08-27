@@ -2,8 +2,8 @@ package middleware
 
 import (
 	"github.com/labstack/echo/v4"
-	domain "github.com/vibecoding-starter/go-shared/domain"
-	"github.com/vibecoding-starter/api/internal/domain/repositories"
+	domain "github.com/irosadie/open-state/go-shared/domain"
+	"github.com/irosadie/open-state/api/internal/domain/repositories"
 )
 
 // AuthSession validates that the JWT token has an active DB session.

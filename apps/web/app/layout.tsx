@@ -4,7 +4,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "vibecoding-starter",
+  title: "openstate",
   description:
     "Monorepo boilerplate with Next.js, Hono, worker, and agent flow",
 }

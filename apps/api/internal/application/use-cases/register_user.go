@@ -3,10 +3,10 @@ package usecases
 import (
 	"context"
 
-	domain "github.com/vibecoding-starter/go-shared/domain"
-	"github.com/vibecoding-starter/api/internal/domain/entities"
-	"github.com/vibecoding-starter/api/internal/domain/repositories"
-	"github.com/vibecoding-starter/api/internal/domain/services"
+	domain "github.com/irosadie/open-state/go-shared/domain"
+	"github.com/irosadie/open-state/api/internal/domain/entities"
+	"github.com/irosadie/open-state/api/internal/domain/repositories"
+	"github.com/irosadie/open-state/api/internal/domain/services"
 	"golang.org/x/crypto/bcrypt"
 )
 

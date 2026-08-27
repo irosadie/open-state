@@ -1,4 +1,4 @@
-module github.com/vibecoding-starter/worker
+module github.com/irosadie/open-state/worker
 
 go 1.26
 
@@ -8,6 +8,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/irosadie/open-state/go-shared v0.0.0
 	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
@@ -16,4 +17,4 @@ require (
 	google.golang.org/protobuf v1.35.1 // indirect
 )
 
-replace github.com/vibecoding-starter/go-shared => ../../packages/go-shared
+replace github.com/irosadie/open-state/go-shared => ../../packages/go-shared

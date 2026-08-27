@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/vibecoding-starter/api/internal/application/dtos"
-	appservices "github.com/vibecoding-starter/api/internal/application/services"
-	usecases "github.com/vibecoding-starter/api/internal/application/use-cases"
-	"github.com/vibecoding-starter/api/internal/interfaces/http/middleware"
+	"github.com/irosadie/open-state/api/internal/application/dtos"
+	appservices "github.com/irosadie/open-state/api/internal/application/services"
+	usecases "github.com/irosadie/open-state/api/internal/application/use-cases"
+	"github.com/irosadie/open-state/api/internal/interfaces/http/middleware"
 )
 
 type AuthController struct {

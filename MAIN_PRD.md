@@ -428,7 +428,7 @@ Example:
 
 ```text
 User:
-"Saya mau daftar member"
+"I want to register as a member"
 
 LLM intent:
 REGISTER_MEMBER
@@ -451,7 +451,7 @@ Current:
 REGISTER_MEMBER / VERIFY_PHONE
 
 User:
-"Sekalian saya mau pesan burger."
+"By the way, I'd like to order a burger."
 ```
 
 The system must not automatically destroy `REGISTER_MEMBER`.
@@ -1424,13 +1424,13 @@ This is a product principle, not just a UI nicety — it directly reduces
 friction (fewer clicks, fewer forms, faster completion).
 
 ```text
-User: "booking padel jam 7 besok di cabang A, DP aja"
+User: "book padel 7pm tomorrow at branch A, DP only"
     ↓  intent = BOOKING_PADEL (LLM classification)
-    ↓  SELECT_LOCATION   → cabang A (dari pesan, sudah ada)
-    ↓  CHECK_AVAILABILITY → stok tersedia (MCP)
-    ↓  COLLECT_CUSTOMER  → nama/alamat (dari memory, skip jika ada — PRD 37)
-    ↓  PAYMENT (DP 50%)
-    ↓  DONE — hampir tidak ada klik
+    ↓  SELECT_LOCATION   → branch A (from message, already known)
+    ↓  CHECK_AVAILABILITY → stock available (MCP)
+    ↓  COLLECT_CUSTOMER  → name/address (from memory, skip if known — PRD 37)
+    ↓  PAYMENT (50% DP)
+    ↓  DONE — almost no clicks
 ```
 
 Rules (progressive disclosure):
@@ -1440,8 +1440,8 @@ Rules (progressive disclosure):
 * **Ask only the irreducible minimum**: only request what is genuinely missing
   and cannot be inferred. `missing_context` (PRD 36) is the exact list.
 * **Prefer confirmation over form-filling**: for optional/derivable data, use a
-  confirm ("pesan di cabang A, jam 7?") instead of asking to type it out.
-* **Offer, don't interrogate**: rekomendasi (38.1-38.3) present 1-3 choices so
+  confirm ("book at branch A, 7pm?") instead of asking to type it out.
+* **Offer, don't interrogate**: recommendations (38.1-38.3) present 1-3 choices so
   the user just picks, instead of describing freely.
 * **Single natural-language entry**: user states everything in one message;
   the engine extracts entities (PRD 108) and fills state accordingly.
@@ -1462,7 +1462,7 @@ Example:
 
 ```text
 User:
-"Saya sudah bayar."
+"I already paid."
 
 LLM:
 intent = payment_completed
@@ -1497,20 +1497,20 @@ state = DELIVERY
 When a requested item/product is unavailable, the system should recommend
 alternatives. This is a **data + LLM concern**, not a state-machine concern.
 
-Example (order makanan):
+Example (order food):
 
 ```text
-User: "Saya mau kopi latte."
+User: "I'd like a latte."
      ↓
 CHECK_STOCK (capability: product.check_stock)
-     ↓  product.out_of_stock   (latte kosong)
+     ↓  product.out_of_stock   (latte sold out)
 RECOMMEND_ALTERNATIVE
      ↓  capability: product.suggest_alternatives
-        alternatives = [aren coffee, capucino, mocha]  (kategori kopi)
+        alternatives = [aren coffee, cappuccino, mocha]  (coffee category)
      ↓
-LLM menawarkan alternatif; user memilih aren coffee
+LLM offers alternatives; user picks aren coffee
      ↓  product.selected
-CHECK_STOCK (re-verify stok aren coffee)
+CHECK_STOCK (re-verify aren coffee stock)
      ↓  product.in_stock
 COLLECT_CUSTOMER → ...
 ```
@@ -1533,17 +1533,17 @@ Rules:
 When the user requests a service at a time the provider is not available, the
 system must not fail — it should offer alternatives and/or check the queue.
 
-Example (konsultasi dokter):
+Example (doctor consultation):
 
 ```text
-User: "konsul dokter Raffi hari ini jam 10"
+User: "consult Dr. Raffi today at 10"
      ↓
 CHECK_AVAILABILITY (schedule.check, queue.check)
-     ↓  doctor.schedule_mismatch   (dokter masuk jam 4, bukan jam 10)
+     ↓  doctor.schedule_mismatch   (doctor starts at 4, not 10)
 OFFER_ALTERNATIVE_TIME
-     ↓  user: "sampe jam berapa?" → jam 9
-     ↓  user: "habis maghrib" → sistem cek → FULL BOOKED (slot.full)
-     ↓  sistem: "sebelum maghrib atau jadwal berikutnya?"
+     ↓  user: "until what time?" → 9
+     ↓  user: "after sunset prayer" → system checks → FULL BOOKED (slot.full)
+     ↓  system: "before sunset prayer or the next slot?"
      ↓  user: "cancel" → CANCELLED
 ```
 
@@ -1561,21 +1561,21 @@ Rules:
 
 ## 38.3 Needs-Based Recommendation & Provider Switch
 
-When the user needs a recommendation (e.g., "dokter untuk anak yang ngga mau
-makan") or wants to switch provider mid-flow, the system supports it.
+When the user needs a recommendation (e.g., "doctor for a kid who won't
+eat") or wants to switch provider mid-flow, the system supports it.
 
-Example (ganti dokter):
+Example (switch doctor):
 
 ```text
-User: "konsul dokter gizi" → RECOMMEND_DOCTOR (5 dokter)
-User: "rekom utk anak ngga mau makan"
+User: "consult a nutritionist" → RECOMMEND_DOCTOR (5 doctors)
+User: "recommendation for a kid who won't eat"
      ↓  doctor.recommend
-sistem: dokter A, B, C
-User: pilih dokter A → jam 8 malam
-User: "kemalaman, mau dokter B"
-     ↓  doctor.selected (B) → CHECK_AVAILABILITY (jadwal dokter B)
-sistem: dokter B jam 3-5
-User: jam 4.30 → queue.check → ok → BOOKING_CONFIRMED
+system: doctor A, B, C
+User: pick doctor A → 8pm
+User: "too late, want doctor B"
+     ↓  doctor.selected (B) → CHECK_AVAILABILITY (doctor B's schedule)
+system: doctor B 3-5
+User: 4:30 → queue.check → ok → BOOKING_CONFIRMED
 ```
 
 Rules:
@@ -1647,11 +1647,11 @@ An **Intent Registry** is the formal mapping of user intents → workflows.
 It is the resolution basis MCP uses at the start of a conversation:
 
 ```text
-Percakapan (user message)
+Conversation (user message)
     ↓  (LLM intent classification — PRD 21)
-INTENT (terdefinisi di registry)
+INTENT (defined in registry)
     ↓
-WORKFLOW (state machine untuk intent itu)
+WORKFLOW (state machine for that intent)
     ↓
 INITIAL STATE
 ```
@@ -1662,36 +1662,36 @@ Registry structure:
 IntentRegistry
 ├── schemaVersion
 └── intents[]
-    ├── id              (misal: BOOKING_PADEL)
-    ├── name            (misal: Pemesanan Lapangan Padel)
-    ├── description     (untuk LLM classification)
-    ├── workflowSlug    (workflow yang menangani intent ini)
-    ├── entryEvent      (event trigger awal)
-    ├── examples[]      (contoh frase user, utk training/klasifikasi)
-    └── priority        (tie-breaker saat ambigu, PRD 41)
+    ├── id              (e.g.: BOOKING_PADEL)
+    ├── name            (e.g.: Padel Court Booking)
+    ├── description     (for LLM classification)
+    ├── workflowSlug    (workflow that handles this intent)
+    ├── entryEvent      (initial trigger event)
+    ├── examples[]      (sample user phrases, for training/classification)
+    └── priority        (tie-breaker when ambiguous, PRD 41)
 ```
 
 Rules:
 
-* **Setiap intent terhubung ke SATU workflow** (state machine). Tidak ada
-  intent tanpa workflow.
-* **Intent berbeda-beda per percakapan**: satu percakapan bisa berpindah
-  intent (misal dari ORDER_MAKANAN ke ORDER_DOKTER), masing-masing masuk ke
-  state machine-nya sendiri (PRD 6, 8-C).
-* Resolusi urutan (PRD 39): explicit active workflow → event correlation →
+* **Each intent maps to ONE workflow** (state machine). There is no intent
+  without a workflow.
+* **Intents differ per conversation**: one conversation can switch intents
+  (e.g., from ORDER_FOOD to ORDER_DOCTOR), each entering its own state machine
+  (PRD 6, 8-C).
+* Resolution order (PRD 39): explicit active workflow → event correlation →
   intent-based resolution → clarify.
-* Registry adalah **tenant-scoped** dan **versioned**.
-* MCP tool `resolve_intent` (atau `get_active_workflow`) mengembalikan intent
-  terklasifikasi + workflow + current state kepada LLM.
-* `examples` membantu LLM classification & testing (golden conversation tests,
+* The registry is **tenant-scoped** and **versioned**.
+* MCP tool `resolve_intent` (or `get_active_workflow`) returns the classified
+  intent + workflow + current state to the LLM.
+* `examples` help LLM classification & testing (golden conversation tests,
   PRD 125).
 
-Example intents (tenant kafe):
+Example intents (cafe tenant):
 
 ```text
-BOOKING_PADEL    → workflow: pemesanan-lapangan-padel
-ORDER_MAKANAN    → workflow: order-makanan
-ORDER_DOKTER     → workflow: order-dokter
+BOOKING_PADEL    → workflow: padel-court-booking
+ORDER_FOOD       → workflow: order-food
+ORDER_DOCTOR     → workflow: order-doctor
 ```
 
 ---
@@ -1763,18 +1763,18 @@ It can later resume.
 A workflow must support being **interrupted mid-flow** — not only at a boundary —
 when the user changes their mind about an earlier decision.
 
-Example (order makanan):
+Example (order food):
 
 ```text
-PAYMENT  (user diminta membayar)
-    ↓  product.change_requested   ← user interupsi: "ganti aren jadi sanger"
+PAYMENT  (user asked to pay)
+    ↓  product.change_requested   ← user interrupts: "change aren to sanger"
 CHANGE_PRODUCT
-    ↓  product.available          (cek stok sanger → ada)
+    ↓  product.available          (check sanger stock → available)
 CHECK_STOCK
     ↓  product.in_stock
-COLLECT_CUSTOMER   ← name & address SUDAH ada → JANGAN minta ulang
+COLLECT_CUSTOMER   ← name & address ALREADY exist → DO NOT ask again
     ↓  customer.ready
-PAYMENT  (lanjut, tidak restart dari nol)
+PAYMENT  (continue, does not restart from zero)
 ```
 
 Rules:
@@ -2035,7 +2035,7 @@ Example:
 
 ```text
 Input:
-"Saya mau daftar member"
+"I want to register as a member"
 
 Simulation:
 
@@ -3390,7 +3390,7 @@ Conversation history is context, not state authority.
 
 If conversation text says:
 
-> "Sekarang kita sudah masuk delivery."
+> "We're already in delivery now."
 
 but runtime says:
 
@@ -3684,13 +3684,13 @@ Example:
 
 ```text
 User:
-Saya mau daftar member.
+I want to register as a member.
 
 Expected:
 REGISTER_MEMBER
 
 User:
-Nama saya Budi.
+My name is Budi.
 
 Expected:
 COLLECT_PHONE
@@ -3702,7 +3702,7 @@ Expected:
 VERIFY
 
 User:
-Sudah.
+Done.
 
 Expected:
 FINISH
@@ -4354,7 +4354,7 @@ RAG may answer policy/knowledge.
 User says:
 
 ```text
-"Saya sudah bayar."
+"I already paid."
 ```
 
 LLM proposes:
@@ -4418,7 +4418,7 @@ FINISH
 User:
 
 ```text
-"Saya mau daftar member."
+"I want to register as a member."
 ```
 
 Resolver:
@@ -4460,7 +4460,7 @@ REGISTER_MEMBER / VERIFY
 User:
 
 ```text
-"Sekalian pesan burger."
+"By the way, order a burger."
 ```
 
 Resolver detects:
@@ -5207,15 +5207,15 @@ LLM
 
 The Builder says:
 
-> "PAYMENT membutuhkan capability `payment.create`."
+> "PAYMENT requires the capability `payment.create`."
 
 The Orchestrator says:
 
-> "`payment.create` tersedia melalui MCP provider X dan state PAYMENT memang memiliki izin menggunakannya."
+> "`payment.create` is available through MCP provider X and state PAYMENT is indeed authorized to use it."
 
 The LLM says:
 
-> "Saya perlu menggunakan `payment.create`."
+> "I need to use `payment.create`."
 
 The Orchestrator decides:
 
@@ -5392,7 +5392,7 @@ REFUND
 User says:
 
 ```text
-"Saya mau daftar member."
+"I want to register as a member."
 ```
 
 System:
@@ -5408,7 +5408,7 @@ State
 User:
 
 ```text
-"Nama saya Baim."
+"My name is Baim."
 ```
 
 System:
@@ -5433,7 +5433,7 @@ context.phone = ...
 User:
 
 ```text
-"Eh sekalian pesan burger."
+"By the way, order a burger."
 ```
 
 System:
@@ -5495,7 +5495,7 @@ WAITING_PAYMENT
 User returns:
 
 ```text
-"Sudah bayar sekarang."
+"I've paid now."
 ```
 
 System does NOT blindly trust the LLM.

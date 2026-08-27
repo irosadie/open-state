@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	domain "github.com/vibecoding-starter/go-shared/domain"
-	"github.com/vibecoding-starter/api/internal/application/use-cases"
-	"github.com/vibecoding-starter/api/internal/domain/entities"
+	domain "github.com/irosadie/open-state/go-shared/domain"
+	"github.com/irosadie/open-state/api/internal/application/use-cases"
+	"github.com/irosadie/open-state/api/internal/domain/entities"
 	"golang.org/x/crypto/bcrypt"
 )
 

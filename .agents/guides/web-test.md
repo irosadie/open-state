@@ -33,7 +33,7 @@ utils/
 └── format-currency.test.ts
 ```
 
-### Test Hook dengan react-query
+### Test Hook with react-query
 
 ```typescript
 // hooks/transactions/use-payment-methods/use-data-table.test.ts

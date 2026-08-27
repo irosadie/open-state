@@ -1,12 +1,12 @@
 import { apiRouters, queryKeys } from "$/constants"
 import { axios } from "$/services/axios"
 import type { ErrorResponse } from "$/types/generals"
-import { useMutation } from "@tanstack/react-query"
 import {
   type RegisterPayloadProps,
   registerPayloadSchema,
-} from "@vibecoding-starter/schemas"
-import type { AuthRegisterResponse } from "@vibecoding-starter/types"
+} from "@openstate/schemas"
+import type { AuthRegisterResponse } from "@openstate/types"
+import { useMutation } from "@tanstack/react-query"
 import type { AxiosError } from "axios"
 
 const register = async (payload: RegisterPayloadProps) => {

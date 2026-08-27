@@ -6,7 +6,7 @@ export default function HomeContent() {
       <PanelCard className="rounded-3xl p-2" noPadding>
         <div className="p-8">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-dark">
-            vibecoding-starter
+            openstate
           </p>
           <h1 className="mt-3 text-3xl font-bold text-slate-900">
             Starter kosong untuk mulai vibe coding dari nol

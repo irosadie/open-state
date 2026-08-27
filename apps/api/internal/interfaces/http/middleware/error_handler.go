@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	domain "github.com/vibecoding-starter/go-shared/domain"
+	domain "github.com/irosadie/open-state/go-shared/domain"
 )
 
 // errorCodeToHTTP maps DomainError codes to HTTP status codes.

@@ -3,9 +3,9 @@ package services
 import (
 	"context"
 
-	"github.com/vibecoding-starter/api/internal/application/dtos"
-	usecases "github.com/vibecoding-starter/api/internal/application/use-cases"
-	"github.com/vibecoding-starter/api/internal/domain/entities"
+	"github.com/irosadie/open-state/api/internal/application/dtos"
+	usecases "github.com/irosadie/open-state/api/internal/application/use-cases"
+	"github.com/irosadie/open-state/api/internal/domain/entities"
 )
 
 type AuthService struct {

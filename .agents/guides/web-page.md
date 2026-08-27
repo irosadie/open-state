@@ -38,7 +38,7 @@ app/
 
 > Components that are **only** used in this route go in `_components/`. If used in more than one route, move to `$/components/`.
 
-### `page.tsx` — Thin Wrapper dengan Suspense
+### `page.tsx` — Thin Wrapper with Suspense
 
 ```tsx
 import { Suspense } from 'react'

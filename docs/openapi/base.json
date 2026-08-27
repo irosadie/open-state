@@ -3,7 +3,7 @@
   "info": {
     "title": "Vibecoding Starter API",
     "version": "0.1.0",
-    "description": "Baseline API scaffold for the vibecoding starter monorepo."
+    "description": "OpenState — Enterprise Conversation State Orchestration Platform API."
   },
   "servers": [
     {

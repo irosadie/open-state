@@ -4,7 +4,7 @@ import { Button } from "$/components/button"
 import { Input } from "$/components/input"
 import { PanelCard } from "$/components/panel-card"
 import { authConfig } from "$/configs/auth"
-import { type LoginProps, loginSchema } from "@vibecoding-starter/schemas"
+import { type LoginProps, loginSchema } from "@openstate/schemas"
 import { signIn, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {

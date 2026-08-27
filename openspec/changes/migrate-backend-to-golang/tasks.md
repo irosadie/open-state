@@ -1,7 +1,7 @@
 ## 1. Monorepo & Go Workspace Setup
 
 - [x] 1.1 Create `go.work` at repo root referencing `apps/api`, `apps/worker`, and `packages/go-shared`
-- [x] 1.2 Create `packages/go-shared/` Go module (`module github.com/vibecoding-starter/go-shared`) with `go.mod`
+- [x] 1.2 Create `packages/go-shared/` Go module (`module github.com/irosadie/open-state/go-shared`) with `go.mod`
 - [x] 1.3 Define `DomainError` struct + error codes + constructor helpers in `packages/go-shared/domain/errors.go`
 - [x] 1.4 Update `turbo.json` to exclude Go apps from TypeScript pipeline tasks
 - [x] 1.5 Update root `package.json` scripts to add `go:build` and `go:test` commands for both apps

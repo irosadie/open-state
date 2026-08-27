@@ -2,10 +2,10 @@ package routes
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/vibecoding-starter/api/internal/interfaces/http/controllers"
-	"github.com/vibecoding-starter/api/internal/interfaces/http/middleware"
-	"github.com/vibecoding-starter/api/internal/domain/repositories"
-	"github.com/vibecoding-starter/api/internal/domain/services"
+	"github.com/irosadie/open-state/api/internal/interfaces/http/controllers"
+	"github.com/irosadie/open-state/api/internal/interfaces/http/middleware"
+	"github.com/irosadie/open-state/api/internal/domain/repositories"
+	"github.com/irosadie/open-state/api/internal/domain/services"
 )
 
 func RegisterAuthRoutes(e *echo.Echo, ctrl *controllers.AuthController, repo repositories.IAuthRepository, tokenSvc services.TokenService) {

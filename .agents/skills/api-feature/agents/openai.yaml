@@ -1,6 +1,6 @@
 interface:
   display_name: "API Feature"
-  short_description: "Implementasi fitur backend Clean Architecture"
+  short_description: "Implement backend feature following Clean Architecture"
   default_prompt: "Use $api-feature to implement a backend feature end-to-end following this repository's Clean Architecture conventions."
 policy:
   allow_implicit_invocation: true

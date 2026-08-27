@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/vibecoding-starter/api/internal/domain/entities"
+	"github.com/irosadie/open-state/api/internal/domain/entities"
 )
 
 // IAuthRepository defines the persistence contract for auth domain.

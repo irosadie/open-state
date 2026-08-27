@@ -21,17 +21,17 @@ All components are flat in `components/` — no subfolders.
 
 ```
 components/
-├── button.tsx             → wrapper dengan prop `intent`, `loading`, `rounded`, `leftIcon`
-├── input.tsx              → wrapper dengan prop `label`, `error`, `leftIcon`, `intent`, `rounded`
-├── dialog.tsx             → Dialog, DialogContent, DialogHeader, DialogTitle, dll.
-├── sheet.tsx              → Sheet, SheetContent, SheetHeader, SheetTitle, dll.
-├── select.tsx             → custom select dengan prop `options`, `getOptionLabel`, `getOptionValue`
-├── radio-group.tsx        → wrapper dengan prop `data`, `getDataLabel`, `getDataValue`
-├── textarea.tsx           → wrapper dengan prop `label`, `rounded`, `intent`
+├── button.tsx             → wrapper with props `intent`, `loading`, `rounded`, `leftIcon`
+├── input.tsx              → wrapper with props `label`, `error`, `leftIcon`, `intent`, `rounded`
+├── dialog.tsx             → Dialog, DialogContent, DialogHeader, DialogTitle, etc.
+├── sheet.tsx              → Sheet, SheetContent, SheetHeader, SheetTitle, etc.
+├── select.tsx             → custom select with props `options`, `getOptionLabel`, `getOptionValue`
+├── radio-group.tsx        → wrapper with props `data`, `getDataLabel`, `getDataValue`
+├── textarea.tsx           → wrapper with props `label`, `rounded`, `intent`
 ├── table.tsx              → custom: data + columns + pagination built-in
-├── actions-dropdown.tsx   → dropdown menu untuk action baris tabel
-├── panel-card.tsx         → card wrapper untuk konten halaman panel
-├── status-badge.tsx       → badge aktif/nonaktif dari boolean
+├── actions-dropdown.tsx   → dropdown menu for row actions in a table
+├── panel-card.tsx         → card wrapper for panel page content
+├── status-badge.tsx       → active/inactive badge from boolean
 └── loading-spinner.tsx    → standalone loading indicator
 ```
 

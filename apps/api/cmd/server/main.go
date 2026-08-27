@@ -4,13 +4,13 @@ import (
 	"context"
 	"log"
 
-	"github.com/vibecoding-starter/api/internal/application/services"
-	usecases "github.com/vibecoding-starter/api/internal/application/use-cases"
-	"github.com/vibecoding-starter/api/internal/infrastructure/config"
-	infradb "github.com/vibecoding-starter/api/internal/infrastructure/database"
-	infrasvc "github.com/vibecoding-starter/api/internal/infrastructure/services"
-	"github.com/vibecoding-starter/api/internal/interfaces/http"
-	"github.com/vibecoding-starter/api/internal/interfaces/http/controllers"
+	"github.com/irosadie/open-state/api/internal/application/services"
+	usecases "github.com/irosadie/open-state/api/internal/application/use-cases"
+	"github.com/irosadie/open-state/api/internal/infrastructure/config"
+	infradb "github.com/irosadie/open-state/api/internal/infrastructure/database"
+	infrasvc "github.com/irosadie/open-state/api/internal/infrastructure/services"
+	"github.com/irosadie/open-state/api/internal/interfaces/http"
+	"github.com/irosadie/open-state/api/internal/interfaces/http/controllers"
 )
 
 func main() {

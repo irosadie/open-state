@@ -3,9 +3,9 @@
   "version": 1,
   "exportedAt": "2026-08-26T18:15:15.775Z",
   "workflow": {
-    "slug": "pemesanan-lapangan-padel",
-    "name": "Pemesanan Lapangan Padel",
-    "description": "Workflow pemesanan lapangan padel: pilih lokasi, cek ketersediaan, rekomendasi alternatif jika overlap, konfirmasi, dan bayar DP 50%.",
+    "slug": "padel-court-booking",
+    "name": "Padel Court Booking",
+    "description": "Workflow for booking a padel court: choose location, check availability, recommend alternatives on overlap, confirm, and pay 50% down payment.",
     "schemaVersion": 1,
     "status": "DRAFT",
     "entryNodeId": "n_start",
@@ -14,7 +14,7 @@
         "id": "n_start",
         "kind": "START",
         "name": "START",
-        "description": "Titik masuk workflow pemesanan lapangan padel.",
+        "description": "Entry point of the padel court booking workflow.",
         "requiredContext": [],
         "capabilities": [],
         "policy": {},
@@ -28,12 +28,12 @@
         "id": "n_select_location",
         "kind": "STATE",
         "name": "SELECT_LOCATION",
-        "description": "User memilih cabang / lokasi lapangan padel.",
+        "description": "User selects the padel branch / location.",
         "requiredContext": [],
         "capabilities": [
           "location.list"
         ],
-        "instructions": "Tampilkan daftar cabang yang tersedia. Tanyakan cabang mana yang diinginkan jika belum disebutkan. Jangan tanya ulang jika sudah ada di context.",
+        "instructions": "Show the list of available branches. Ask which branch the user wants if not already mentioned. Do not re-ask if it is already in context.",
         "policy": {
           "timeoutSeconds": 300,
           "onTimeout": "state.timeout"
@@ -47,14 +47,14 @@
         "id": "n_select_datetime",
         "kind": "STATE",
         "name": "SELECT_DATE_TIME",
-        "description": "User memilih tanggal dan jam main padel (slot 1 jam).",
+        "description": "User selects the date and time to play padel (1-hour slot).",
         "requiredContext": [
           "location.id"
         ],
         "capabilities": [
           "slot.list"
         ],
-        "instructions": "Tanyakan tanggal dan jam yang diinginkan. Ingatkan bahwa slot adalah 1 jam. Jika sudah ada preferensi dari context sebelumnya, konfirmasi ulang saja.",
+        "instructions": "Ask for the desired date and time. Remind that each slot is 1 hour. If there is already a preference from prior context, just confirm it again.",
         "policy": {
           "timeoutSeconds": 300,
           "onTimeout": "state.timeout"
@@ -68,7 +68,7 @@
         "id": "n_check_availability",
         "kind": "DECISION",
         "name": "CHECK_AVAILABILITY",
-        "description": "Cek ketersediaan slot yang dipilih via MCP. Jika overlap → rekomendasi alternatif.",
+        "description": "Check availability of the selected slot via MCP. If overlap → recommend alternatives.",
         "requiredContext": [
           "location.id",
           "booking.date",
@@ -78,7 +78,7 @@
         "capabilities": [
           "slot.check_availability"
         ],
-        "instructions": "Panggil slot.check_availability. Jangan lanjutkan tanpa verifikasi dari sistem. Jangan percaya klaim user bahwa slot tersedia.",
+        "instructions": "Call slot.check_availability. Do not continue without system verification. Do not trust the user's claim that a slot is available.",
         "policy": {
           "timeoutSeconds": 30,
           "onTimeout": "state.timeout",
@@ -99,7 +99,7 @@
         "id": "n_recommend_alternative",
         "kind": "STATE",
         "name": "RECOMMEND_ALTERNATIVE",
-        "description": "Slot yang dipilih tidak tersedia (overlap). Tampilkan rekomendasi waktu terdekat dan/atau hari lain.",
+        "description": "The selected slot is not available (overlap). Show the nearest available times and/or another day.",
         "requiredContext": [
           "location.id",
           "booking.date",
@@ -109,7 +109,7 @@
         "capabilities": [
           "slot.check_availability"
         ],
-        "instructions": "Beritahu user bahwa slot yang dipilih tidak tersedia. Tawarkan dua pilihan: (1) jam terdekat yang tersedia di hari yang sama, (2) slot yang sama di hari berikutnya. Tampilkan opsi secara ringkas. Tunggu pilihan user.",
+        "instructions": "Inform the user that the selected slot is not available. Offer two options: (1) the nearest available time on the same day, (2) the same slot on the next day. Present options concisely. Wait for the user's choice.",
         "policy": {
           "timeoutSeconds": 300,
           "onTimeout": "state.timeout"
@@ -123,7 +123,7 @@
         "id": "n_select_court",
         "kind": "STATE",
         "name": "SELECT_COURT",
-        "description": "Pilih nomor lapangan yang tersedia untuk slot yang dikonfirmasi.",
+        "description": "Select the court number available for the confirmed slot.",
         "requiredContext": [
           "location.id",
           "booking.date",
@@ -134,7 +134,7 @@
         "capabilities": [
           "court.list"
         ],
-        "instructions": "Tampilkan daftar lapangan yang tersedia untuk slot tersebut. Tanyakan preferensi lapangan (nomor/tipe). Jika hanya ada satu, konfirmasi langsung.",
+        "instructions": "Show the list of courts available for that slot. Ask for the court preference (number/type). If only one is available, confirm directly.",
         "policy": {
           "timeoutSeconds": 180,
           "onTimeout": "state.timeout"
@@ -148,7 +148,7 @@
         "id": "n_confirm_booking",
         "kind": "STATE",
         "name": "CONFIRM_BOOKING",
-        "description": "Tampilkan ringkasan pemesanan lengkap termasuk harga dan DP 50% yang harus dibayar.",
+        "description": "Show the complete booking summary including the price and the 50% down payment due.",
         "requiredContext": [
           "location.id",
           "location.name",
@@ -162,7 +162,7 @@
         "capabilities": [
           "booking.calculate_price"
         ],
-        "instructions": "Tampilkan ringkasan: lokasi, tanggal, jam, lapangan, harga total, dan DP 50% yang harus dibayar sekarang. Minta konfirmasi sebelum melanjutkan ke pembayaran. Jangan lanjut tanpa konfirmasi eksplisit dari user.",
+        "instructions": "Show the summary: location, date, time, court, total price, and the 50% down payment due now. Ask for confirmation before proceeding to payment. Do not continue without explicit user confirmation.",
         "policy": {
           "timeoutSeconds": 300,
           "onTimeout": "state.timeout"
@@ -176,7 +176,7 @@
         "id": "n_payment",
         "kind": "STATE",
         "name": "PAYMENT",
-        "description": "Proses pembayaran DP 50% dari total harga sewa lapangan.",
+        "description": "Process the 50% down payment of the total court rental price.",
         "requiredContext": [
           "booking.id",
           "booking.price_total",
@@ -188,7 +188,7 @@
           "payment.create",
           "payment.status"
         ],
-        "instructions": "Minta user membayar DP 50% dari total harga. Berikan instruksi pembayaran. Tunggu konfirmasi pembayaran dari sistem (jangan percaya klaim user). Verifikasi via payment.status sebelum transisi.",
+        "instructions": "Ask the user to pay the 50% down payment of the total price. Provide payment instructions. Wait for payment confirmation from the system (do not trust the user's claim). Verify via payment.status before transitioning.",
         "policy": {
           "timeoutSeconds": 1800,
           "onTimeout": "state.timeout",
@@ -210,7 +210,7 @@
         "id": "n_payment_failed",
         "kind": "STATE",
         "name": "PAYMENT_FAILED",
-        "description": "Pembayaran DP gagal. Tawarkan retry atau pembatalan.",
+        "description": "The down payment failed. Offer retry or cancellation.",
         "requiredContext": [
           "booking.id",
           "payment.failure_reason"
@@ -218,7 +218,7 @@
         "capabilities": [
           "payment.status"
         ],
-        "instructions": "Beritahu user bahwa pembayaran gagal beserta alasannya. Tawarkan untuk mencoba ulang atau membatalkan pemesanan.",
+        "instructions": "Inform the user that the payment failed along with the reason. Offer to retry or cancel the booking.",
         "policy": {
           "timeoutSeconds": 300,
           "onTimeout": "state.timeout"
@@ -232,7 +232,7 @@
         "id": "n_booking_confirmed",
         "kind": "END",
         "name": "BOOKING_CONFIRMED",
-        "description": "Pemesanan berhasil dikonfirmasi. DP 50% sudah diterima. Kirim voucher/e-ticket.",
+        "description": "Booking successfully confirmed. The 50% down payment has been received. Send voucher/e-ticket.",
         "requiredContext": [
           "booking.id",
           "payment.id"
@@ -241,7 +241,7 @@
           "booking.confirm",
           "notification.send_ticket"
         ],
-        "instructions": "Ucapkan selamat, tampilkan detail booking, nomor booking, dan informasikan sisa pelunasan yang dibayar saat tiba di lokasi.",
+        "instructions": "Congratulate the user, show booking details, booking number, and inform them that the remaining balance is paid upon arrival at the location.",
         "policy": {},
         "isTerminal": true,
         "position": {
@@ -253,7 +253,7 @@
         "id": "n_payment_expired",
         "kind": "END",
         "name": "PAYMENT_EXPIRED",
-        "description": "Waktu pembayaran DP habis. Slot dilepas kembali.",
+        "description": "The down payment time has expired. The slot is released.",
         "requiredContext": [
           "booking.id"
         ],
@@ -261,7 +261,7 @@
           "booking.cancel",
           "slot.release"
         ],
-        "instructions": "Beritahu user bahwa waktu pembayaran habis dan slot sudah dilepas. Tawarkan untuk memulai pemesanan baru.",
+        "instructions": "Inform the user that the payment time has expired and the slot has been released. Offer to start a new booking.",
         "policy": {},
         "isTerminal": true,
         "position": {
@@ -273,12 +273,12 @@
         "id": "n_cancelled",
         "kind": "END",
         "name": "CANCELLED",
-        "description": "Pemesanan dibatalkan oleh user.",
+        "description": "Booking cancelled by the user.",
         "requiredContext": [],
         "capabilities": [
           "slot.release"
         ],
-        "instructions": "Konfirmasi pembatalan. Jika slot sudah di-hold, pastikan dilepas.",
+        "instructions": "Confirm the cancellation. If the slot was on hold, make sure it is released.",
         "policy": {},
         "isTerminal": true,
         "position": {
@@ -290,7 +290,7 @@
         "id": "n_human_handoff",
         "kind": "END",
         "name": "HUMAN_HANDOFF",
-        "description": "Pembayaran gagal 3x. Eskalasi ke agen manusia.",
+        "description": "Payment failed 3 times. Escalate to a human agent.",
         "requiredContext": [
           "booking.id",
           "customer.id"
@@ -298,7 +298,7 @@
         "capabilities": [
           "handoff.create"
         ],
-        "instructions": "Beritahu user bahwa akan dihubungkan ke agen untuk membantu proses pembayaran. Hentikan semua transisi otomatis.",
+        "instructions": "Inform the user that they will be connected to an agent to help with the payment process. Stop all automatic transitions.",
         "policy": {
           "humanHandoff": {
             "enabled": true

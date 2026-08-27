@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/vibecoding-starter/api/internal/domain/services"
+	"github.com/irosadie/open-state/api/internal/domain/services"
 )
 
 type LocalStorageService struct {

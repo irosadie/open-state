@@ -1,8 +1,8 @@
 import { apiRouters, queryKeys } from "$/constants"
 import { axios } from "$/services/axios"
 import type { ErrorResponse } from "$/types/generals"
+import type { AuthCurrentUserResponse } from "@openstate/types"
 import { useQuery } from "@tanstack/react-query"
-import type { AuthCurrentUserResponse } from "@vibecoding-starter/types"
 import type { AxiosError } from "axios"
 
 type UseCurrentUserArgs = {

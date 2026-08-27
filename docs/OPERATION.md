@@ -26,7 +26,7 @@ Structure conventions:
 | Web Proxy | `http://localhost:3020/api/proxy/*` | Internal proxy for all browser requests to backend |
 | API | `http://localhost:8020` | HTTP API for root and health check |
 | Worker | n/a | Idle worker scaffold for background runtime |
-| PostgreSQL | `postgresql://postgres:postgres@127.0.0.1:5432/vibecoding_starter?schema=public` | Local database for next Prisma features |
+| PostgreSQL | `postgresql://postgres:postgres@127.0.0.1:5432/openstate?schema=public` | Local database for next Prisma features |
 | Redis | `redis://127.0.0.1:6379` | Ready-to-use broker for next queue features |
 | Prisma Studio | `http://localhost:5555` | Browser UI for local database when schema is in use |
 
@@ -65,7 +65,7 @@ Repo does not use root `.env` as source of truth. Env is managed per app.
 | Variable | Required | Default | Notes |
 | --- | --- | --- | --- |
 | `API_PORT` | no | `8020` | HTTP API port |
-| `DATABASE_URL` | no | `postgresql://postgres:postgres@127.0.0.1:5432/vibecoding_starter?schema=public` | Default local PostgreSQL for Prisma |
+| `DATABASE_URL` | no | `postgresql://postgres:postgres@127.0.0.1:5432/openstate?schema=public` | Default local PostgreSQL for Prisma |
 
 ### `apps/worker/.env.example`
 

@@ -1,15 +1,15 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: vibecoding-starter-postgres
+    container_name: openstate-postgres
     ports:
       - "5437:5432"
     environment:
-      POSTGRES_DB: vibecoding_starter
+      POSTGRES_DB: openstate
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d vibecoding_starter"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d openstate"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -18,7 +18,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: vibecoding-starter-redis
+    container_name: openstate-redis
     ports:
       - "6381:6379"
     command: redis-server --save 60 1 --loglevel warning

@@ -1,6 +1,6 @@
 schema: spec-driven
 
-# Project context — ditampilkan ke AI saat membuat artifact OpenSpec.
+# Project context — shown to AI when creating OpenSpec artifacts.
 context: |
   # OpenState
   Open-source enterprise **Conversation State Orchestration Platform**.
@@ -8,19 +8,19 @@ context: |
   ## Core principle
   > The LLM can suggest. The State Engine decides. The MCP executes.
   > The RAG informs. PostgreSQL remembers.
-  LLM TIDAK pernah menjadi source of truth untuk workflow state.
+  The LLM is NEVER the source of truth for workflow state.
 
   ## Tech stack
   - Frontend: Next.js (App Router) + React Flow + Zustand + TanStack Query
   - Backend: Go (Echo) Clean Architecture + sqlc + goose + pgx
   - Worker: Go (asynq) + Redis
   - Monorepo: Turborepo + bun
-  - Database: PostgreSQL (primary), repositori abstraction untuk adapter lain
+  - Database: PostgreSQL (primary), repository abstraction for other adapters
 
-  ## Arsitektur
-  - Modular monolith (PRD 175) — 1 binary Go, batas internal bersih
+  ## Architecture
+  - Modular monolith (PRD 175) — 1 Go binary, clean internal boundaries
   - Domain / Application / Infrastructure / Interfaces
-  - MCP server HTTP/SSE untuk integrasi LLM/RAG
+  - MCP server HTTP/SSE for LLM/RAG integration
   - LLM multi-provider abstraction
 
   ## Domain model
@@ -29,13 +29,13 @@ context: |
   - Capability Registry: logical capability → MCP provider
   - Context: tenant → conversation → workflow → state → turn
 
-  ## Konvensi
+  ## Conventions
   - Conventional commits
   - Frontend lint: Biome (no any, no console.*)
   - Backend: go vet, idiomatic Go
   - Source of truth: MAIN_PRD.md
 
-# Per-artifact rules (opsional)
+# Per-artifact rules (optional)
 rules:
   proposal:
     - Keep proposals focused and reference PRD sections where relevant

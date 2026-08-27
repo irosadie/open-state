@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	domain "github.com/vibecoding-starter/go-shared/domain"
-	"github.com/vibecoding-starter/api/internal/domain/services"
+	domain "github.com/irosadie/open-state/go-shared/domain"
+	"github.com/irosadie/open-state/api/internal/domain/services"
 )
 
 const UserIDKey = "userID"

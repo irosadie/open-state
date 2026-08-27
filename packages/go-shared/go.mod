@@ -1,3 +1,3 @@
-module github.com/vibecoding-starter/go-shared
+module github.com/irosadie/open-state/go-shared
 
 go 1.26

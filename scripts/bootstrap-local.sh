@@ -45,7 +45,7 @@ wait_for_redis() {
 wait_for_postgres() {
   local retries=60
 
-  until "$COMPOSE" exec -T postgres pg_isready -U postgres -d vibecoding_starter >/dev/null 2>&1; do
+  until "$COMPOSE" exec -T postgres pg_isready -U postgres -d openstate >/dev/null 2>&1; do
     retries=$((retries - 1))
     if [[ "$retries" -le 0 ]]; then
       printf '[bootstrap] postgres did not become ready in time\n' >&2

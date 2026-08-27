@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	usecases "github.com/vibecoding-starter/api/internal/application/use-cases"
+	usecases "github.com/irosadie/open-state/api/internal/application/use-cases"
 )
 
 type SystemController struct {

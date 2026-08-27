@@ -9,7 +9,7 @@ import {
   type RegisterProps,
   registerPayloadSchema,
   registerSchema,
-} from "@vibecoding-starter/schemas"
+} from "@openstate/schemas"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { type FormEvent, useState } from "react"

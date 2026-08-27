@@ -1,7 +1,7 @@
 import { authConfig } from "$/configs/auth"
 import { queryKeys } from "$/constants"
+import { type LoginProps, loginSchema } from "@openstate/schemas"
 import { useMutation } from "@tanstack/react-query"
-import { type LoginProps, loginSchema } from "@vibecoding-starter/schemas"
 import { signIn } from "next-auth/react"
 
 type LoginPayload = LoginProps & {
