@@ -6,6 +6,22 @@ speaks to repository **ports** (interfaces), implemented later by PostgreSQL
 
 ## Decisions
 
+### D0. Hierarchy
+
+The domain follows the hierarchy:
+
+```
+Perusahaan (Tenant) → Project → Intent → Workflow → State
+```
+
+- **Tenant** owns many **Projects** (business areas: resto, padel, dokter).
+- **Project** owns many **Intents**.
+- **Intent** resolves to a **Workflow** (state machine) within the same project.
+- **Workflow** contains many **States** (nodes + transitions).
+
+This replaces the earlier flat `Tenant → Workflow → State` model. Scoping is
+enforced at every repository port (`tenantID`, `projectID`).
+
 ### D1. Package layout
 `apps/api/internal/domain/engine/`:
 ```

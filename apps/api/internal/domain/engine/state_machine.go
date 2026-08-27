@@ -20,7 +20,8 @@ func NewEngine(repos EngineRepositories) *Engine {
 }
 
 // StartWorkflow creates a workflow instance and enters the START node.
-func (e *Engine) StartWorkflow(ctx context.Context, tenantID, conversationID string, def *WorkflowDefinition, entryEvent string) (*WorkflowInstance, error) {
+// The workflow is resolved within the given project (hierarchy: project → workflow).
+func (e *Engine) StartWorkflow(ctx context.Context, tenantID, projectID, conversationID string, def *WorkflowDefinition, entryEvent string) (*WorkflowInstance, error) {
 	if def == nil || def.EntryNodeID == "" {
 		return nil, domain.NewValidation("workflow definition or entry node is missing")
 	}
@@ -32,6 +33,7 @@ func (e *Engine) StartWorkflow(ctx context.Context, tenantID, conversationID str
 	instance := &WorkflowInstance{
 		ID:                newID(),
 		TenantID:          tenantID,
+		ProjectID:         projectID,
 		WorkflowID:        def.Slug,
 		WorkflowVersionID: defSlugVersion(def),
 		ConversationID:    conversationID,
@@ -75,7 +77,7 @@ func (e *Engine) ProcessEvent(ctx context.Context, tenantID, instanceID string, 
 		}
 	}
 
-	def, err := e.loadDefinition(ctx, tenantID, instance.WorkflowID)
+	def, err := e.loadDefinition(ctx, tenantID, instance.ProjectID, instance.WorkflowID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -145,8 +147,8 @@ func (e *Engine) ProcessEvent(ctx context.Context, tenantID, instanceID string, 
 	return instance, stateInst, nil
 }
 
-func (e *Engine) loadDefinition(ctx context.Context, tenantID, slug string) (*WorkflowDefinition, error) {
-	def, err := e.repos.Workflows.GetBySlug(ctx, tenantID, slug)
+func (e *Engine) loadDefinition(ctx context.Context, tenantID, projectID, slug string) (*WorkflowDefinition, error) {
+	def, err := e.repos.Workflows.GetBySlug(ctx, tenantID, projectID, slug)
 	if err != nil {
 		return nil, err
 	}

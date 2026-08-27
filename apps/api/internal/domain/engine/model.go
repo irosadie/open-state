@@ -8,6 +8,25 @@ package engine
 
 import "time"
 
+// Tenant is an isolated organization/customer using the platform (PRD §3.1).
+// A tenant owns many projects.
+type Tenant struct {
+	ID        string
+	Name      string
+	Slug      string
+	Status    string // ACTIVE | INACTIVE
+}
+
+// Project is a business area owned by a tenant (e.g. resto, padel, dokter).
+// A project owns many intents; each intent resolves to a workflow.
+type Project struct {
+	ID        string
+	TenantID  string
+	Name      string
+	Slug      string
+	Status    string // ACTIVE | ARCHIVED
+}
+
 // WorkflowNodeKind identifies the logical role of a node in a workflow graph.
 type WorkflowNodeKind string
 
@@ -123,6 +142,7 @@ type WorkflowDefinition struct {
 	Description     string               `json:"description,omitempty"`
 	SchemaVersion   int                  `json:"schemaVersion"`
 	Status          WorkflowStatus       `json:"status"`
+	ProjectID       string               `json:"projectId"`
 	EntryNodeID     string               `json:"entryNodeId,omitempty"`
 	Nodes           []WorkflowNode       `json:"nodes"`
 	Transitions     []TransitionDefinition `json:"transitions"`
@@ -146,17 +166,18 @@ const (
 
 // WorkflowInstance is a runtime execution of a workflow (PRD §3.4).
 type WorkflowInstance struct {
-	ID              string                `json:"id"`
-	TenantID        string                `json:"tenantId"`
-	WorkflowID      string                `json:"workflowId"`
-	WorkflowVersionID string              `json:"workflowVersionId"`
-	ConversationID  string                `json:"conversationId,omitempty"`
-	Status          WorkflowInstanceStatus `json:"status"`
-	CurrentStateID  string                `json:"currentStateId,omitempty"`
-	Context         map[string]any        `json:"context,omitempty"`
-	Version         int                   `json:"version"`
-	CreatedAt       time.Time             `json:"createdAt"`
-	UpdatedAt       time.Time             `json:"updatedAt"`
+	ID                string                `json:"id"`
+	TenantID          string                `json:"tenantId"`
+	ProjectID         string                `json:"projectId"`
+	WorkflowID        string                `json:"workflowId"`
+	WorkflowVersionID string                `json:"workflowVersionId"`
+	ConversationID    string                `json:"conversationId,omitempty"`
+	Status            WorkflowInstanceStatus `json:"status"`
+	CurrentStateID    string                `json:"currentStateId,omitempty"`
+	Context           map[string]any        `json:"context,omitempty"`
+	Version           int                   `json:"version"`
+	CreatedAt         time.Time             `json:"createdAt"`
+	UpdatedAt         time.Time             `json:"updatedAt"`
 }
 
 // StateInstanceStatus is the runtime lifecycle of a state (PRD §11).

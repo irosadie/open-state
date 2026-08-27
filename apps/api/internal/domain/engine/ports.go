@@ -2,11 +2,21 @@ package engine
 
 import "context"
 
+// ProjectRepository provides access to projects (owned by a tenant).
+// Implemented by a concrete adapter (PostgreSQL) in Epic #3.
+type ProjectRepository interface {
+	// Get returns a project by id within a tenant.
+	Get(ctx context.Context, tenantID, projectID string) (*Project, error)
+	// Save persists a project.
+	Save(ctx context.Context, project *Project) error
+}
+
 // WorkflowRepository provides access to workflow definitions.
 // Implemented by a concrete adapter (PostgreSQL) in Epic #3.
+// Workflows are scoped per project.
 type WorkflowRepository interface {
-	// GetBySlug returns a published workflow definition by slug.
-	GetBySlug(ctx context.Context, tenantID, slug string) (*WorkflowDefinition, error)
+	// GetBySlug returns a published workflow definition by slug within a project.
+	GetBySlug(ctx context.Context, tenantID, projectID, slug string) (*WorkflowDefinition, error)
 	// Save persists a workflow definition.
 	Save(ctx context.Context, def *WorkflowDefinition) error
 }
@@ -36,6 +46,7 @@ type EventRepository interface {
 
 // EngineRepositories bundles the ports the engine depends on.
 type EngineRepositories struct {
+	Projects  ProjectRepository
 	Workflows WorkflowRepository
 	Instances InstanceRepository
 	Events    EventRepository

@@ -15,8 +15,10 @@ type fakeWorkflowRepo struct {
 	defs map[string]*WorkflowDefinition
 }
 
-func (f *fakeWorkflowRepo) GetBySlug(_ context.Context, _ string, slug string) (*WorkflowDefinition, error) {
-	d, ok := f.defs[slug]
+func workflowKey(projectID, slug string) string { return projectID + "/" + slug }
+
+func (f *fakeWorkflowRepo) GetBySlug(_ context.Context, _ string, projectID, slug string) (*WorkflowDefinition, error) {
+	d, ok := f.defs[workflowKey(projectID, slug)]
 	if !ok {
 		return nil, domain.NewNotFound("workflow not found")
 	}
@@ -26,7 +28,7 @@ func (f *fakeWorkflowRepo) Save(_ context.Context, def *WorkflowDefinition) erro
 	if f.defs == nil {
 		f.defs = map[string]*WorkflowDefinition{}
 	}
-	f.defs[def.Slug] = def
+	f.defs[workflowKey(def.ProjectID, def.Slug)] = def
 	return nil
 }
 
@@ -97,8 +99,28 @@ func (f *fakeEventRepo) MarkProcessed(_ context.Context, _ string, key, _ string
 	return nil
 }
 
+type fakeProjectRepo struct {
+	projects map[string]*Project
+}
+
+func (f *fakeProjectRepo) Get(_ context.Context, _ string, projectID string) (*Project, error) {
+	p, ok := f.projects[projectID]
+	if !ok {
+		return nil, domain.NewNotFound("project not found")
+	}
+	return p, nil
+}
+func (f *fakeProjectRepo) Save(_ context.Context, project *Project) error {
+	if f.projects == nil {
+		f.projects = map[string]*Project{}
+	}
+	f.projects[project.ID] = project
+	return nil
+}
+
 func newFakeRepos() EngineRepositories {
 	return EngineRepositories{
+		Projects:  &fakeProjectRepo{},
 		Workflows: &fakeWorkflowRepo{},
 		Instances: &fakeInstanceRepo{},
 		Events:    &fakeEventRepo{},
@@ -113,6 +135,7 @@ func padelDef() *WorkflowDefinition {
 	prio := 300
 	return &WorkflowDefinition{
 		Slug:          "padel-booking",
+		ProjectID:     "project-padel",
 		Name:          "Padel Booking",
 		SchemaVersion: 1,
 		Status:        WorkflowPublished,
@@ -146,7 +169,7 @@ func TestStartWorkflow(t *testing.T) {
 	_ = repos.Workflows.Save(context.Background(), padelDef())
 	eng := NewEngine(repos)
 
-	inst, err := eng.StartWorkflow(context.Background(), "tenant1", "conv1", padelDef(), "workflow.started")
+	inst, err := eng.StartWorkflow(context.Background(), "tenant1", "project-padel", "conv1", padelDef(), "workflow.started")
 	if err != nil {
 		t.Fatalf("StartWorkflow error: %v", err)
 	}
@@ -163,7 +186,7 @@ func TestProcessEventHappyPath(t *testing.T) {
 	def := padelDef()
 	_ = repos.Workflows.Save(context.Background(), def)
 	eng := NewEngine(repos)
-	inst, _ := eng.StartWorkflow(context.Background(), "t", "c", def, "workflow.started")
+	inst, _ := eng.StartWorkflow(context.Background(), "t", "project-padel", "c", def, "workflow.started")
 
 	// move start -> select_time
 	_, _, err := eng.ProcessEvent(context.Background(), "t", inst.ID, &Event{ID: "e0", Type: "workflow.started", Source: SourceSystem})
@@ -196,7 +219,7 @@ func TestProcessEventGuardFail(t *testing.T) {
 	def := padelDef()
 	_ = repos.Workflows.Save(context.Background(), def)
 	eng := NewEngine(repos)
-	inst, _ := eng.StartWorkflow(context.Background(), "t", "c", def, "workflow.started")
+	inst, _ := eng.StartWorkflow(context.Background(), "t", "project-padel", "c", def, "workflow.started")
 	_, _, _ = eng.ProcessEvent(context.Background(), "t", inst.ID, &Event{ID: "e0", Type: "workflow.started", Source: SourceSystem})
 	_, _, _ = eng.ProcessEvent(context.Background(), "t", inst.ID, &Event{ID: "e1", Type: "datetime.selected", Source: SourceUser})
 
@@ -217,7 +240,7 @@ func TestIdempotencyDedup(t *testing.T) {
 	def := padelDef()
 	_ = repos.Workflows.Save(context.Background(), def)
 	eng := NewEngine(repos)
-	inst, _ := eng.StartWorkflow(context.Background(), "t", "c", def, "workflow.started")
+	inst, _ := eng.StartWorkflow(context.Background(), "t", "project-padel", "c", def, "workflow.started")
 	_, _, _ = eng.ProcessEvent(context.Background(), "t", inst.ID, &Event{ID: "e0", Type: "workflow.started", Source: SourceSystem})
 
 	evt := &Event{ID: "e1", Type: "datetime.selected", Source: SourceUser, IdempotencyKey: "k1"}
@@ -237,16 +260,16 @@ func TestIdempotencyDedup(t *testing.T) {
 
 func TestIntentResolver(t *testing.T) {
 	reg := IntentRegistry{SchemaVersion: 1, Intents: []IntentDefinition{
-		{ID: "BOOKING_PADEL", Name: "Padel", WorkflowSlug: "padel-booking", EntryEvent: "padel.booking.requested", Priority: 10},
+		{ID: "BOOKING_PADEL", ProjectID: "project-padel", Name: "Padel", WorkflowSlug: "padel-booking", EntryEvent: "padel.booking.requested", Priority: 10},
 	}}
-	lookup := func(slug string) (*WorkflowDefinition, bool) {
-		if slug == "padel-booking" {
+	lookup := func(projectID, slug string) (*WorkflowDefinition, bool) {
+		if projectID == "project-padel" && slug == "padel-booking" {
 			return padelDef(), true
 		}
 		return nil, false
 	}
 	r := NewIntentResolver(reg, lookup)
-	def, entry, stateID, ok := r.ResolveIntent("BOOKING_PADEL")
+	def, entry, stateID, ok := r.ResolveIntent("project-padel", "BOOKING_PADEL")
 	if !ok {
 		t.Fatal("intent not resolved")
 	}

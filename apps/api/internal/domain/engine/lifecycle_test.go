@@ -10,7 +10,7 @@ func TestSuspendResume(t *testing.T) {
 	def := padelDef()
 	_ = repos.Workflows.Save(context.Background(), def)
 	eng := NewEngine(repos)
-	inst, _ := eng.StartWorkflow(context.Background(), "t", "c", def, "workflow.started")
+	inst, _ := eng.StartWorkflow(context.Background(), "t", "project-padel", "c", def, "workflow.started")
 
 	sus, err := eng.SuspendWorkflow(context.Background(), "t", inst.ID)
 	if err != nil {
@@ -43,7 +43,7 @@ func TestCancelWorkflow(t *testing.T) {
 	def := padelDef()
 	_ = repos.Workflows.Save(context.Background(), def)
 	eng := NewEngine(repos)
-	inst, _ := eng.StartWorkflow(context.Background(), "t", "c", def, "workflow.started")
+	inst, _ := eng.StartWorkflow(context.Background(), "t", "project-padel", "c", def, "workflow.started")
 
 	cancel, err := eng.CancelWorkflow(context.Background(), "t", inst.ID)
 	if err != nil {
@@ -59,7 +59,7 @@ func TestOptimisticConcurrencyConflict(t *testing.T) {
 	def := padelDef()
 	_ = repos.Workflows.Save(context.Background(), def)
 	eng := NewEngine(repos)
-	inst, _ := eng.StartWorkflow(context.Background(), "t", "c", def, "workflow.started")
+	inst, _ := eng.StartWorkflow(context.Background(), "t", "project-padel", "c", def, "workflow.started")
 
 	// simulate two concurrent updates both at version 1
 	instA, _ := repos.Instances.Get(context.Background(), "t", inst.ID) // version 1
