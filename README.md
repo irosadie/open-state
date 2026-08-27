@@ -72,13 +72,16 @@ well-defined contracts.
 
 ## Features
 
-- **Multi-tenant** — tenant isolation at API, service, repository, cache,
-  event, and capability layers
-- **Multiple workflows per tenant** —   unlimited workflows (ORDER, BOOKING, CONSULTATION, etc.)
+- **Multi-tenant & multi-project** — isolation at API, service, repository,
+  cache, event, and capability layers. Domain hierarchy:
+  `Perusahaan (Tenant) → Project → Intent → Workflow → State`
+- **Multiple workflows per tenant** — unlimited workflows across projects
+  (ORDER, BOOKING, CONSULTATION, etc.)
 - **Workflow versioning** — immutable published versions, rollback for new
   instances
 - **State Builder** — visual drag-and-drop flowchart editor (React Flow)
-- **Intent Registry** — conversation → intent → workflow → state resolution
+- **Intent Registry** — conversation → intent → workflow → state resolution,
+  scoped per project
 - **Deterministic guards** — JSON-based, no arbitrary code execution
 - **Events & transitions** — with priority, guards, and concurrency control
 - **State & workflow timeouts** — processed through the normal event pipeline
@@ -107,6 +110,22 @@ packages/
   types/         Shared TypeScript types
   utils/         Shared utilities
 ```
+
+### Domain Hierarchy
+
+```
+Perusahaan (Tenant)
+  └── Project (business area: resto | padel | dokter)
+        └── Intent
+              └── Workflow (state machine)
+                    └── State
+```
+
+- **Tenant** owns many **Projects**
+- **Project** owns many **Intents**
+- **Intent** resolves to a **Workflow** within the same project
+- **Workflow** contains many **States**
+- All persistence & runtime operations are scoped by `tenant_id` + `project_id`
 
 ### Persistence
 

@@ -90,7 +90,27 @@ Example:
 tenant: cafe_abc
 ```
 
-A tenant can have many workflows.
+A tenant can have many **projects**.
+
+---
+
+## 3.1.1 Project
+
+A **Project** is a business area owned by a tenant (e.g. resto, padel, dokter).
+A tenant can have many projects; each project can have many intents.
+
+```text
+Cafe ABC (tenant)
+├── Project: Resto
+├── Project: Padel
+└── Project: Dokter
+```
+
+Rules:
+
+* A project belongs to exactly one tenant (`tenant_id`).
+* Workflow & intent resolution are scoped per project (PRD §4).
+* A project slug is unique within a tenant.
 
 ---
 
@@ -1643,17 +1663,30 @@ schedule
 
 ## 40.1 Intent Registry
 
-An **Intent Registry** is the formal mapping of user intents → workflows.
-It is the resolution basis MCP uses at the start of a conversation:
+An **Intent Registry** is the formal mapping of user intents → workflows,
+**scoped per project**. It is the resolution basis MCP uses at the start of a
+conversation:
 
 ```text
 Conversation (user message)
     ↓  (LLM intent classification — PRD 21)
-INTENT (defined in registry)
+PROJECT (business area)
     ↓
-WORKFLOW (state machine for that intent)
+INTENT (defined in registry, within the project)
+    ↓
+WORKFLOW (state machine for that intent, within the project)
     ↓
 INITIAL STATE
+```
+
+Full hierarchy:
+
+```text
+Tenant
+  └── Project
+        └── Intent
+              └── Workflow (state machine)
+                    └── State
 ```
 
 Registry structure:
@@ -1663,9 +1696,10 @@ IntentRegistry
 ├── schemaVersion
 └── intents[]
     ├── id              (e.g.: BOOKING_PADEL)
+    ├── projectId       (the project that owns this intent)
     ├── name            (e.g.: Padel Court Booking)
     ├── description     (for LLM classification)
-    ├── workflowSlug    (workflow that handles this intent)
+    ├── workflowSlug    (workflow that handles this intent, within the project)
     ├── entryEvent      (initial trigger event)
     ├── examples[]      (sample user phrases, for training/classification)
     └── priority        (tie-breaker when ambiguous, PRD 41)
@@ -1673,14 +1707,16 @@ IntentRegistry
 
 Rules:
 
-* **Each intent maps to ONE workflow** (state machine). There is no intent
-  without a workflow.
+* **Each intent maps to ONE workflow** within its project (state machine).
+  There is no intent without a workflow.
+* **Intents are scoped per project**: the same intent id may exist in
+  different projects independently (tenant + project isolation, PRD §4).
 * **Intents differ per conversation**: one conversation can switch intents
   (e.g., from ORDER_FOOD to ORDER_DOCTOR), each entering its own state machine
   (PRD 6, 8-C).
 * Resolution order (PRD 39): explicit active workflow → event correlation →
   intent-based resolution → clarify.
-* The registry is **tenant-scoped** and **versioned**.
+* The registry is **tenant- and project-scoped** and **versioned**.
 * MCP tool `resolve_intent` (or `get_active_workflow`) returns the classified
   intent + workflow + current state to the LLM.
 * `examples` help LLM classification & testing (golden conversation tests,
