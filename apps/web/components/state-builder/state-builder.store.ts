@@ -20,11 +20,15 @@ import { getLayoutedNodes } from "./utils/auto-layout"
 import { loadDraft, saveDraft } from "./utils/pglite-store"
 import { toast } from "./utils/toast"
 import { padelBookingWorkflow } from "./workflows"
+import { ALL_WORKFLOWS } from "./workflows/intent-resolver"
 
 /** Maksimal histori undo yang disimpan */
 const MAX_HISTORY = 50
-/** Slug default workflow padel */
+/** Slug default workflow (draft yang di-persist) */
 const DEFAULT_SLUG = padelBookingWorkflow.slug
+
+/** Daftar workflow contoh yang bisa di-load (single source: intent-resolver) */
+export const EXAMPLE_WORKFLOWS: WorkflowDefinition[] = ALL_WORKFLOWS
 
 interface StateBuilderState {
   workflow: WorkflowDefinition
@@ -66,7 +70,7 @@ interface StateBuilderState {
   redo: () => void
   loadWorkflow: (wf: WorkflowDefinition) => void
   newWorkflow: () => void
-  resetToPadel: () => void
+  resetToWorkflow: (slug: string) => void
   clearAll: () => void
   setSearchQuery: (q: string) => void
   persist: () => Promise<void>
@@ -428,8 +432,9 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
       void schedulePersist()
     },
 
-    resetToPadel: () => {
-      get().loadWorkflow(structuredClone(padelBookingWorkflow))
+    resetToWorkflow: (slug) => {
+      const example = EXAMPLE_WORKFLOWS.find((w) => w.slug === slug)
+      get().loadWorkflow(structuredClone(example ?? padelBookingWorkflow))
     },
 
     clearAll: () => {

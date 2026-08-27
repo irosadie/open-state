@@ -1414,6 +1414,46 @@ This is one of the primary benefits of the State Orchestrator.
 
 ---
 
+## 37.1 Less-Click / Minimal Friction
+
+User experience goal: **the user should not have to click or type anything the
+system can already know or derive.** The platform should do the work, the user
+just expresses intent in natural language.
+
+This is a product principle, not just a UI nicety — it directly reduces
+friction (fewer clicks, fewer forms, faster completion).
+
+```text
+User: "booking padel jam 7 besok di cabang A, DP aja"
+    ↓  intent = BOOKING_PADEL (LLM classification)
+    ↓  SELECT_LOCATION   → cabang A (dari pesan, sudah ada)
+    ↓  CHECK_AVAILABILITY → stok tersedia (MCP)
+    ↓  COLLECT_CUSTOMER  → nama/alamat (dari memory, skip jika ada — PRD 37)
+    ↓  PAYMENT (DP 50%)
+    ↓  DONE — hampir tidak ada klik
+```
+
+Rules (progressive disclosure):
+
+* **Auto-fill from context**: anything already known (memory, workflow context,
+  prior turns) is pre-filled, never re-asked (PRD 37, 43.2).
+* **Ask only the irreducible minimum**: only request what is genuinely missing
+  and cannot be inferred. `missing_context` (PRD 36) is the exact list.
+* **Prefer confirmation over form-filling**: for optional/derivable data, use a
+  confirm ("pesan di cabang A, jam 7?") instead of asking to type it out.
+* **Offer, don't interrogate**: rekomendasi (38.1-38.3) present 1-3 choices so
+  the user just picks, instead of describing freely.
+* **Single natural-language entry**: user states everything in one message;
+  the engine extracts entities (PRD 108) and fills state accordingly.
+* **Never block on what's optional**: if a field is optional, proceed; collect
+  later only if needed by a downstream state.
+
+The Less-Click principle is a **first-class design goal** and a measurable
+differentiator: for a given workflow, track and minimize the number of
+required user inputs/clicks to completion.
+
+---
+
 # 38. User Intent vs State Transition
 
 User intent is not automatically a transition.
@@ -1449,6 +1489,106 @@ The LLM cannot simply declare:
 ```text
 state = DELIVERY
 ```
+
+---
+
+## 38.1 Item Recommendation (Alternatives on Unavailability)
+
+When a requested item/product is unavailable, the system should recommend
+alternatives. This is a **data + LLM concern**, not a state-machine concern.
+
+Example (order makanan):
+
+```text
+User: "Saya mau kopi latte."
+     ↓
+CHECK_STOCK (capability: product.check_stock)
+     ↓  product.out_of_stock   (latte kosong)
+RECOMMEND_ALTERNATIVE
+     ↓  capability: product.suggest_alternatives
+        alternatives = [aren coffee, capucino, mocha]  (kategori kopi)
+     ↓
+LLM menawarkan alternatif; user memilih aren coffee
+     ↓  product.selected
+CHECK_STOCK (re-verify stok aren coffee)
+     ↓  product.in_stock
+COLLECT_CUSTOMER → ...
+```
+
+Rules:
+
+* The engine does **not** compute "what is similar" — that belongs to the
+  catalog/capability (data) and the LLM (presentation).
+* The engine only routes: `product.out_of_stock` → a recommendation state, and
+  re-verifies the chosen alternative before proceeding.
+* Alternatives are returned as **structured data** in context (e.g.,
+  `product.alternatives`), not free-text from the LLM.
+* Re-selection must go through a **stock re-check** to avoid race conditions
+  (PRD 30-32).
+
+---
+
+## 38.2 Schedule Mismatch & Queue
+
+When the user requests a service at a time the provider is not available, the
+system must not fail — it should offer alternatives and/or check the queue.
+
+Example (konsultasi dokter):
+
+```text
+User: "konsul dokter Raffi hari ini jam 10"
+     ↓
+CHECK_AVAILABILITY (schedule.check, queue.check)
+     ↓  doctor.schedule_mismatch   (dokter masuk jam 4, bukan jam 10)
+OFFER_ALTERNATIVE_TIME
+     ↓  user: "sampe jam berapa?" → jam 9
+     ↓  user: "habis maghrib" → sistem cek → FULL BOOKED (slot.full)
+     ↓  sistem: "sebelum maghrib atau jadwal berikutnya?"
+     ↓  user: "cancel" → CANCELLED
+```
+
+Rules:
+
+* A schedule mismatch is a normal **event** (`doctor.schedule_mismatch`) that
+  routes to an offer-alternatives state — not an error.
+* Queue/slot availability is checked via **capability** (`schedule.check`,
+  `queue.check`), never the LLM's claim (PRD 38, 112).
+* `slot.full` routes back to the alternative-offer state.
+* The user can accept an alternative, change the time, or cancel — all are
+  explicit transitions.
+
+---
+
+## 38.3 Needs-Based Recommendation & Provider Switch
+
+When the user needs a recommendation (e.g., "dokter untuk anak yang ngga mau
+makan") or wants to switch provider mid-flow, the system supports it.
+
+Example (ganti dokter):
+
+```text
+User: "konsul dokter gizi" → RECOMMEND_DOCTOR (5 dokter)
+User: "rekom utk anak ngga mau makan"
+     ↓  doctor.recommend
+sistem: dokter A, B, C
+User: pilih dokter A → jam 8 malam
+User: "kemalaman, mau dokter B"
+     ↓  doctor.selected (B) → CHECK_AVAILABILITY (jadwal dokter B)
+sistem: dokter B jam 3-5
+User: jam 4.30 → queue.check → ok → BOOKING_CONFIRMED
+```
+
+Rules:
+
+* Needs-based recommendation is **data + LLM**: the engine routes
+  (`doctor.recommend`) to a recommendation state; the LLM presents the list
+  derived from structured provider data.
+* Switching provider (`doctor.selected`) **re-enters the availability check**
+  for the new provider — never assume the new provider's schedule.
+* Collected context (patient needs) is **retained** across the switch
+  (PRD 43.2).
+* Final booking requires a **queue re-check** right before confirmation to
+  avoid race conditions.
 
 ---
 
@@ -1497,6 +1637,61 @@ API
 intent
 webhook
 schedule
+```
+
+---
+
+## 40.1 Intent Registry
+
+An **Intent Registry** is the formal mapping of user intents → workflows.
+It is the resolution basis MCP uses at the start of a conversation:
+
+```text
+Percakapan (user message)
+    ↓  (LLM intent classification — PRD 21)
+INTENT (terdefinisi di registry)
+    ↓
+WORKFLOW (state machine untuk intent itu)
+    ↓
+INITIAL STATE
+```
+
+Registry structure:
+
+```text
+IntentRegistry
+├── schemaVersion
+└── intents[]
+    ├── id              (misal: BOOKING_PADEL)
+    ├── name            (misal: Pemesanan Lapangan Padel)
+    ├── description     (untuk LLM classification)
+    ├── workflowSlug    (workflow yang menangani intent ini)
+    ├── entryEvent      (event trigger awal)
+    ├── examples[]      (contoh frase user, utk training/klasifikasi)
+    └── priority        (tie-breaker saat ambigu, PRD 41)
+```
+
+Rules:
+
+* **Setiap intent terhubung ke SATU workflow** (state machine). Tidak ada
+  intent tanpa workflow.
+* **Intent berbeda-beda per percakapan**: satu percakapan bisa berpindah
+  intent (misal dari ORDER_MAKANAN ke ORDER_DOKTER), masing-masing masuk ke
+  state machine-nya sendiri (PRD 6, 8-C).
+* Resolusi urutan (PRD 39): explicit active workflow → event correlation →
+  intent-based resolution → clarify.
+* Registry adalah **tenant-scoped** dan **versioned**.
+* MCP tool `resolve_intent` (atau `get_active_workflow`) mengembalikan intent
+  terklasifikasi + workflow + current state kepada LLM.
+* `examples` membantu LLM classification & testing (golden conversation tests,
+  PRD 125).
+
+Example intents (tenant kafe):
+
+```text
+BOOKING_PADEL    → workflow: pemesanan-lapangan-padel
+ORDER_MAKANAN    → workflow: order-makanan
+ORDER_DOKTER     → workflow: order-dokter
 ```
 
 ---
@@ -1560,6 +1755,66 @@ timeout
 ```
 
 It can later resume.
+
+---
+
+## 43.1 Mid-Flow Interruption (Change Product / Re-order)
+
+A workflow must support being **interrupted mid-flow** — not only at a boundary —
+when the user changes their mind about an earlier decision.
+
+Example (order makanan):
+
+```text
+PAYMENT  (user diminta membayar)
+    ↓  product.change_requested   ← user interupsi: "ganti aren jadi sanger"
+CHANGE_PRODUCT
+    ↓  product.available          (cek stok sanger → ada)
+CHECK_STOCK
+    ↓  product.in_stock
+COLLECT_CUSTOMER   ← name & address SUDAH ada → JANGAN minta ulang
+    ↓  customer.ready
+PAYMENT  (lanjut, tidak restart dari nol)
+```
+
+Rules:
+
+* An interruption is just a normal **event** (`product.change_requested`) that
+  triggers a transition out of the current state — no special "jump" mechanism.
+* The workflow must **retain all prior context** (name, address, earlier items)
+  across the interruption (see 43.2).
+* After the interruption resolves, flow **resumes from where context is complete**,
+  not from `START`.
+* Re-verify anything that may have changed (e.g., stock of the new product) via
+  capability — never trust the LLM's claim (PRD 38, 112).
+
+---
+
+## 43.2 Context Preservation & Resume
+
+When an interruption or suspension occurs, the system must not lose collected context.
+
+```text
+Before interruption:
+  customer.name    = Baim
+  customer.address = Jl. Melati No. 1
+  order.items      = [aren coffee]
+
+After interruption (ganti ke sanger):
+  customer.name    = Baim        ← retained
+  customer.address = Jl. Melati No. 1  ← retained
+  order.items      = [sanger]    ← updated
+```
+
+Rules:
+
+* Collected context survives suspension/interruption (PRD 24 — persistent memory
+  vs workflow data distinction).
+* A state that already has all required context must **skip re-asking** (PRD 37).
+* `requiredContext` drives what must still be collected — the engine checks what
+  is present and only asks for the missing pieces.
+* Context is scoped: persistent memory (customer) vs workflow data (order) are
+  separate; deleting one must not delete the other.
 
 ---
 

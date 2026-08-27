@@ -6,7 +6,6 @@ import {
   FilePlus2,
   LayoutGrid,
   Redo2,
-  RotateCcw,
   Save,
   ShieldCheck,
   Undo2,
@@ -23,6 +22,11 @@ interface ToolbarStats {
   total: number
 }
 
+interface ExampleWorkflow {
+  slug: string
+  name: string
+}
+
 interface ToolbarProps {
   validation: WorkflowValidationResult | null
   onValidate: () => void
@@ -31,7 +35,8 @@ interface ToolbarProps {
   onExport: () => void
   onImport: () => void
   onNew: () => void
-  onReset: () => void
+  onReset: (slug: string) => void
+  examples: ExampleWorkflow[]
   onUndo: () => void
   onRedo: () => void
   canUndo: boolean
@@ -59,6 +64,7 @@ export function Toolbar({
   isSaving,
   lastSavedAt,
   stats,
+  examples,
   onNewStart,
   hasNode,
 }: ToolbarProps) {
@@ -178,14 +184,23 @@ export function Toolbar({
         >
           <FilePlus2 className="h-4 w-4" />
         </button>
-        <button
-          type="button"
-          onClick={onReset}
-          title="Reset ke contoh PADEL"
-          className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onReset(e.target.value)
+          }}
+          title="Muat contoh workflow"
+          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-50 focus:outline-none"
         >
-          <RotateCcw className="h-4 w-4" />
-        </button>
+          <option value="" disabled>
+            Contoh…
+          </option>
+          {examples.map((ex) => (
+            <option key={ex.slug} value={ex.slug}>
+              {ex.name}
+            </option>
+          ))}
+        </select>
 
         <button
           type="button"

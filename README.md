@@ -1,434 +1,226 @@
-# vibecoding-starter
+# OpenState — Enterprise Conversation State Orchestration Platform
 
-Starter monorepo for building products with **vibe coding** — a workflow where AI agents (Claude Code / Codex) handle implementation tasks end-to-end, from feature planning to merge-ready PRs.
+> **The LLM can suggest. The State Engine decides. The MCP executes. The RAG informs. PostgreSQL remembers.**
 
-This repo provides two things:
-1. **Production-ready starter monorepo** (Next.js + Go/Echo + asynq + local PostgreSQL + local Redis)
-2. **Agent system** (`.agents/`) containing skills, guides, and code examples used by AI agents during coding
+OpenState is an open-source, enterprise-grade platform for defining, publishing,
+executing, observing, and versioning **conversation state** and **business
+workflows**. It sits between the user's conversation and external AI/tooling
+systems, giving the LLM authoritative runtime context while keeping the LLM
+**out of the loop** when it comes to workflow state.
 
-Status:
-- Open source under [MIT](./LICENSE) license
-- Clone, fork, use as a baseline for new projects, or contribute back via pull requests
-- Agent workflow source of truth lives in `.agents/`
+## Why OpenState
 
-## Table of Contents
+LLMs are great at understanding language, inferring intent, and generating
+responses — but they must **never** become the source of truth for workflow
+state. OpenState gives you a deterministic state engine that controls:
 
-- [Open Source](#open-source)
-- [What's Included](#whats-included)
-- [Quick Start](#quick-start)
-- [Key Endpoints](#key-endpoints)
-- [OpenAPI & Scalar](#openapi--scalar)
-- [Quality Checks](#quality-checks)
-- [Start a Session](#start-a-session)
-  - [Invoking Skills Explicitly](#invoking-skills-explicitly)
-- [Vibe Coding Flow](#vibe-coding-flow)
-- [Developing the Agent System](#developing-the-agent-system)
-- [MCP Setup](#mcp-setup-for-ai-agents)
-- [Contributing](#contributing)
-- [License](#license)
+- Which business process the conversation is currently executing
+- What state that process is in
+- What context is available / required
+- What capabilities are allowed
+- What transitions are valid
 
-Stack:
-- `apps/web`: Next.js + Tailwind + Vitest
-- `apps/api`: Go (Echo, Clean Architecture) + sqlc + goose + pgx
-- `apps/worker`: Go (asynq) + Redis
-- `packages/go-shared`: Shared Go module (DomainError) — used by api + worker via `go.work`
-- `docker-compose.yml`: PostgreSQL + Redis for local development
-- `scripts/`: repo-level helper executables for bootstrap and operations
-- `Turbo` for task orchestration (web + packages)
-- `Bun` as package manager and script runner (frontend)
-- `Biome` for lint/format (frontend)
-- `Go 1.26` for backend and worker
+```
+User
+  ↓
+LLM
+  ↓
+Conversation Orchestrator
+  ├── Workflow Resolver
+  ├── State Engine
+  ├── Context Engine
+  ├── Policy Engine
+  ├── Event Engine
+  └── Capability Resolver
+        ├── MCP
+        └── RAG
+  ↓
+LLM
+  ↓
+User
+```
 
-## Open Source
+RAG and MCP are **not owned** by this platform — they are integrated through
+well-defined contracts.
 
-This repo is intended for public use:
-- Clone and use directly as a baseline for new projects
-- Fork for internal or custom workflow versions
-- Open issues or pull requests for fixes, cleanup, or new features
-- Licensed under **MIT** — commercial and non-commercial use allowed as long as the license notice is preserved
+## Core Principle
 
-## What's Included
+> **The LLM can suggest. The State Engine decides. The MCP executes. The RAG informs. PostgreSQL remembers.**
 
-### Monorepo Runtime
-- `apps/web` — Next.js App Router frontend
-- `apps/api` — Go backend with Echo and Clean Architecture layering (sqlc + goose + pgx)
-- `apps/worker` — Redis-based background worker (asynq)
-- `packages/go-shared` — Shared Go module for DomainError (used by api + worker via `go.work`)
-- `docker-compose.yml` — local PostgreSQL + Redis
-- `scripts/bootstrap-local.sh`, `scripts/compose.sh`, and other repo-level helpers
+| Component          | Responsibility                                                        |
+| ------------------ | --------------------------------------------------------------------- |
+| LLM                | Understand language, infer intent, generate responses                 |
+| State Orchestrator | Authoritative workflow/state decision                                  |
+| State Builder      | Define workflows visually                                             |
+| RAG                | Retrieve knowledge                                                     |
+| MCP                | Execute external capabilities/tools                                   |
+| PostgreSQL         | Persistent source of truth                                            |
 
-### Frontend Starter
-- App Router baseline pages
-- `NextAuth` credentials-based auth foundation in `apps/web/auth.ts`
-- Auth route handler at `apps/web/app/api/(auth)/auth/[...nextauth]/route.ts`
-- Internal BFF proxy at `apps/web/app/api/proxy/[...path]/route.ts`
-- Starter login page `/login` and register page `/register`
-- Route protection and basic redirects via `apps/web/proxy.ts`
-- `SessionProvider` and `QueryProvider`
-- Query client service and axios interceptors defaulting to internal proxy `/api/proxy`
-- Baseline constants for API routes and query keys
-- Utility hooks: `useQueryParam`, `useNetworkInfo`, `useUserAgent`
-- Utility helpers: `cn`, `objectToForm`, `rbacFilterMenu`
-- General frontend types for App Router, data tables, and NextAuth augmentation
-- Comprehensive reusable UI kit including:
-  - action dropdown, autocomplete, avatar, breadcrumb
-  - button, input, textarea, select, radio, radio-group, datepicker, file upload
-  - currency input, currency select, currency display, content title
-  - dialog, drawer, dropdown, menubar, tabs
-  - table, pagination, status badge, stat card, panel card, panel context, search toolbar
-  - text editor, map, route card, stepper, loading spinner, loading overlay, content loading, display with skeleton, empty state, user menu
+## Features
 
-### Backend Starter
-- API entrypoint with `/` and `/health` endpoints
-- Service + use case baseline for system info and health check
-- Controller, route, and middleware baseline for system endpoints
-- `DomainError` foundation in `packages/go-shared/domain` — shared by api and worker
-- Separate env config in `internal/infrastructure/config`
-- Middleware foundation for JWT, auth session, and centralized error handling (Echo)
-- Auth domain: register, login, logout, get-current-user use cases
-- sqlc query layer + goose migrations for PostgreSQL
-- pgx/v5 connection pool
-- Go multi-stage Dockerfile ready for Linux deployment
+- **Multi-tenant** — tenant isolation at API, service, repository, cache,
+  event, and capability layers
+- **Multiple workflows per tenant** — unlimited workflows (ORDER, BOOKING,
+  KONSULTASI, etc.)
+- **Workflow versioning** — immutable published versions, rollback for new
+  instances
+- **State Builder** — visual drag-and-drop flowchart editor (React Flow)
+- **Intent Registry** — conversation → intent → workflow → state resolution
+- **Deterministic guards** — JSON-based, no arbitrary code execution
+- **Events & transitions** — with priority, guards, and concurrency control
+- **State & workflow timeouts** — processed through the normal event pipeline
+- **Idempotency & optimistic concurrency** — safe external event processing
+- **Capability Registry** — logical capabilities mapped to MCP providers
+- **LLM context compilation** — minimal context per turn, PII redaction
+- **Suspension / resume** — mid-flow interruption without losing context
+- **Audit trail & replay** — full operational history
+- **Simulation & validation** — test workflows before publishing
+- **Import / Export** — versioned JSON, git-friendly
 
-### Worker Starter
-- Worker entrypoint connected to Redis (asynq)
-- Runtime summary job handler scaffold
-- Separate env config
-- Minimal queue bootstrap to start the first worker without business features
-- Go multi-stage Dockerfile ready for Linux deployment
+## Architecture
 
-### Shared Packages
-- `packages/schemas` — Zod schemas for frontend forms (login, register)
-- `packages/types` — shared TypeScript response types for frontend API consumption
-- `packages/utils` — pure utility functions shared across frontend apps
-- `packages/go-shared` — shared Go module (DomainError) for backend apps
+OpenState is a **modular monolith** (Go) with clean internal boundaries
+(domain / application / infrastructure / interfaces), per PRD section 175.
+It scales horizontally when operational requirements justify it.
 
-Utilities in `packages/utils`:
-- currency format, date range, debounce, enum to object, string generator
-- masking, number helpers, path variable, point converter, time helpers, to-camel-case
+```
+apps/
+  web/           Next.js + React Flow (State Builder, Admin Console)
+  api/           Go (Echo, Clean Architecture) + sqlc + goose + pgx
+  worker/        Go (asynq) + Redis (timeout, outbox, delayed events)
+packages/
+  go-shared/     Shared Go module
+  schemas/       Shared validation schemas
+  types/         Shared TypeScript types
+  utils/         Shared utilities
+```
 
-### Docs & DevEx
-- OpenAPI split source in `docs/openapi/`
-- Merged OpenAPI spec at `docs/openapi.json`
-- GitHub Actions for app CI and skill hygiene
+### Persistence
 
-### Agent Workflow
-- Onboarding session via `bun run session:status`
-- Planning & specs via [OpenSpec](https://github.com/Fission-AI/OpenSpec) (`/opsx:propose`)
-- Skill registry and agent entrypoint in `.agents/AGENTS.md`
-- Source of truth skills in `.agents/skills/`
-- Reusable examples in `.agents/examples/`
-- Claude wrappers auto-generated from source of truth skills
+PostgreSQL is the primary persistent database (the source of truth). The
+engine talks to **repository interfaces** — the Postgres adapter is the primary
+implementation, and MySQL/SQLite/MongoDB adapters can be added later without
+rewriting the engine. See [ADR-001](./docs/adr/ADR-001-persistence.md).
 
 ## Quick Start
 
-Prerequisites:
-- Bun `>= 1.3`
-- Go `>= 1.26`
-- Docker
+### Prerequisites
+
+- [Go](https://golang.org/dl/) 1.26+
+- [Bun](https://bun.sh) 1.3+
+- [Docker](https://www.docker.com/) (for local PostgreSQL + Redis)
+- [goose](https://github.com/pressly/goose) (migrations)
+
+### 1. Start infrastructure (PostgreSQL + Redis)
+
+```bash
+docker compose up -d
+```
+
+> Default ports: PostgreSQL `5437`, Redis `6381` (adjusted to avoid conflicts
+> with common local setups). See `docker-compose.yml`.
+
+### 2. Configure environment
+
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/worker/.env.example apps/worker/.env
+cp apps/web/.env.example apps/web/.env
+```
+
+Edit the `.env` files with your own secrets.
+
+### 3. Install dependencies & run migrations
 
 ```bash
 bun install
-bun run bootstrap
-bun run dev
+cd apps/api && goose -dir db/migrations postgres "$DATABASE_URL" up
 ```
 
-`bun run bootstrap` will:
-- Copy `.env.example` to `.env` if it doesn't exist
-- Start PostgreSQL and Redis
-- Wait for services to be ready
-- Run goose migrations
-- Generate merged OpenAPI spec
-
-After bootstrapping, initialize OpenSpec for the planning layer:
+### 4. Run the stack
 
 ```bash
-bunx openspec init
+# API (port 8020)
+cd apps/api && go run ./cmd/server/main.go
+
+# Worker (Redis queue)
+cd apps/worker && go run ./cmd/worker/main.go
+
+# Web (port 3020)
+cd apps/web && bun run dev
 ```
 
-This sets up the `openspec/` directory and generates slash commands for your AI tool of choice:
-- **Claude Code** — commands are added to `.claude/commands/`
-- **Codex** — invoke skills with `$openspec-propose`, `$openspec-apply-change`, etc.
-- **OpenCode** — instructions are loaded via `opencode.md` and `.opencode.json`
+Open:
 
-Daily commands:
-```bash
-bun run stack:up
-bun run stack:down
-bun run stack:logs
-bun run session:status
-bun run go:build
-bun run go:test
-bun run openapi:generate
-```
+- **State Builder**: <http://localhost:3020/state-builder>
+- **Web app**: <http://localhost:3020>
+- **API health**: <http://localhost:8020/health>
 
-Backend-specific (run from `apps/api/`):
-```bash
-go run ./cmd/server/main.go        # dev server
-go test ./...                      # run tests
-sqlc generate                      # regenerate DB queries
-goose -dir db/migrations postgres "$DATABASE_URL" up   # run migrations
-```
+## Configuration
 
-## Key Endpoints
-- Web: `http://localhost:3020`
-- Web login: `http://localhost:3020/login`
-- Web register: `http://localhost:3020/register`
-- Web auth route: `http://localhost:3020/api/auth/*`
-- Web internal proxy: `http://localhost:3020/api/proxy/*`
-- API root: `http://localhost:8080/`
-- API health: `http://localhost:8080/health`
-- API auth: `http://localhost:8080/api/auth/*`
-- Merged OpenAPI spec: `docs/openapi.json`
+| Env | Default | Description |
+| --- | --- | --- |
+| `API_PORT` | `8020` | HTTP API port |
+| `DATABASE_URL` | — | PostgreSQL connection string |
+| `JWT_SECRET` | — | JWT signing secret (API) |
+| `REDIS_URL` | `redis://127.0.0.1:6381` | Redis URL (worker) |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3020` | Web app base URL |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8020` | Backend base URL |
 
-## OpenAPI & Scalar
+## MCP Integration
 
-The OpenAPI workflow is ready for docs tooling:
-- Split JSON source of truth in `docs/openapi/base.json`, `docs/openapi/paths/*.json`, and `docs/openapi/schemas/*.json`
-- Merged artifact at `docs/openapi.json`
-- Merge generator runs via `bun run openapi:generate`
+OpenState exposes a **MCP server (HTTP/SSE)** so your LLM / RAG can connect and
+query / drive workflow state. Tools include:
 
-This means:
-- Don't edit `docs/openapi.json` directly
-- Update specs in the split `docs/openapi/` folder
-- Regenerate the merged spec afterward
+- `get_active_workflow` — conversation → intent → workflow + current state
+- `get_current_state` — state id, purpose, instructions, allowed events
+- `get_context` — available + missing context (PII-redacted)
+- `get_allowed_capabilities` — authorized capabilities per state
+- `propose_event` — LLM suggests, engine validates & transitions
+- `execute_capability` — authorized capability execution
+- `start_workflow`, `suspend_workflow`, `resume_workflow`, `cancel_workflow`
+- `get_workflow_instances`, `get_history`, `replay_workflow`
 
-## Quality Checks
+> The full MCP tool contract is tracked in the GitHub issue
+> "[MCP & Integrasi] Server MCP + LLM provider + capability".
 
-```bash
-bun run check
-```
+## Example Workflows
 
-Partial commands:
-```bash
-bun run lint          # Biome lint (frontend)
-bun run typecheck     # TypeScript typecheck (frontend)
-bun run test          # frontend tests
-bun run go:test       # Go tests (api + worker)
-bun run go:build      # Go build (api + worker)
-bun run build         # full turbo build
-```
+- **PADEL Booking** — availability check, overlap recommendation, 50% down payment
+- **Order Makanan** — product selection, stock check, recommendation, payment, mid-flow product change
+- **Order Dokter** — schedule/queue check, needs-based recommendation, doctor switch
 
-Generate merged OpenAPI spec:
-```bash
-bun run openapi:generate
-```
+Load them in the State Builder via the "Examples" dropdown.
 
-## Start a Session
+## Documentation
 
-Type **"Start"** or **"Mulai Vibe Coding"** in Claude Code or Codex.
+- **PRD**: [`MAIN_PRD.md`](./MAIN_PRD.md) — the product definition & engineering
+  specification (source of truth)
+- **Architecture Decision Records**: [`docs/adr/`](./docs/adr/)
+- **Operations**: [`docs/OPERATION.md`](./docs/OPERATION.md)
 
-The agent will run a quick check:
-- Check repo-level MCP (`.mcp.json`) and missing services
-- Check active branch and whether there's work in progress
+## Roadmap
 
-Then it will direct the session to one of:
-- Set up MCP first
-- Resume last task
-- Start a new feature via OpenSpec (`/opsx:propose`)
+Tracked as GitHub issues (per PRD phases):
 
-To run the same quick check manually:
-
-```bash
-bun run session:status
-```
-
-### Invoking Skills Explicitly
-
-Skills can be invoked directly — use these if you want full control:
-
-**Claude Code** — use `/` prefix:
-```
-/web-slicing
-/api-feature
-/web-api-integrated
-```
-
-**Codex** — use `$` prefix:
-```
-$web-slicing
-$api-feature
-$web-api-integrated
-```
-
-Full skill list available in `.agents/AGENTS.md` under `Skill Registry`.
-
----
-
-## Developing the Agent System
-
-### Creating a New Skill
-
-Use the `skill-creator` skill to add new capabilities to the agent system.
-
-**Claude:** `/skill-creator` &nbsp;|&nbsp; **Codex:** `$skill-creator`
-
-Or run the generator directly:
-
-```bash
-bun run skills:create -- \
-  --name {scope}-{capability} \
-  --scope {scope} \
-  --description "{One-line description}" \
-  --when "{When to use}"
-```
-
-The generator creates the full structure:
-
-```
-.agents/skills/{name}/
-├── SKILL.md                → Definition + workflow + constraints + checklist
-├── references/context.md   → Target folders + code examples + patterns
-├── templates/checklist.md  → Step-by-step execution checklist
-└── agents/openai.yaml      → Codex/OpenAI metadata
-.claude/skills/{name}/
-└── SKILL.md                → Claude wrapper (auto-generated)
-```
-
-After creating or modifying skills:
-
-```bash
-bun run skills:sync      # sync Claude wrappers from source of truth
-bun run skills:validate  # validate all skill assets
-```
-
-### Adding Training Data / Code Examples
-
-Use the `skill-add-example` skill to add real code examples as agent references.
-
-**Claude:** `/skill-add-example` &nbsp;|&nbsp; **Codex:** `$skill-add-example`
-
-Examples are stored in `.agents/examples/`:
-
-```
-.agents/examples/
-└── {skill-name}/
-    └── {framework-or-context}/
-        └── {example-name}/
-            ├── page.tsx
-            └── hooks/
-```
-
-Each example must be referenced in the related skill's `references/context.md` so the agent can find it during execution.
-
----
-
-## Vibe Coding Flow
-
-Feature development in this repo uses AI agents. Planning is handled by [OpenSpec](https://github.com/Fission-AI/OpenSpec), implementation is guided by **skills** — structured instructions the agent reads before executing tasks.
-
-**All feature work must follow the OpenSpec workflow.**
-
-Why:
-- **Structured thinking** — forces upfront design before implementation, reducing rework and scope creep
-- **Traceability** — every feature has documented proposal, specs, design, and tasks in `openspec/changes/`
-- **Quality assurance** — changes are reviewed against specs before archiving
-- **Context preservation** — future developers and AI agents can understand why decisions were made
-- **Collaboration** — clear handoff between propose → implement → verify phases
-
-Exceptions (direct implementation allowed):
-- Trivial fixes (typos, formatting, dead code removal)
-- Maintenance tasks (dependency updates, config adjustments)
-- Documentation-only changes
-- Emergency hotfixes (must be documented retroactively)
-
-### Phase 1 — Propose (OpenSpec)
-
-Turn a feature idea into a proposal, specs, design, and task list.
-
-```
-Trigger: /opsx:propose "feature name"
-Output:  openspec/changes/{slug}/
-           proposal.md
-           specs/
-           design.md
-           tasks.md
-```
-
----
-
-### Phase 2 — Implementation (per task)
-
-Execution order per feature:
-
-#### 2a. FE Slicing
-> Skill: `web-slicing`
-
-Implement UI from design/description — no real data yet, use dummy.
-
-```
-Target: apps/web/app/(group)/[feature]/
-Output: page.tsx + [feature]-content.tsx
-```
-
-#### 2b. Backend + OpenAPI
-> Skill: `api-feature` + `docs-openapi`
-
-Implement Clean Architecture in Go/Echo: entity → use case → repository → controller → route.
-Write split OpenAPI documentation alongside.
-
-```
-Target: apps/api/internal/
-         docs/openapi/
-```
-
-#### 2c. FE ↔ API Integration
-> Skill: `web-api-integrated`
-
-Create Zod schemas, response types, constants, and react-query hooks. Wire the sliced UI to the running API.
-
-```
-Target: packages/schemas/
-         packages/types/
-         apps/web/hooks/transactions/use-{domain}/
-         apps/web/constants/
-```
-
----
-
-### Phase 3 — Verify & Archive (OpenSpec)
-
-```
-Trigger: /opsx:verify     → validate implementation
-         /opsx:archive    → archive specs after completion
-```
-
-## MCP Setup for AI Agents
-
-Required MCP for this repo:
-- `github`
-
-Configuration is read from `.mcp.json` at the repo root. This file is gitignored since it contains real tokens/credentials.
-
-If you just cloned this repo:
-1. Create `.mcp.json` with your GitHub token
-2. Fill in `.agents/settings.json` for `repo.owner` and `repo.name`
-3. Run `bun run session:status`
-4. Start with OpenSpec or resume an active task
+1. **Runtime Engine** — state machine, guard evaluation, context store
+2. **Data & Persistence** — PostgreSQL schema + repository abstraction
+3. **MCP & Integration** — MCP server, LLM provider abstraction, capability
+4. **Frontend** — State Builder production + Admin Console
+5. **Security & Ops** — multi-tenant, RBAC, audit, observability, deployment
+6. **Quality** — example workflows, testing, documentation
 
 ## Contributing
 
-Contributions welcome.
+Contributions are welcome! Please:
 
-Recommended workflow:
-1. Fork or create a new branch from `main`
-2. Run `bun install`
-3. Run `bun run bootstrap`
-4. Make your changes
-5. Ensure `bun run check` passes for frontend, `go build ./...` for backend
-6. If touching skills / `.agents`, also run `bun run skills:sync` and `bun run skills:validate`
-7. Open a pull request
+1. Fork the repository
+2. Create a feature branch
+3. Follow the coding conventions (Biome for frontend, `go vet` for backend)
+4. Open a pull request
 
-For OpenAPI documentation changes:
-1. Edit split files in `docs/openapi/`
-2. Run `bun run openapi:generate`
-3. Commit both split files and `docs/openapi.json`
-
-For skill changes:
-1. Edit source of truth in `.agents/skills/*`
-2. Run `bun run skills:sync`
-3. Validate with `bun run skills:validate`
+See [`MAIN_PRD.md`](./MAIN_PRD.md) and the GitHub issues for the roadmap.
 
 ## License
 
-This repo is licensed under [MIT](./LICENSE).
+[MIT](./LICENSE)

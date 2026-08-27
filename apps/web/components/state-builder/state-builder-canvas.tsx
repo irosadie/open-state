@@ -20,7 +20,7 @@ import { edgeTypes } from "./edges/edges"
 import { nodeTypes } from "./nodes/nodes"
 import { Palette } from "./palette"
 import { PropertiesPanel } from "./properties-panel"
-import { useStateBuilderStore } from "./state-builder.store"
+import { EXAMPLE_WORKFLOWS, useStateBuilderStore } from "./state-builder.store"
 import { Toolbar } from "./toolbar"
 import { getLayoutedNodes } from "./utils/auto-layout"
 import { Toaster, toast } from "./utils/toast"
@@ -61,7 +61,7 @@ function BuilderInner() {
   const redo = useStateBuilderStore((s) => s.redo)
   const loadWorkflow = useStateBuilderStore((s) => s.loadWorkflow)
   const newWorkflow = useStateBuilderStore((s) => s.newWorkflow)
-  const resetToPadel = useStateBuilderStore((s) => s.resetToPadel)
+  const resetToWorkflow = useStateBuilderStore((s) => s.resetToWorkflow)
   const persist = useStateBuilderStore((s) => s.persist)
   const removeNode = useStateBuilderStore((s) => s.removeNode)
   const removeTransition = useStateBuilderStore((s) => s.removeTransition)
@@ -221,16 +221,20 @@ function BuilderInner() {
     }
   }, [newWorkflow])
 
-  const handleReset = useCallback(() => {
-    if (
-      window.confirm(
-        "Reset ke contoh PADEL? Perubahan pada canvas akan ditimpa (draft lama tetap tersimpan).",
-      )
-    ) {
-      resetToPadel()
-      toast.info("Di-reset ke contoh PADEL")
-    }
-  }, [resetToPadel])
+  const handleReset = useCallback(
+    (slug: string) => {
+      const example = EXAMPLE_WORKFLOWS.find((w) => w.slug === slug)
+      if (
+        window.confirm(
+          `Muat contoh workflow "${example?.name ?? slug}"? Perubahan pada canvas akan ditimpa (draft lama tetap tersimpan).`,
+        )
+      ) {
+        resetToWorkflow(slug)
+        toast.info(`Contoh "${example?.name ?? slug}" dimuat`)
+      }
+    },
+    [resetToWorkflow],
+  )
 
   const hasNode = useCallback(
     (kind: string) => workflow.nodes.some((n) => n.kind === kind),
@@ -274,6 +278,10 @@ function BuilderInner() {
         onImport={() => fileInputRef.current?.click()}
         onNew={handleNew}
         onReset={handleReset}
+        examples={EXAMPLE_WORKFLOWS.map((w) => ({
+          slug: w.slug,
+          name: w.name,
+        }))}
         onUndo={undo}
         onRedo={redo}
         canUndo={history.length > 0}

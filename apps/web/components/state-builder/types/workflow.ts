@@ -121,6 +121,37 @@ export interface WorkflowTrigger {
 }
 
 /**
+ * Intent — klasifikasi keinginan user pada satu percakapan.
+ * Setiap intent terhubung ke SATU state machine (workflow).
+ * Ini yang dikembalikan MCP pada awal percakapan / saat resolusi.
+ */
+export interface IntentDefinition {
+  /** kode intent, misal: BOOKING_PADEL */
+  id: string
+  /** nama deskriptif, misal: "Pemesanan Lapangan Padel" */
+  name: string
+  /** deskripsi kapan intent ini cocok (untuk LLM classification) */
+  description: string
+  /** slug workflow yang menangani intent ini */
+  workflowSlug: string
+  /** event trigger awal (default: workflow.started) */
+  entryEvent?: string
+  /** contoh frase user (untuk training/klasifikasi) */
+  examples?: string[]
+  /** prioritas tie-breaker saat ambigu (PRD 41) */
+  priority: number
+}
+
+/**
+ * Intent Registry — daftar intent terdefinisi untuk satu tenant.
+ * Basis resolusi: percakapan → intent → workflow (state machine).
+ */
+export interface IntentRegistry {
+  schemaVersion: number
+  intents: IntentDefinition[]
+}
+
+/**
  * Definisi workflow penuh (DSL). Sesuai PRD section 161.
  * Ini representasi yang disimpan & divalidasi.
  */
