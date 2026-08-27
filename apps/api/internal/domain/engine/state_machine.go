@@ -60,7 +60,7 @@ func (e *Engine) ProcessEvent(ctx context.Context, tenantID, instanceID string, 
 	if err != nil {
 		return nil, nil, err
 	}
-	if instance.Status != InstanceRunning && instance.Status != InstanceWaiting && instance.Status != InstanceSuspended {
+	if instance.Status != InstanceRunning && instance.Status != InstanceWaiting {
 		return nil, nil, domain.NewConflict("workflow instance is not active (status: " + string(instance.Status) + ")")
 	}
 
