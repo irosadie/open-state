@@ -41,7 +41,7 @@ output:
 # Semantic extraction (LLM-driven; only semantic descriptions sent, never raw source)
 semantic:
   enabled: true
-  model_env: GRAPHIFY_MODEL  # e.g. OPENAI_API_KEY / ANTHROPIC_API_KEY
+  # Uses your configured AI model API key (OPENAI_API_KEY / ANTHROPIC_API_KEY)
 
 # Export formats
 export:

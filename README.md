@@ -221,10 +221,18 @@ Graphify builds a queryable knowledge graph of the codebase (code + docs +
 diagrams) for the agent. Configuration lives in [`.graphify/`](./.graphify).
 
 ```bash
-# requires Python 3.12 and uv; run from the Graphify repo root
-uv sync --extra dev --extra cloud --no-editable --reinstall-package private-context-mcp
-uv run --no-sync private-context doctor
+# install via uv (provides `graphify` + `graphify-mcp` binaries)
+uv tool install graphifyy
+
+# verify
+graphify --help
+
+# run the local stdio MCP server
+graphify-mcp serve --transport stdio
 ```
+
+> Set your AI model API key (e.g. `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`) for
+> semantic extraction. Graphify only sends semantic descriptions, never raw source.
 
 Docs: <https://graphify.net/>
 
@@ -248,8 +256,8 @@ query / drive workflow state. Tools include:
 ## Example Workflows
 
 - **PADEL Booking** — availability check, overlap recommendation, 50% down payment
-- **Order Makanan** — product selection, stock check, recommendation, payment, mid-flow product change
-- **Order Dokter** — schedule/queue check, needs-based recommendation, doctor switch
+- **Order Food** — product selection, stock check, recommendation, payment, mid-flow product change
+- **Order Doctor** — schedule/queue check, needs-based recommendation, doctor switch
 
 Load them in the State Builder via the "Examples" dropdown.
 
