@@ -73,8 +73,27 @@ func (f *fakeCapRepo) ListByTenantFiltered(_ context.Context, _ string, _ entiti
 	return f.ListByTenant(context.Background(), "")
 }
 
-func (f *fakeCapRepo) Update(_ context.Context, _, _ string, _ *string, _ entities.ProviderType, _ *string, _, _ []byte, _ entities.CapabilityStatus, _ int, _ *string) (*entities.Capability, error) {
-	return nil, nil
+func (f *fakeCapRepo) Update(_ context.Context, _, id string, description *string, providerType entities.ProviderType, providerID *string, input, output []byte, status entities.CapabilityStatus, version int, credRef *string) (*entities.Capability, error) {
+	for _, c := range f.caps {
+		if c.ID == id {
+			if description != nil {
+				c.Description = sql.NullString{String: *description, Valid: true}
+			}
+			c.ProviderType = providerType
+			if providerID != nil {
+				c.ProviderID = sql.NullString{String: *providerID, Valid: true}
+			}
+			c.InputSchema = input
+			c.OutputSchema = output
+			c.Status = status
+			c.Version = version
+			if credRef != nil {
+				c.CredentialReference = sql.NullString{String: *credRef, Valid: true}
+			}
+			return c, nil
+		}
+	}
+	return nil, domain.NewNotFound("capability not found")
 }
 
 func (f *fakeCapRepo) UpdateStatus(_ context.Context, _, _ string, _ entities.CapabilityStatus) (*entities.Capability, error) {
