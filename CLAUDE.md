@@ -41,7 +41,6 @@ If the user only types `Start`, `Mulai`, `Mulai Vibe Coding`, or similar:
 | `docs-openapi` | Docs | Write or update split OpenAPI documentation per feature |
 | `ops-docker` | Ops | Write or modify backend Dockerfile for Linux deployment |
 | `ops-mcp-setup` | Ops | Setup GitHub MCP for this repo's workflow |
-| `flow-session-start` | Flow | Handle Start/Mulai command for repo onboarding |
 | `meta-skill-hygiene` | Meta | Audit and maintain skill metadata consistency |
 | `skill-add-example` | Meta | Add reusable example code for other skills |
 | `skill-creator` | Meta | Create or update skills with consistent format |

@@ -1,6 +1,0 @@
-interface:
-  display_name: "Session Start"
-  short_description: "Repo onboarding session from Start command"
-  default_prompt: "Use $flow-session-start when the user says Mulai, Start, or similar start-session commands for this repository."
-policy:
-  allow_implicit_invocation: true

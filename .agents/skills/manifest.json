@@ -86,13 +86,6 @@
       "whenToUse": "Setup GitHub MCP for this repo's workflow"
     },
     {
-      "name": "flow-session-start",
-      "description": "Handle Start or Mulai commands for repo onboarding: check MCP, registry, memory, and work status then direct user to the appropriate next step.",
-      "scope": "flow",
-      "path": ".agents/skills/flow-session-start",
-      "whenToUse": "Handle Start/Mulai command for repo onboarding"
-    },
-    {
       "name": "meta-skill-hygiene",
       "description": "Audit, sync, and maintain skill metadata consistency across this repo. Use when skills, the registry, Claude wrappers, or agent metadata change.",
       "scope": "meta",
