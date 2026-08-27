@@ -7,6 +7,7 @@ package db
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -105,6 +106,135 @@ type AuthSession struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type Capability struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+type CapabilityBinding struct {
+	ID           uuid.UUID `json:"id"`
+	TenantID     uuid.UUID `json:"tenant_id"`
+	CapabilityID uuid.UUID `json:"capability_id"`
+	ScopeType    string    `json:"scope_type"`
+	ScopeID      string    `json:"scope_id"`
+	Permission   string    `json:"permission"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type ContextRecord struct {
+	ID        uuid.UUID       `json:"id"`
+	TenantID  uuid.UUID       `json:"tenant_id"`
+	ScopeType string          `json:"scope_type"`
+	ScopeID   string          `json:"scope_id"`
+	Key       string          `json:"key"`
+	Value     json.RawMessage `json:"value"`
+	Version   int32           `json:"version"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+type MemoryReference struct {
+	ID                       uuid.UUID       `json:"id"`
+	TenantID                 uuid.UUID       `json:"tenant_id"`
+	OwnerType                string          `json:"owner_type"`
+	OwnerID                  string          `json:"owner_id"`
+	Name                     string          `json:"name"`
+	Value                    json.RawMessage `json:"value"`
+	SourceWorkflowInstanceID uuid.NullUUID   `json:"source_workflow_instance_id"`
+	CreatedAt                time.Time       `json:"created_at"`
+	UpdatedAt                time.Time       `json:"updated_at"`
+}
+
+type Policy struct {
+	ID        uuid.UUID       `json:"id"`
+	TenantID  uuid.UUID       `json:"tenant_id"`
+	ScopeType string          `json:"scope_type"`
+	ScopeID   string          `json:"scope_id"`
+	Type      string          `json:"type"`
+	Content   json.RawMessage `json:"content"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+type Project struct {
+	ID        uuid.UUID `json:"id"`
+	TenantID  uuid.UUID `json:"tenant_id"`
+	Name      string    `json:"name"`
+	Slug      string    `json:"slug"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type State struct {
+	ID                uuid.UUID       `json:"id"`
+	WorkflowVersionID uuid.UUID       `json:"workflow_version_id"`
+	Key               string          `json:"key"`
+	Kind              string          `json:"kind"`
+	Name              string          `json:"name"`
+	Description       sql.NullString  `json:"description"`
+	Instructions      sql.NullString  `json:"instructions"`
+	RequiredContext   json.RawMessage `json:"required_context"`
+	Capabilities      json.RawMessage `json:"capabilities"`
+	Policy            json.RawMessage `json:"policy"`
+	IsTerminal        bool            `json:"is_terminal"`
+	Position          json.RawMessage `json:"position"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
+}
+
+type StateInstance struct {
+	ID                 uuid.UUID     `json:"id"`
+	TenantID           uuid.UUID     `json:"tenant_id"`
+	WorkflowInstanceID uuid.UUID     `json:"workflow_instance_id"`
+	WorkflowVersionID  uuid.UUID     `json:"workflow_version_id"`
+	StateKey           string        `json:"state_key"`
+	StateID            uuid.NullUUID `json:"state_id"`
+	Status             string        `json:"status"`
+	Version            int32         `json:"version"`
+	RetryCount         int32         `json:"retry_count"`
+	EnteredAt          time.Time     `json:"entered_at"`
+	ExpiresAt          sql.NullTime  `json:"expires_at"`
+	ExitedAt           sql.NullTime  `json:"exited_at"`
+	CreatedAt          time.Time     `json:"created_at"`
+	UpdatedAt          time.Time     `json:"updated_at"`
+}
+
+type Transition struct {
+	ID                uuid.UUID `json:"id"`
+	WorkflowVersionID uuid.UUID `json:"workflow_version_id"`
+	Key               string    `json:"key"`
+	SourceStateID     uuid.UUID `json:"source_state_id"`
+	TargetStateID     uuid.UUID `json:"target_state_id"`
+	Event             string    `json:"event"`
+	Priority          int32     `json:"priority"`
+	IsActive          bool      `json:"is_active"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+type TransitionGuard struct {
+	ID                uuid.UUID       `json:"id"`
+	TransitionID      uuid.UUID       `json:"transition_id"`
+	WorkflowVersionID uuid.UUID       `json:"workflow_version_id"`
+	Logic             string          `json:"logic"`
+	Conditions        json.RawMessage `json:"conditions"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
+}
+
 type User struct {
 	ID           uuid.UUID      `json:"id"`
 	Email        string         `json:"email"`
@@ -115,4 +245,47 @@ type User struct {
 	Photo        sql.NullString `json:"photo"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
+}
+
+type Workflow struct {
+	ID             uuid.UUID      `json:"id"`
+	TenantID       uuid.UUID      `json:"tenant_id"`
+	ProjectID      uuid.UUID      `json:"project_id"`
+	Slug           string         `json:"slug"`
+	Name           string         `json:"name"`
+	Description    sql.NullString `json:"description"`
+	Status         string         `json:"status"`
+	CurrentVersion int32          `json:"current_version"`
+	Version        int32          `json:"version"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+type WorkflowInstance struct {
+	ID                     uuid.UUID      `json:"id"`
+	TenantID               uuid.UUID      `json:"tenant_id"`
+	WorkflowID             uuid.UUID      `json:"workflow_id"`
+	WorkflowVersionID      uuid.UUID      `json:"workflow_version_id"`
+	CorrelationKey         sql.NullString `json:"correlation_key"`
+	Status                 string         `json:"status"`
+	Version                int32          `json:"version"`
+	CurrentStateInstanceID uuid.NullUUID  `json:"current_state_instance_id"`
+	StartedAt              sql.NullTime   `json:"started_at"`
+	CompletedAt            sql.NullTime   `json:"completed_at"`
+	ExpiresAt              sql.NullTime   `json:"expires_at"`
+	CreatedAt              time.Time      `json:"created_at"`
+	UpdatedAt              time.Time      `json:"updated_at"`
+}
+
+type WorkflowVersion struct {
+	ID         uuid.UUID       `json:"id"`
+	WorkflowID uuid.UUID       `json:"workflow_id"`
+	TenantID   uuid.UUID       `json:"tenant_id"`
+	ProjectID  uuid.UUID       `json:"project_id"`
+	VersionNo  int32           `json:"version_no"`
+	Definition json.RawMessage `json:"definition"`
+	Status     string          `json:"status"`
+	IsCurrent  bool            `json:"is_current"`
+	CreatedAt  time.Time       `json:"created_at"`
+	UpdatedAt  time.Time       `json:"updated_at"`
 }

@@ -1,6 +1,6 @@
 ## Context
 
-The platform must persist workflow *definitions* as the source of truth (PRD 128), with a versioned, publish-immutable lifecycle (PRD 9, 55, 56) and tenant isolation (PRD 4, 96). Per ADR-001, the engine depends on a repository interface; PostgreSQL is the primary adapter. This change is the first persistence slice of epic #3.
+The platform must persist workflow *definitions* as the source of truth (PRD 128), with a versioned, publish-immutable lifecycle (PRD 9, 55, 56) and tenant+project isolation (PRD 4, 96, 3.1.1). Per ADR-001, the engine depends on a repository interface; PostgreSQL is the primary adapter. This change is the first persistence slice of epic #3. Hierarchy: `Tenant → Project → Intent → Workflow → State`.
 
 ## Goals / Non-Goals
 
@@ -18,6 +18,9 @@ The platform must persist workflow *definitions* as the source of truth (PRD 128
 
 ## Decisions
 
+### D0: Tenant → Project → Workflow hierarchy
+Per the engine refactor (Tenant → Project → Intent → Workflow → State), a `projects` table holds business areas owned by a tenant (PRD 3.1.1). `workflows` is scoped to `(tenant_id, project_id)`; `workflows.slug` is unique per `(tenant_id, project_id)` (PRD 5). Repository methods take explicit `tenantID` and `projectID`. An `IProjectRepository` manages projects separately.
+
 ### D1: Relational tables + full definition JSONB snapshot
 The epic and PRD 68 name concrete tables (`workflows`, `workflow_versions`, `states`, `transitions`, `transition_guards`). Each `workflow_versions.definition` also stores the complete `WorkflowDefinition` envelope as `JSONB` (same shape used by the builder, PRD 75.1). Relational rows give queryable access; JSONB preserves the authoritative authoring artifact and future portability to other adapters. Both are written atomically in the same transaction.
 
@@ -31,8 +34,8 @@ Per `db-sqlc-schema` prohibition (no PostgreSQL ENUM) and `api-feature` (typed G
 ### D4: Optimistic locking on the definition root
 `workflows.version` (integer, default 0) enables optimistic concurrency (PRD 31). Every update runs `... WHERE id=$n AND version=$old` and bumps `version=version+1`; a 0-row result signals a conflict. Instance-level locking is a later change.
 
-### D5: Tenant isolation via composite unique + scoped queries
-Every definition query filters by `tenant_id` (PRD 4, 96). `workflows` has `UNIQUE (tenant_id, slug)` (PRD 5: slug unique inside tenant). `IWorkflowRepository` methods take an explicit `tenantID string` parameter so cross-tenant reads are impossible at the data-access layer.
+### D5: Tenant+project isolation via composite unique + scoped queries
+Every definition query filters by `tenant_id` and `project_id` (PRD 4, 96, 3.1.1). `projects` has `UNIQUE (tenant_id, slug)`; `workflows` has `UNIQUE (tenant_id, project_id, slug)` (PRD 5). `IWorkflowRepository` methods take explicit `tenantID string` and `projectID string` parameters so cross-tenant/project reads are impossible at the data-access layer. `project_id` is denormalized onto `workflow_versions` for join-free scoped reads (PRD 96).
 
 ### D6: Entity identifiers as strings
 Following the auth pattern (`User.ID string`), entity IDs are `string` UUIDs; the adapter parses/serializes to `uuid.UUID` via pgx/sqlc. This keeps the domain DB-agnostic (ADR-001).
@@ -40,9 +43,19 @@ Following the auth pattern (`User.ID string`), entity IDs are `string` UUIDs; th
 ## Schema Outline
 
 ```
+projects
+  id            UUID PK
+  tenant_id     UUID NOT NULL
+  name          VARCHAR NOT NULL
+  slug          VARCHAR NOT NULL
+  status        VARCHAR NOT NULL DEFAULT 'ACTIVE'   -- ACTIVE/ARCHIVED
+  created_at / updated_at
+  UNIQUE(tenant_id, slug)
+
 workflows
   id            UUID PK
   tenant_id     UUID NOT NULL
+  project_id    UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE
   slug          VARCHAR NOT NULL
   name          VARCHAR NOT NULL
   description   TEXT
@@ -50,12 +63,13 @@ workflows
   current_version INT NOT NULL DEFAULT 0
   version       INT NOT NULL DEFAULT 0           -- optimistic lock (PRD 31)
   created_at / updated_at
-  UNIQUE(tenant_id, slug)
+  UNIQUE(tenant_id, project_id, slug)
 
 workflow_versions
   id            UUID PK
   workflow_id   UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE
   tenant_id     UUID NOT NULL                     -- denormalized for scoped reads
+  project_id    UUID NOT NULL                     -- denormalized for scoped reads
   version_no    INT NOT NULL
   definition    JSONB NOT NULL                    -- full WorkflowDefinition
   status        VARCHAR NOT NULL DEFAULT 'DRAFT'
@@ -100,7 +114,7 @@ transition_guards
   created_at / updated_at
 ```
 
-Indexes: FK columns (`tenant_id` on every table; `workflow_id` on versions; `workflow_version_id` on states/transitions; `transition_id` on guards), plus `workflows(tenant_id, slug)` unique and `workflow_versions(workflow_id, version_no)` unique.
+Indexes: FK columns (`tenant_id`/`project_id` on scoped tables; `workflow_id` on versions; `workflow_version_id` on states/transitions; `transition_id` on guards), plus `projects(tenant_id, slug)` unique, `workflows(tenant_id, project_id, slug)` unique, and `workflow_versions(workflow_id, version_no)` unique.
 
 ## Risks / Trade-offs
 

@@ -1,11 +1,10 @@
 # monorepo-identity Specification
 
 ## Purpose
-
 Define the repository identity (name, package scope, module paths) and the
 naming conventions used across the monorepo.
 
-## MODIFIED Requirements
+## Requirements
 
 ### Requirement: Consistent product name
 
