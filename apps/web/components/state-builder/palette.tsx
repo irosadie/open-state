@@ -24,7 +24,8 @@ function loadOrder(): string[] {
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return [...DEFAULT_ORDER]
     const order = parsed.filter(
-      (t): t is string => typeof t === "string" && DEFAULT_ORDER.includes(t as never),
+      (t): t is string =>
+        typeof t === "string" && DEFAULT_ORDER.includes(t as never),
     )
     // pastikan semua tipe ada (antisipasi tipe baru ditambahkan)
     for (const t of DEFAULT_ORDER) {
