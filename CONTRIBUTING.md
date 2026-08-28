@@ -38,16 +38,22 @@ Open an issue with:
      `const`, double quotes, no semicolons)
    - **Backend**: `go vet`, idiomatic Go, clean architecture
      (domain / application / infrastructure / interfaces)
-3. Add tests for new functionality.
+3. Add tests for new functionality. Feature changes follow the **OpenSpec**
+   workflow (propose → implement → verify → archive) tracked under
+   [`openspec/changes/`](./openspec/changes/).
 4. Run the quality checks:
    ```bash
    # frontend
    cd apps/web && bun run lint && bun run typecheck && bun run test
 
-   # backend
+   # backend (unit + golden + deterministic + E2E + load)
    cd apps/api && go vet ./... && go test ./...
    ```
 5. Commit with a clear message, then open a pull request.
+
+CI gates both toolchains via GitHub Actions:
+`.github/workflows/app-ci.yml` (frontend) and `.github/workflows/go-ci.yml`
+(Go backend build/vet/test/bench).
 
 ## Pull Request Guidelines
 

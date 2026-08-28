@@ -162,12 +162,17 @@ cp apps/web/.env.example apps/web/.env
 
 Edit the `.env` files with your own secrets.
 
-### 3. Install dependencies & run migrations
+### 3. Install dependencies, run migrations & seed
 
 ```bash
 bun install
 cd apps/api && goose -dir db/migrations postgres "$DATABASE_URL" up
+DATABASE_URL="..." go run ./cmd/seed
 ```
+
+The seed (idempotent) registers the demo example workflows under a dedicated
+demo tenant so they can be resolved and executed end-to-end. See
+[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md#seed-data).
 
 ### 4. Run the stack
 
@@ -291,11 +296,43 @@ tools:
 
 Load them in the State Builder via the "Examples" dropdown.
 
+## Quality & Testing
+
+The engine and integration surface are covered by deterministic tests that run
+in CI **without a real LLM** (PRD 170):
+
+- **Deterministic runtime tests** — every guard operator, AND/OR grouping,
+  priority ordering, and rejection, driven directly on the engine (PRD 126).
+- **Golden conversation tests** — per-workflow fixtures replaying user turns and
+  asserting the resolved state, as AI-behavior regression (PRD 125).
+- **End-to-end test** — a deterministic LLM/MCP mock drives the real MCP tool
+  handlers (`resolve_intent`, `start_workflow`, `propose_event`) through the
+  engine to a persisted state transition.
+- **Load test** — in-memory state-transition throughput baseline with a loose
+  lower bound, plus a Go benchmark (`go test -bench=BenchmarkProcessEvent`).
+
+Run them:
+
+```bash
+# Go backend (unit + golden + deterministic + E2E + load)
+cd apps/api && go test ./...
+
+# throughput benchmark
+cd apps/api && go test ./internal/domain/engine -bench=BenchmarkProcessEvent -benchtime=1s
+
+# frontend
+cd apps/web && bun run test
+```
+
+CI gates both toolchains: `.github/workflows/app-ci.yml` (frontend) and
+`.github/workflows/go-ci.yml` (Go build/vet/test/bench).
+
 ## Documentation
 
 - **PRD**: [`MAIN_PRD.md`](./MAIN_PRD.md) — the product definition & engineering
   specification (source of truth)
 - **Architecture Decision Records**: [`docs/adr/`](./docs/adr/)
+- **Deployment**: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) — local, Docker, and Kubernetes
 - **Operations**: [`docs/OPERATION.md`](./docs/OPERATION.md)
 - **Changelog**: [`CHANGELOG.md`](./CHANGELOG.md)
 - **Contributing**: [`CONTRIBUTING.md`](./CONTRIBUTING.md)

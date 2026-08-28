@@ -1,0 +1,413 @@
+{
+  "format": "openstate.workflow",
+  "version": 1,
+  "exportedAt": "2026-08-28T00:00:00.000Z",
+  "workflow": {
+    "slug": "order-food",
+    "name": "Order Makanan (Kafe)",
+    "description": "Workflow pemesanan makanan/minuman: pilih produk, cek stok, rekomendasi alternatif saat stok kosong, kumpulkan nama & alamat, pembayaran, dan dukung interupsi ganti produk di tengah proses.",
+    "schemaVersion": 1,
+    "status": "DRAFT",
+    "entryNodeId": "n_start",
+    "nodes": [
+      {
+        "id": "n_start",
+        "kind": "START",
+        "name": "START",
+        "description": "Titik masuk workflow order makanan.",
+        "requiredContext": [],
+        "capabilities": [],
+        "policy": {},
+        "isTerminal": false,
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_select_product",
+        "kind": "STATE",
+        "name": "SELECT_PRODUCT",
+        "description": "User memilih/menyebutkan produk yang ingin dipesan.",
+        "requiredContext": ["order.items"],
+        "capabilities": ["catalog.list"],
+        "instructions": "Terima produk yang diminta user. Konfirmasi produk & jumlah. Jika user belum menyebut produk, tanyakan. Jangan tanya ulang produk yang sudah ada di context.",
+        "policy": { "timeoutSeconds": 300, "onTimeout": "state.timeout" },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_check_stock",
+        "kind": "DECISION",
+        "name": "CHECK_STOCK",
+        "description": "Cek stok produk via MCP. Jika kosong, rekomendasi alternatif dalam kategori yang sama.",
+        "requiredContext": ["order.items", "product.sku"],
+        "capabilities": ["product.check_stock"],
+        "instructions": "Panggil product.check_stock. JANGAN percaya klaim user bahwa produk tersedia. Verifikasi dari sistem sebelum lanjut.",
+        "policy": {
+          "timeoutSeconds": 30,
+          "onTimeout": "state.timeout",
+          "retry": { "maxAttempts": 2, "backoffMs": 1000, "retryableEvents": ["capability.timeout"] }
+        },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_recommend_alternative",
+        "kind": "STATE",
+        "name": "RECOMMEND_ALTERNATIVE",
+        "description": "Produk kosong. Tampilkan rekomendasi produk lain dalam kategori yang sama.",
+        "requiredContext": ["product.category", "product.alternatives"],
+        "capabilities": ["product.suggest_alternatives"],
+        "instructions": "Beritahu user bahwa produk yang diminta kosong. Tampilkan 1-3 rekomendasi produk dalam kategori yang sama. Tunggu pilihan user.",
+        "policy": { "timeoutSeconds": 300, "onTimeout": "state.timeout" },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_collect_customer",
+        "kind": "STATE",
+        "name": "COLLECT_CUSTOMER",
+        "description": "Kumpulkan nama & alamat customer. Jangan minta ulang jika sudah ada di context.",
+        "requiredContext": ["customer.name", "customer.address"],
+        "capabilities": ["customer.lookup"],
+        "instructions": "Pastikan nama & alamat lengkap. Jika customer.name atau customer.address SUDAH ada di context, JANGAN tanya ulang. Hanya minta yang kurang. Verifikasi alamat yang ada.",
+        "policy": { "timeoutSeconds": 300, "onTimeout": "state.timeout" },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_payment",
+        "kind": "STATE",
+        "name": "PAYMENT",
+        "description": "Proses pembayaran pesanan.",
+        "requiredContext": ["order.id", "order.total", "customer.id"],
+        "capabilities": ["payment.instruction", "payment.create", "payment.status"],
+        "instructions": "Minta user melakukan pembayaran. Berikan instruksi. Tunggu verifikasi dari sistem. Terima event product.change_requested bila user ingin ganti produk di tengah.",
+        "policy": {
+          "timeoutSeconds": 900,
+          "onTimeout": "state.timeout",
+          "retry": { "maxAttempts": 3, "backoffMs": 2000, "retryableEvents": ["payment.failed", "capability.timeout"] }
+        },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_payment_failed",
+        "kind": "STATE",
+        "name": "PAYMENT_FAILED",
+        "description": "Pembayaran gagal. Tawarkan retry / ganti produk / batal.",
+        "requiredContext": ["order.id", "payment.failure_reason"],
+        "capabilities": ["payment.status"],
+        "instructions": "Beritahu user pembayaran gagal + alasan. Tawarkan coba lagi atau batal.",
+        "policy": { "timeoutSeconds": 300, "onTimeout": "state.timeout" },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_change_product",
+        "kind": "STATE",
+        "name": "CHANGE_PRODUCT",
+        "description": "User ingin ganti produk di tengah proses. Verifikasi stok produk baru.",
+        "requiredContext": ["product.sku", "order.items"],
+        "capabilities": ["product.check_stock", "catalog.list"],
+        "instructions": "User ingin mengganti produk. Tanyakan produk pengganti. Cek stok produk baru. Setelah ganti, PERTAHANKAN konteks yang sudah ada dan lanjut ke payment.",
+        "policy": { "timeoutSeconds": 300, "onTimeout": "state.timeout" },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_order_confirmed",
+        "kind": "END",
+        "name": "ORDER_CONFIRMED",
+        "description": "Pesanan berhasil & dibayar. Kirim konfirmasi/struk.",
+        "requiredContext": ["order.id", "payment.id"],
+        "capabilities": ["order.confirm", "notification.send_receipt"],
+        "instructions": "Konfirmasi pesanan, tampilkan ringkasan & estimasi selesai.",
+        "policy": {},
+        "isTerminal": true,
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_payment_expired",
+        "kind": "END",
+        "name": "PAYMENT_EXPIRED",
+        "description": "Waktu pembayaran habis. Pesanan dibatalkan otomatis.",
+        "requiredContext": ["order.id"],
+        "capabilities": ["order.cancel"],
+        "instructions": "Beritahu user waktu pembayaran habis dan pesanan dibatalkan.",
+        "policy": {},
+        "isTerminal": true,
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_cancelled",
+        "kind": "END",
+        "name": "CANCELLED",
+        "description": "Pesanan dibatalkan.",
+        "requiredContext": [],
+        "capabilities": ["order.cancel"],
+        "instructions": "Konfirmasi pembatalan pesanan.",
+        "policy": {},
+        "isTerminal": true,
+        "position": { "x": 0, "y": 0 }
+      }
+    ],
+    "transitions": [
+      {
+        "id": "tr_start_select",
+        "sourceStateId": "n_start",
+        "targetStateId": "n_select_product",
+        "event": "order.started",
+        "guards": [],
+        "priority": 1
+      },
+      {
+        "id": "tr_select_stock",
+        "sourceStateId": "n_select_product",
+        "targetStateId": "n_check_stock",
+        "event": "product.requested",
+        "guards": [
+          {
+            "id": "g1",
+            "logic": "AND",
+            "conditions": [
+              { "id": "c1", "field": "product.sku", "operator": "EXISTS" },
+              { "id": "c2", "field": "order.items", "operator": "EXISTS" }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_select_timeout",
+        "sourceStateId": "n_select_product",
+        "targetStateId": "n_cancelled",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_select_cancel",
+        "sourceStateId": "n_select_product",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 5
+      },
+      {
+        "id": "tr_stock_available",
+        "sourceStateId": "n_check_stock",
+        "targetStateId": "n_collect_customer",
+        "event": "product.in_stock",
+        "guards": [
+          {
+            "id": "g2",
+            "logic": "AND",
+            "conditions": [{ "id": "c3", "field": "product.in_stock", "operator": "==", "value": "true" }]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_stock_unavailable",
+        "sourceStateId": "n_check_stock",
+        "targetStateId": "n_recommend_alternative",
+        "event": "product.out_of_stock",
+        "guards": [
+          {
+            "id": "g3",
+            "logic": "AND",
+            "conditions": [{ "id": "c4", "field": "product.in_stock", "operator": "==", "value": "false" }]
+          }
+        ],
+        "priority": 2
+      },
+      {
+        "id": "tr_stock_timeout",
+        "sourceStateId": "n_check_stock",
+        "targetStateId": "n_select_product",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_reco_select",
+        "sourceStateId": "n_recommend_alternative",
+        "targetStateId": "n_check_stock",
+        "event": "product.selected",
+        "guards": [
+          {
+            "id": "g4",
+            "logic": "AND",
+            "conditions": [{ "id": "c5", "field": "product.sku", "operator": "EXISTS" }]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_reco_cancel",
+        "sourceStateId": "n_recommend_alternative",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 2
+      },
+      {
+        "id": "tr_reco_timeout",
+        "sourceStateId": "n_recommend_alternative",
+        "targetStateId": "n_cancelled",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_customer_payment",
+        "sourceStateId": "n_collect_customer",
+        "targetStateId": "n_payment",
+        "event": "customer.ready",
+        "guards": [
+          {
+            "id": "g5",
+            "logic": "AND",
+            "conditions": [
+              { "id": "c6", "field": "customer.name", "operator": "EXISTS" },
+              { "id": "c7", "field": "customer.address", "operator": "EXISTS" }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_customer_cancel",
+        "sourceStateId": "n_collect_customer",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 2
+      },
+      {
+        "id": "tr_payment_success",
+        "sourceStateId": "n_payment",
+        "targetStateId": "n_order_confirmed",
+        "event": "payment.success",
+        "guards": [
+          {
+            "id": "g6",
+            "logic": "AND",
+            "conditions": [
+              { "id": "c8", "field": "payment.status", "operator": "==", "value": "success" },
+              { "id": "c9", "field": "payment.amount", "operator": ">=", "value": "order.total" }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_payment_failed",
+        "sourceStateId": "n_payment",
+        "targetStateId": "n_payment_failed",
+        "event": "payment.failed",
+        "guards": [
+          {
+            "id": "g7",
+            "logic": "AND",
+            "conditions": [{ "id": "c10", "field": "payment.status", "operator": "==", "value": "failed" }]
+          }
+        ],
+        "priority": 2
+      },
+      {
+        "id": "tr_payment_change",
+        "sourceStateId": "n_payment",
+        "targetStateId": "n_change_product",
+        "event": "product.change_requested",
+        "guards": [],
+        "priority": 3
+      },
+      {
+        "id": "tr_payment_timeout",
+        "sourceStateId": "n_payment",
+        "targetStateId": "n_payment_expired",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_payment_exhausted",
+        "sourceStateId": "n_payment",
+        "targetStateId": "n_cancelled",
+        "event": "retry.exhausted",
+        "guards": [],
+        "priority": 6
+      },
+      {
+        "id": "tr_failed_retry",
+        "sourceStateId": "n_payment_failed",
+        "targetStateId": "n_payment",
+        "event": "retry.requested",
+        "guards": [],
+        "priority": 1
+      },
+      {
+        "id": "tr_failed_cancel",
+        "sourceStateId": "n_payment_failed",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 2
+      },
+      {
+        "id": "tr_failed_change",
+        "sourceStateId": "n_payment_failed",
+        "targetStateId": "n_change_product",
+        "event": "product.change_requested",
+        "guards": [],
+        "priority": 3
+      },
+      {
+        "id": "tr_change_verify",
+        "sourceStateId": "n_change_product",
+        "targetStateId": "n_check_stock",
+        "event": "product.available",
+        "guards": [
+          {
+            "id": "g8",
+            "logic": "AND",
+            "conditions": [{ "id": "c11", "field": "product.in_stock", "operator": "==", "value": "true" }]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_change_unavailable",
+        "sourceStateId": "n_change_product",
+        "targetStateId": "n_recommend_alternative",
+        "event": "product.unavailable",
+        "guards": [
+          {
+            "id": "g9",
+            "logic": "AND",
+            "conditions": [{ "id": "c12", "field": "product.in_stock", "operator": "==", "value": "false" }]
+          }
+        ],
+        "priority": 2
+      },
+      {
+        "id": "tr_change_keep",
+        "sourceStateId": "n_change_product",
+        "targetStateId": "n_collect_customer",
+        "event": "keep.current",
+        "guards": [],
+        "priority": 3
+      },
+      {
+        "id": "tr_change_cancel",
+        "sourceStateId": "n_change_product",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 5
+      }
+    ],
+    "policy": {
+      "maxDurationSeconds": 3600,
+      "interruptible": "USER_REQUESTED",
+      "priority": 10
+    },
+    "triggers": [
+      { "event": "food.order.requested", "source": "intent" },
+      { "event": "order.started", "source": "api" }
+    ]
+  }
+}

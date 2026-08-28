@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/irosadie/open-state/go-shared/domain"
@@ -176,12 +177,20 @@ func transitionsFrom(def *WorkflowDefinition, sourceStateID, eventType string) [
 
 // selectTransition returns the highest-priority transition whose guards pass.
 // Returns nil if none pass. (PRD §34 — lower numeric priority evaluated first)
+//
+// A candidate whose guards fail (ErrGuardFailed) is skipped, not fatal, so the
+// highest-priority *passing* transition wins. Only genuine evaluation errors
+// (e.g. an unsupported operator) abort the selection.
 func selectTransition(candidates []TransitionDefinition, ctx map[string]any) (*TransitionDefinition, error) {
 	var best *TransitionDefinition
 	for i := range candidates {
 		c := candidates[i]
 		ok, err := EvaluateGuards(c.Guards, ctx)
 		if err != nil {
+			var guardErr *ErrGuardFailed
+			if errors.As(err, &guardErr) {
+				continue // this candidate doesn't apply; try the next
+			}
 			return nil, err
 		}
 		if !ok {

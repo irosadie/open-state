@@ -1,0 +1,70 @@
+name: Go CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "packages/go-shared/**"
+      - "go.work"
+      - "go.work.sum"
+      - "**/go.mod"
+      - "**/go.sum"
+      - ".github/workflows/go-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/**"
+      - "packages/go-shared/**"
+      - "go.work"
+      - "go.work.sum"
+      - "**/go.mod"
+      - "**/go.sum"
+      - ".github/workflows/go-ci.yml"
+
+concurrency:
+  group: go-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+
+      - name: Build (apps/api + apps/worker via workspace)
+        working-directory: apps/api
+        run: go build ./...
+
+      - name: Vet (apps/api)
+        working-directory: apps/api
+        run: go vet ./...
+
+      - name: Build (apps/worker)
+        working-directory: apps/worker
+        run: go build ./...
+
+      - name: Vet (apps/worker)
+        working-directory: apps/worker
+        run: go vet ./...
+
+      - name: Test (unit + golden + deterministic + E2E + load)
+        working-directory: apps/api
+        run: go test ./...
+
+      - name: Test (apps/worker)
+        working-directory: apps/worker
+        run: go test ./...
+
+      - name: Benchmark smoke (engine throughput)
+        working-directory: apps/api
+        run: go test ./internal/domain/engine -run '^$' -bench=BenchmarkProcessEvent -benchtime=100ms

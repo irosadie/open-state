@@ -1,0 +1,325 @@
+{
+  "format": "openstate.workflow",
+  "version": 1,
+  "exportedAt": "2026-08-28T00:00:00.000Z",
+  "workflow": {
+    "slug": "order-doctor",
+    "name": "Order Dokter (Konsultasi)",
+    "description": "Workflow konsultasi dokter: pilih spesialisasi/dokter, cek jadwal & antrian, rekomendasi dokter sesuai kebutuhan, tawarkan waktu alternatif saat slot penuh/jadwal tak sesuai, dan dukung ganti dokter/waktu di tengah proses.",
+    "schemaVersion": 1,
+    "status": "DRAFT",
+    "entryNodeId": "n_start",
+    "nodes": [
+      {
+        "id": "n_start",
+        "kind": "START",
+        "name": "START",
+        "description": "Titik masuk workflow konsultasi dokter.",
+        "requiredContext": [],
+        "capabilities": [],
+        "policy": {},
+        "isTerminal": false,
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_select_specialty",
+        "kind": "STATE",
+        "name": "SELECT_SPECIALTY",
+        "description": "User menyebut dokter spesifik (misal dokter Raffi) atau kategori (misal dokter gizi).",
+        "requiredContext": ["doctor.specialty"],
+        "capabilities": ["doctor.lookup", "catalog.doctor_list"],
+        "instructions": "Terima permintaan user: dokter spesifik atau kategori spesialisasi. Jika belum jelas, tanyakan. Jangan tanya ulang yang sudah ada di context.",
+        "policy": { "timeoutSeconds": 300, "onTimeout": "state.timeout" },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_check_availability",
+        "kind": "DECISION",
+        "name": "CHECK_AVAILABILITY",
+        "description": "Cek jadwal & antrian dokter yang diminta. Mengarahkan ke: slot tersedia, jadwal tak sesuai, atau rekomendasi dokter lain.",
+        "requiredContext": ["doctor.id", "booking.date"],
+        "capabilities": ["schedule.check", "queue.check"],
+        "instructions": "Cek jadwal & antrian via sistem (bukan klaim user). Tentukan arah: dokter tersedia, jadwal tidak sesuai permintaan, atau butuh rekomendasi dokter lain.",
+        "policy": {
+          "timeoutSeconds": 30,
+          "onTimeout": "state.timeout",
+          "retry": { "maxAttempts": 2, "backoffMs": 1000, "retryableEvents": ["capability.timeout"] }
+        },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_recommend_doctor",
+        "kind": "STATE",
+        "name": "RECOMMEND_DOCTOR",
+        "description": "Rekomendasikan dokter sesuai kategori/kebutuhan user.",
+        "requiredContext": ["doctor.specialty", "patient.needs"],
+        "capabilities": ["doctor.recommend", "catalog.doctor_list"],
+        "instructions": "Jika user minta rekomendasi berdasarkan kebutuhan, berikan daftar dokter yang sesuai. Tampilkan 2-3 opsi. Tunggu pilihan user.",
+        "policy": { "timeoutSeconds": 300, "onTimeout": "state.timeout" },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_offer_alternative_time",
+        "kind": "STATE",
+        "name": "OFFER_ALTERNATIVE_TIME",
+        "description": "Jadwal yang diminta tidak tersedia / slot penuh. Tawarkan waktu alternatif atau jadwal berikutnya.",
+        "requiredContext": ["doctor.id", "booking.date", "schedule.alternatives"],
+        "capabilities": ["schedule.check"],
+        "instructions": "Beritahu user jadwal yang diminta tidak tersedia. Tawarkan alternatif. Tunggu pilihan: pilih slot, ganti waktu, atau batal.",
+        "policy": { "timeoutSeconds": 300, "onTimeout": "state.timeout" },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_select_time_slot",
+        "kind": "STATE",
+        "name": "SELECT_TIME_SLOT",
+        "description": "User memilih jam. Sistem cek antrian untuk memastikan slot masih tersedia.",
+        "requiredContext": ["doctor.id", "booking.date", "booking.time_start"],
+        "capabilities": ["schedule.check", "queue.check", "booking.reserve"],
+        "instructions": "Tampilkan jam yang tersedia. Saat user memilih, cek antrian/slot terlebih dahulu. Jika slot tersedia, konfirmasi.",
+        "policy": { "timeoutSeconds": 300, "onTimeout": "state.timeout" },
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_booking_confirmed",
+        "kind": "END",
+        "name": "BOOKING_CONFIRMED",
+        "description": "Antrian konsultasi berhasil dipesan.",
+        "requiredContext": ["booking.id", "doctor.id", "booking.time_start"],
+        "capabilities": ["booking.confirm", "notification.send_confirmation"],
+        "instructions": "Konfirmasi antrian: dokter, tanggal, jam, nomor antrian.",
+        "policy": {},
+        "isTerminal": true,
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "n_cancelled",
+        "kind": "END",
+        "name": "CANCELLED",
+        "description": "Permintaan konsultasi dibatalkan.",
+        "requiredContext": [],
+        "capabilities": ["booking.cancel"],
+        "instructions": "Konfirmasi pembatalan.",
+        "policy": {},
+        "isTerminal": true,
+        "position": { "x": 0, "y": 0 }
+      }
+    ],
+    "transitions": [
+      {
+        "id": "tr_start_specialty",
+        "sourceStateId": "n_start",
+        "targetStateId": "n_select_specialty",
+        "event": "consultation.requested",
+        "guards": [],
+        "priority": 1
+      },
+      {
+        "id": "tr_specialty_check",
+        "sourceStateId": "n_select_specialty",
+        "targetStateId": "n_check_availability",
+        "event": "doctor.requested",
+        "guards": [
+          {
+            "id": "g1",
+            "logic": "AND",
+            "conditions": [{ "id": "c1", "field": "doctor.specialty", "operator": "EXISTS" }]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_specialty_cancel",
+        "sourceStateId": "n_select_specialty",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 5
+      },
+      {
+        "id": "tr_specialty_timeout",
+        "sourceStateId": "n_select_specialty",
+        "targetStateId": "n_cancelled",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_check_available",
+        "sourceStateId": "n_check_availability",
+        "targetStateId": "n_select_time_slot",
+        "event": "doctor.available",
+        "guards": [
+          {
+            "id": "g2",
+            "logic": "AND",
+            "conditions": [{ "id": "c2", "field": "schedule.available", "operator": "==", "value": "true" }]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_check_mismatch",
+        "sourceStateId": "n_check_availability",
+        "targetStateId": "n_offer_alternative_time",
+        "event": "doctor.schedule_mismatch",
+        "guards": [
+          {
+            "id": "g3",
+            "logic": "AND",
+            "conditions": [{ "id": "c3", "field": "schedule.available", "operator": "==", "value": "false" }]
+          }
+        ],
+        "priority": 2
+      },
+      {
+        "id": "tr_check_recommend",
+        "sourceStateId": "n_check_availability",
+        "targetStateId": "n_recommend_doctor",
+        "event": "doctor.unavailable",
+        "guards": [],
+        "priority": 3
+      },
+      {
+        "id": "tr_check_recommend_needs",
+        "sourceStateId": "n_check_availability",
+        "targetStateId": "n_recommend_doctor",
+        "event": "doctor.recommend",
+        "guards": [],
+        "priority": 4
+      },
+      {
+        "id": "tr_check_timeout",
+        "sourceStateId": "n_check_availability",
+        "targetStateId": "n_cancelled",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_reco_select",
+        "sourceStateId": "n_recommend_doctor",
+        "targetStateId": "n_check_availability",
+        "event": "doctor.selected",
+        "guards": [
+          {
+            "id": "g4",
+            "logic": "AND",
+            "conditions": [{ "id": "c4", "field": "doctor.id", "operator": "EXISTS" }]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_reco_cancel",
+        "sourceStateId": "n_recommend_doctor",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 5
+      },
+      {
+        "id": "tr_reco_timeout",
+        "sourceStateId": "n_recommend_doctor",
+        "targetStateId": "n_cancelled",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_alt_reserve",
+        "sourceStateId": "n_offer_alternative_time",
+        "targetStateId": "n_select_time_slot",
+        "event": "slot.reserved",
+        "guards": [
+          {
+            "id": "g5",
+            "logic": "AND",
+            "conditions": [{ "id": "c5", "field": "booking.time_start", "operator": "EXISTS" }]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_alt_change",
+        "sourceStateId": "n_offer_alternative_time",
+        "targetStateId": "n_select_time_slot",
+        "event": "time.change_requested",
+        "guards": [],
+        "priority": 2
+      },
+      {
+        "id": "tr_alt_cancel",
+        "sourceStateId": "n_offer_alternative_time",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 5
+      },
+      {
+        "id": "tr_alt_timeout",
+        "sourceStateId": "n_offer_alternative_time",
+        "targetStateId": "n_cancelled",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      },
+      {
+        "id": "tr_slot_confirm",
+        "sourceStateId": "n_select_time_slot",
+        "targetStateId": "n_booking_confirmed",
+        "event": "slot.confirmed",
+        "guards": [
+          {
+            "id": "g6",
+            "logic": "AND",
+            "conditions": [
+              { "id": "c6", "field": "queue.available", "operator": "==", "value": "true" },
+              { "id": "c7", "field": "booking.time_start", "operator": "EXISTS" }
+            ]
+          }
+        ],
+        "priority": 1
+      },
+      {
+        "id": "tr_slot_full",
+        "sourceStateId": "n_select_time_slot",
+        "targetStateId": "n_offer_alternative_time",
+        "event": "slot.full",
+        "guards": [
+          {
+            "id": "g7",
+            "logic": "AND",
+            "conditions": [{ "id": "c8", "field": "queue.available", "operator": "==", "value": "false" }]
+          }
+        ],
+        "priority": 2
+      },
+      {
+        "id": "tr_slot_cancel",
+        "sourceStateId": "n_select_time_slot",
+        "targetStateId": "n_cancelled",
+        "event": "user.cancelled",
+        "guards": [],
+        "priority": 5
+      },
+      {
+        "id": "tr_slot_timeout",
+        "sourceStateId": "n_select_time_slot",
+        "targetStateId": "n_cancelled",
+        "event": "state.timeout",
+        "guards": [],
+        "priority": 10
+      }
+    ],
+    "policy": {
+      "maxDurationSeconds": 7200,
+      "interruptible": "USER_REQUESTED",
+      "priority": 10
+    },
+    "triggers": [
+      { "event": "doctor.consultation.requested", "source": "intent" },
+      { "event": "doctor.consultation.started", "source": "api" }
+    ]
+  }
+}
