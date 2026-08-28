@@ -38,8 +38,14 @@ func (fakeOrchestrator) ListInstances(context.Context, string) ([]entities.Workf
 func (fakeOrchestrator) GetCurrentState(context.Context, string, string) (*entities.WorkflowInstance, *entities.StateInstance, error) {
 	return nil, nil, nil
 }
+func (fakeOrchestrator) GetActiveWorkflow(context.Context, string, string) (*entities.WorkflowInstance, error) {
+	return nil, nil
+}
 func (fakeOrchestrator) ListHistory(context.Context, string, string) ([]entities.Event, error) {
 	return nil, nil
+}
+func (fakeOrchestrator) ReplayWorkflow(context.Context, string, string) (map[string]any, *entities.Event, error) {
+	return map[string]any{}, nil, nil
 }
 func (fakeOrchestrator) ProposeEvent(context.Context, string, string, string, map[string]any, string) (*entities.Event, error) {
 	return nil, nil
@@ -50,10 +56,12 @@ func (fakeOrchestrator) ListAllowedCapabilities(context.Context, string, entitie
 
 type fakeIntentResolver struct{}
 
-func (fakeIntentResolver) ListIntents() []IntentInfo {
-	return []IntentInfo{
-		{ID: "BOOKING_PADEL", ProjectID: "project-padel", Name: "Padel", WorkflowSlug: "padel-booking"},
-	}
+func (fakeIntentResolver) ListIntents(context.Context, string, string) ([]entities.Workflow, error) {
+	return []entities.Workflow{{ID: "BOOKING_PADEL", Slug: "padel-booking", Name: "Padel"}}, nil
+}
+
+func (fakeIntentResolver) ResolveIntent(_ context.Context, _ string, projectID, intentID string) (*entities.Workflow, error) {
+	return &entities.Workflow{ID: intentID, Slug: "padel-booking", Name: "Padel", Status: entities.WorkflowPublished}, nil
 }
 
 func TestServerRegistersTools(t *testing.T) {
@@ -73,6 +81,7 @@ func TestServerRegistersTools(t *testing.T) {
 		"cancel_workflow",
 		"get_workflow_instances",
 		"get_history",
+		"replay_workflow",
 	}
 	if len(tools) != len(expected) {
 		t.Errorf("expected %d tools, got %d: %v", len(expected), len(tools), toolNames(tools))
@@ -99,6 +108,7 @@ func TestResolveIntentTool(t *testing.T) {
 	call := mcp.CallToolRequest{Params: mcp.CallToolParams{
 		Name: "resolve_intent",
 		Arguments: map[string]any{
+			"tenant":  "tenant-1",
 			"intent":  "BOOKING_PADEL",
 			"project": "project-padel",
 		},

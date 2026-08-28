@@ -56,20 +56,26 @@ func main() {
 		raginfra.NewDefaultRedactor(),
 	)
 
-	// Capability invoker (sandbox/mock provider by default, PRD §2064).
+	// Capability invoker (sandbox/mock provider by default, PRD §2064). Wired with
+	// a repository-backed resolver (authorization, PRD 59-62) and the JSON schema
+	// validator (payload validation, PRD 62).
+	capResolver := capability.NewCapabilityResolver(adapter.Capabilities())
 	invoker := capability.NewCapabilityInvoker(
-		nil, // capability resolver not wired in this slice
+		capResolver,
 		capinfra.MockProviderResolver{},
-		nil, // schema validator not wired in this slice
+		capinfra.JSONSchemaValidator{},
 		nil, // rate limiter not wired in this slice
 		capability.NewInMemoryIdempotencyStore(),
 	)
 
+	// Intent service: resolves conversation intents to real workflows (PRD 38, 171).
+	intentSvc := appservices.NewIntentService(adapter.Workflows())
+
 	deps := mcpapi.Dependencies{
-		IntentResolver:  stubIntentResolver{},
+		IntentResolver:    intentSvc,
 		CapabilityInvoker: invoker,
-		Orchestrator:     orchestrator,
-		ContextCompiler:  contextCompiler,
+		Orchestrator:      orchestrator,
+		ContextCompiler:   contextCompiler,
 	}
 
 	srv := mcpapi.NewServer(deps)
@@ -92,9 +98,3 @@ func main() {
 		log.Fatalf("MCP server error: %v", err)
 	}
 }
-
-// stubIntentResolver provides intent listing when the real registry is not
-// wired in this slice.
-type stubIntentResolver struct{}
-
-func (stubIntentResolver) ListIntents() []mcpapi.IntentInfo { return nil }

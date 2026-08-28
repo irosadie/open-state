@@ -22,10 +22,8 @@ import (
 // Dependencies bundles the domain services the MCP server needs. This keeps
 // the package decoupled from concrete infrastructure wiring.
 type Dependencies struct {
-	// IntentResolver resolves an intent to its workflow + initial state.
-	IntentResolver interface {
-		ListIntents() []IntentInfo
-	}
+	// IntentResolver resolves an intent to its workflow (PRD 38, 171).
+	IntentResolver IntentPort
 	// CapabilityInvoker executes authorized capabilities.
 	CapabilityInvoker *capability.CapabilityInvoker
 	// Orchestrator exposes runtime workflow orchestration (lifecycle, history,
@@ -33,6 +31,12 @@ type Dependencies struct {
 	Orchestrator OrchestratorPort
 	// ContextCompiler compiles minimal per-turn context (PRD 22).
 	ContextCompiler ContextCompilerPort
+}
+
+// IntentPort resolves conversation intents to workflows.
+type IntentPort interface {
+	ListIntents(ctx context.Context, tenantID, projectID string) ([]entities.Workflow, error)
+	ResolveIntent(ctx context.Context, tenantID, projectID, intentID string) (*entities.Workflow, error)
 }
 
 // OrchestratorPort is the application-layer seam the orchestrator tools delegate
@@ -44,7 +48,9 @@ type OrchestratorPort interface {
 	CancelWorkflow(ctx context.Context, tenantID, instanceID string) (*entities.WorkflowInstance, error)
 	ListInstances(ctx context.Context, tenantID string) ([]entities.WorkflowInstance, error)
 	GetCurrentState(ctx context.Context, tenantID, instanceID string) (*entities.WorkflowInstance, *entities.StateInstance, error)
+	GetActiveWorkflow(ctx context.Context, tenantID, conversationID string) (*entities.WorkflowInstance, error)
 	ListHistory(ctx context.Context, tenantID, instanceID string) ([]entities.Event, error)
+	ReplayWorkflow(ctx context.Context, tenantID, instanceID string) (map[string]any, *entities.Event, error)
 	ProposeEvent(ctx context.Context, tenantID, instanceID, eventType string, payload map[string]any, correlationID string) (*entities.Event, error)
 	ListAllowedCapabilities(ctx context.Context, tenantID string, scopeType entities.BindingScopeType, scopeID string) ([]entities.Capability, error)
 }
@@ -83,7 +89,8 @@ func getArgs(req mcp.CallToolRequest) map[string]any {
 func registerTools(srv *server.MCPServer, deps Dependencies) {
 	// resolve_intent
 	resolveTool := mcp.NewTool("resolve_intent",
-		mcp.WithDescription("Resolve a conversation intent to its workflow and current state."),
+		mcp.WithDescription("Resolve a conversation intent to its workflow."),
+		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("intent", mcp.Required(), mcp.Description("Intent id, e.g. BOOKING_PADEL")),
 		mcp.WithString("project", mcp.Required(), mcp.Description("Project id owning the intent")),
 	)
@@ -91,18 +98,21 @@ func registerTools(srv *server.MCPServer, deps Dependencies) {
 		args := getArgs(req)
 		intentID, _ := args["intent"].(string)
 		projectID, _ := args["project"].(string)
-		return handleResolveIntent(ctx, deps, intentID, projectID)
+		tenantID, _ := args["tenant"].(string)
+		return handleResolveIntent(ctx, deps, tenantID, projectID, intentID)
 	})
 
 	// get_active_workflow
 	activeTool := mcp.NewTool("get_active_workflow",
 		mcp.WithDescription("Return the active workflow and current state for a conversation."),
+		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("conversation", mcp.Required(), mcp.Description("Conversation id")),
 	)
 	srv.AddTool(activeTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
 		conv, _ := args["conversation"].(string)
-		return handleGetActiveWorkflow(ctx, deps, conv)
+		tenantID, _ := args["tenant"].(string)
+		return handleGetActiveWorkflow(ctx, deps, tenantID, conv)
 	})
 
 	// invoke_capability
@@ -215,6 +225,16 @@ func registerOrchestratorTools(srv *server.MCPServer, deps Dependencies) {
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
 		return handleListHistory(ctx, deps, str(args, "tenant"), str(args, "instance"))
+	})
+
+	// replay_workflow
+	srv.AddTool(mcp.NewTool("replay_workflow",
+		mcp.WithDescription("Replay the event history of a workflow instance to reproduce its resulting state."),
+		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
+		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := getArgs(req)
+		return handleReplayWorkflow(ctx, deps, str(args, "tenant"), str(args, "instance"))
 	})
 }
 
