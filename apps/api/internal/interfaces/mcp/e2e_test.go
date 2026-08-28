@@ -172,6 +172,10 @@ func (o *mockOrchestrator) ListAllowedCapabilities(context.Context, string, enti
 	return nil, nil
 }
 
+func (o *mockOrchestrator) GetAllowedTransitions(ctx context.Context, _, instanceID string) ([]engine.TransitionDefinition, error) {
+	return o.eng.AllowedTransitions(ctx, "demo", instanceID)
+}
+
 func toEntitiesInstance(i *engine.WorkflowInstance) *entities.WorkflowInstance {
 	stateID := i.CurrentStateID
 	return &entities.WorkflowInstance{

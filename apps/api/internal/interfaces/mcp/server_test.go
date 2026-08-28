@@ -8,6 +8,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
+	"github.com/irosadie/open-state/api/internal/domain/engine"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 )
 
@@ -51,6 +52,10 @@ func (fakeOrchestrator) ProposeEvent(context.Context, string, string, string, ma
 	return nil, nil
 }
 func (fakeOrchestrator) ListAllowedCapabilities(context.Context, string, entities.BindingScopeType, string) ([]entities.Capability, error) {
+	return nil, nil
+}
+
+func (fakeOrchestrator) GetAllowedTransitions(context.Context, string, string) ([]engine.TransitionDefinition, error) {
 	return nil, nil
 }
 

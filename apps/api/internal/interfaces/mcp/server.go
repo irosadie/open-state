@@ -16,6 +16,7 @@ import (
 	"github.com/irosadie/open-state/api/internal/application/dtos"
 	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	"github.com/irosadie/open-state/api/internal/domain/capability"
+	"github.com/irosadie/open-state/api/internal/domain/engine"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 )
 
@@ -49,6 +50,7 @@ type OrchestratorPort interface {
 	ListInstances(ctx context.Context, tenantID string) ([]entities.WorkflowInstance, error)
 	GetCurrentState(ctx context.Context, tenantID, instanceID string) (*entities.WorkflowInstance, *entities.StateInstance, error)
 	GetActiveWorkflow(ctx context.Context, tenantID, conversationID string) (*entities.WorkflowInstance, error)
+	GetAllowedTransitions(ctx context.Context, tenantID, instanceID string) ([]engine.TransitionDefinition, error)
 	ListHistory(ctx context.Context, tenantID, instanceID string) ([]entities.Event, error)
 	ReplayWorkflow(ctx context.Context, tenantID, instanceID string) (map[string]any, *entities.Event, error)
 	ProposeEvent(ctx context.Context, tenantID, instanceID, eventType string, payload map[string]any, correlationID string) (*entities.Event, error)

@@ -129,6 +129,19 @@ func handleGetCurrentState(ctx context.Context, deps Dependencies, tenantID, ins
 		out["stateKey"] = stateInst.StateKey
 		out["stateStatus"] = stateInst.Status
 	}
+
+	// Allowed events/transitions from the current state (PRD 12, 14, 33-34).
+	if transitions, terr := deps.Orchestrator.GetAllowedTransitions(ctx, tenantID, instanceID); terr == nil {
+		list := make([]map[string]any, 0, len(transitions))
+		for _, t := range transitions {
+			list = append(list, map[string]any{
+				"event":    t.Event,
+				"targetStateId": t.TargetStateID,
+				"priority": t.Priority,
+			})
+		}
+		out["allowedTransitions"] = list
+	}
 	return mcp.NewToolResultJSON(out)
 }
 

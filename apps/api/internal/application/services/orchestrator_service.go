@@ -143,6 +143,16 @@ func (s *OrchestratorService) ListHistory(ctx context.Context, tenantID, instanc
 	return s.events.ListEventsByInstance(ctx, tenantID, instanceID)
 }
 
+// GetAllowedTransitions returns the transitions available from the instance's
+// current state. When an engine is wired, it derives them from the pinned workflow
+// definition; otherwise it returns an empty list.
+func (s *OrchestratorService) GetAllowedTransitions(ctx context.Context, tenantID, instanceID string) ([]engine.TransitionDefinition, error) {
+	if s.engine == nil {
+		return []engine.TransitionDefinition{}, nil
+	}
+	return s.engine.AllowedTransitions(ctx, tenantID, instanceID)
+}
+
 // ProposeEvent validates the instance is active and, when an engine is wired, runs
 // the engine's `event → guard → transition` evaluation and persists the resulting
 // state (PRD 38, §34). Without an engine, it falls back to appending the event to

@@ -156,6 +156,27 @@ func (e *Engine) loadDefinition(ctx context.Context, tenantID, projectID, slug s
 	return def, nil
 }
 
+// AllowedTransitions returns the transitions available from the instance's current
+// state (derived from its pinned workflow definition), so a client knows which
+// events it may propose next (PRD 12, 14, 33-34).
+func (e *Engine) AllowedTransitions(ctx context.Context, tenantID, instanceID string) ([]TransitionDefinition, error) {
+	instance, err := e.repos.Instances.Get(ctx, tenantID, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	def, err := e.loadDefinition(ctx, tenantID, instance.ProjectID, instance.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	var out []TransitionDefinition
+	for _, t := range def.Transitions {
+		if t.SourceStateID == instance.CurrentStateID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
 func nodeByID(def *WorkflowDefinition, id string) (WorkflowNode, bool) {
 	for _, n := range def.Nodes {
 		if n.ID == id {

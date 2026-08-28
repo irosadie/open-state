@@ -254,3 +254,30 @@ func TestRejectNoPassingGuard(t *testing.T) {
 		t.Fatal("expected ErrGuardFailed when no transition passes guards")
 	}
 }
+
+func TestAllowedTransitions(t *testing.T) {
+	repos := newFakeRepos()
+	def := padelDef()
+	_ = repos.Workflows.Save(context.Background(), def)
+	eng := NewEngine(repos)
+	inst, _ := eng.StartWorkflow(context.Background(), "t", "project-padel", "c", def, "workflow.started")
+	_, _, _ = eng.ProcessEvent(context.Background(), "t", inst.ID, &Event{ID: "e0", Type: "workflow.started", Source: SourceSystem})
+
+	// After start -> select_time, allowed transitions are those from select_time.
+	transitions, err := eng.AllowedTransitions(context.Background(), "t", inst.ID)
+	if err != nil {
+		t.Fatalf("allowed transitions: %v", err)
+	}
+	found := false
+	for _, tr := range transitions {
+		if tr.SourceStateID != "select_time" {
+			t.Errorf("transition source %q is not the current state", tr.SourceStateID)
+		}
+		if tr.Event == "datetime.selected" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a 'datetime.selected' transition from select_time, got %+v", transitions)
+	}
+}
