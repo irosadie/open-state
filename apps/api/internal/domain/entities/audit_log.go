@@ -11,15 +11,25 @@ import (
 type AuditAction string
 
 const (
-	AuditActionWorkflowPublished  AuditAction = "workflow.published"
-	AuditActionStateEntered       AuditAction = "state.entered"
-	AuditActionTransitionExecuted AuditAction = "transition.executed"
-	AuditActionGuardFailed        AuditAction = "guard.failed"
-	AuditActionCapabilityInvoked  AuditAction = "capability.invoked"
-	AuditActionCapabilityDenied   AuditAction = "capability.denied"
-	AuditActionWorkflowSuspended  AuditAction = "workflow.suspended"
-	AuditActionWorkflowResumed    AuditAction = "workflow.resumed"
+	AuditActionWorkflowPublished   AuditAction = "workflow.published"
+	AuditActionStateEntered        AuditAction = "state.entered"
+	AuditActionTransitionExecuted  AuditAction = "transition.executed"
+	AuditActionGuardFailed         AuditAction = "guard.failed"
+	AuditActionCapabilityInvoked   AuditAction = "capability.invoked"
+	AuditActionCapabilityDenied    AuditAction = "capability.denied"
+	AuditActionWorkflowSuspended   AuditAction = "workflow.suspended"
+	AuditActionWorkflowResumed     AuditAction = "workflow.resumed"
 	AuditActionHumanHandoffCreated AuditAction = "human_handoff.created"
+
+	// RBAC actions (PRD 80, 81): role-assignment mutations and authorization denials.
+	AuditActionRoleAssigned AuditAction = "rbac.role_assigned"
+	AuditActionRoleUpdated  AuditAction = "rbac.role_updated"
+	AuditActionRoleRemoved  AuditAction = "rbac.role_removed"
+	AuditActionAuthDenied   AuditAction = "authorization.denied"
+
+	// Binding actions (PRD 60): capability-binding mutations.
+	AuditActionBindingCreated AuditAction = "binding.created"
+	AuditActionBindingDeleted AuditAction = "binding.deleted"
 )
 
 // AuditLog is an append-only, tenant-isolated audit entry (PRD 50). It records an
@@ -28,9 +38,9 @@ const (
 type AuditLog struct {
 	ID            string
 	TenantID      string
-	Actor         string            // user/system id
-	Action        AuditAction       // PRD 50 audit event set
-	ResourceType  string            // workflow / instance / state / event / capability / ...
+	Actor         string      // user/system id
+	Action        AuditAction // PRD 50 audit event set
+	ResourceType  string      // workflow / instance / state / event / capability / ...
 	ResourceID    string
 	Before        *json.RawMessage // state before the operation
 	After         *json.RawMessage // state after the operation

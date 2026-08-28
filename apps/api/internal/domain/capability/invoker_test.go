@@ -44,6 +44,19 @@ type allowRateLimiter struct{}
 
 func (allowRateLimiter) Allow(_ context.Context, _ string) (bool, error) { return true, nil }
 
+// denyRateLimiter rejects every request, simulating an exceeded rate limit.
+type denyRateLimiter struct{}
+
+func (denyRateLimiter) Allow(_ context.Context, _ string) (bool, error) { return false, nil }
+
+// recordingRateLimiter allows and records the last key passed to Allow.
+type recordingRateLimiter struct{ lastKey string }
+
+func (r *recordingRateLimiter) Allow(_ context.Context, key string) (bool, error) {
+	r.lastKey = key
+	return true, nil
+}
+
 func baseInvocation() Invocation {
 	return Invocation{
 		TenantID: "t", ProjectID: "p", WorkflowID: "wf", StateID: "st",
@@ -90,6 +103,51 @@ func TestInvokerSchemaValidationFails(t *testing.T) {
 	}
 	if prov.invoked.Load() != 0 {
 		t.Error("provider must NOT be invoked on schema failure")
+	}
+}
+
+func TestInvokerRateLimitedNoInvoke(t *testing.T) {
+	repo := &fakeCapabilityRepo{}
+	pid := "mcp"
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, []byte(`{}`), nil, 1, nil)
+	prov := &fakeProvider{}
+	inv := NewCapabilityInvoker(
+		NewCapabilityResolver(repo), stubProviderResolver{prov},
+		stubSchemaValidator{}, denyRateLimiter{}, NewInMemoryIdempotencyStore(),
+	)
+	_, err := inv.Execute(context.Background(), baseInvocation())
+	var ce *CapabilityError
+	if !errors.As(err, &ce) || ce.Kind != ErrorKindRateLimited {
+		t.Fatalf("expected rate_limited error, got %v", err)
+	}
+	if ce.Code != "capability.rate_limited" {
+		t.Errorf("expected code capability.rate_limited, got %q", ce.Code)
+	}
+	if prov.invoked.Load() != 0 {
+		t.Error("provider must NOT be invoked when rate limited")
+	}
+}
+
+func TestInvokerRateLimitedKeyScoped(t *testing.T) {
+	repo := &fakeCapabilityRepo{}
+	pid := "mcp"
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, []byte(`{}`), nil, 1, nil)
+	prov := &fakeProvider{}
+
+	// Capture the key passed to the rate limiter to verify tenant+capability scope.
+	rl := &recordingRateLimiter{}
+	inv := NewCapabilityInvoker(
+		NewCapabilityResolver(repo), stubProviderResolver{prov},
+		stubSchemaValidator{}, rl, NewInMemoryIdempotencyStore(),
+	)
+	invOC := baseInvocation()
+	invOC.CapabilityID = "cap-123"
+	invOC.TenantID = "tenant-9"
+	if _, err := inv.Execute(context.Background(), invOC); err != nil {
+		t.Fatalf("execute error: %v", err)
+	}
+	if rl.lastKey != "tenant:tenant-9:capability:cap-123" {
+		t.Errorf("expected scoped key, got %q", rl.lastKey)
 	}
 }
 

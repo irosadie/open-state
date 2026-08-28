@@ -138,7 +138,7 @@ func isValidation(err error) bool {
 // newTestService builds a CapabilityService with the real mock/sandbox
 // collaborators, mirroring the composition root wiring.
 func newTestService(repo repositories.ICapabilityRepository) *CapabilityService {
-	return NewCapabilityService(repo, infracap.MockProviderResolver{}, infracap.JSONSchemaValidator{})
+	return NewCapabilityService(repo, infracap.MockProviderResolver{}, infracap.JSONSchemaValidator{}, nil, nil)
 }
 
 func TestCreateInvalidProviderType(t *testing.T) {
@@ -222,7 +222,7 @@ func TestUpdatePreservesUnsetFields(t *testing.T) {
 
 func TestBindInvalidScopeType(t *testing.T) {
 	svc := newTestService(&fakeCapRepo{})
-	_, err := svc.Bind(context.Background(), "tenant-1", "cap-1", dtos.CreateBindingRequest{
+	_, err := svc.Bind(context.Background(), "tenant-1", "cap-1", "actor-1", dtos.CreateBindingRequest{
 		ScopeType: "GLOBAL", ScopeID: "x", Permission: "ALLOW",
 	})
 	if !isValidation(err) {
@@ -232,7 +232,7 @@ func TestBindInvalidScopeType(t *testing.T) {
 
 func TestBindEmptyScopeID(t *testing.T) {
 	svc := newTestService(&fakeCapRepo{})
-	_, err := svc.Bind(context.Background(), "tenant-1", "cap-1", dtos.CreateBindingRequest{
+	_, err := svc.Bind(context.Background(), "tenant-1", "cap-1", "actor-1", dtos.CreateBindingRequest{
 		ScopeType: "STATE", ScopeID: "", Permission: "ALLOW",
 	})
 	if !isValidation(err) {

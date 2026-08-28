@@ -24,12 +24,13 @@ const defaultProjectSlug = "default"
 type BuilderService struct {
 	workflows repositories.IWorkflowRepository
 	projects  repositories.IProjectRepository
+	audit     *AuditWriter
 	now       func() time.Time
 }
 
 // NewBuilderService builds a BuilderService.
-func NewBuilderService(workflows repositories.IWorkflowRepository, projects repositories.IProjectRepository) *BuilderService {
-	return &BuilderService{workflows: workflows, projects: projects, now: time.Now}
+func NewBuilderService(workflows repositories.IWorkflowRepository, projects repositories.IProjectRepository, audit *AuditWriter) *BuilderService {
+	return &BuilderService{workflows: workflows, projects: projects, audit: audit, now: time.Now}
 }
 
 // CreateDraft persists a new workflow definition draft for the tenant within a
@@ -114,8 +115,9 @@ func (s *BuilderService) UpdateDraft(ctx context.Context, tenantID, projectID, i
 
 // Publish creates an immutable, current workflow version from the provided
 // definition (PRD §3.3, §9, §55, §65, §69, §68). It uses optimistic concurrency
-// on the workflow root version.
-func (s *BuilderService) Publish(ctx context.Context, tenantID, projectID, id string, req dtos.PublishWorkflowRequest) (*dtos.WorkflowVersionDTO, error) {
+// on the workflow root version. On success it appends a workflow.published
+// audit entry (PRD 50) attributed to the actor.
+func (s *BuilderService) Publish(ctx context.Context, tenantID, projectID, id, actor string, req dtos.PublishWorkflowRequest) (*dtos.WorkflowVersionDTO, error) {
 	if len(req.Definition) == 0 {
 		return nil, domain.NewValidation("definition is required")
 	}
@@ -135,6 +137,10 @@ func (s *BuilderService) Publish(ctx context.Context, tenantID, projectID, id st
 	version, err := s.workflows.Publish(ctx, tenantID, pid, id, versionNo, req.Definition, entities.VersionStatusPublished, existing.Version)
 	if err != nil {
 		return nil, err
+	}
+	if s.audit != nil {
+		s.audit.Write(ctx, tenantID, actor, entities.AuditActionWorkflowPublished, "workflow", id,
+			nil, map[string]any{"version": versionNo}, nil)
 	}
 	return toWorkflowVersionDTO(version), nil
 }

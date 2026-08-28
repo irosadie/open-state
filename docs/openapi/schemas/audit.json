@@ -1,0 +1,74 @@
+{
+  "AuditEntry": {
+    "type": "object",
+    "required": ["id", "tenantId", "actor", "action", "resourceType", "resourceId", "occurredAt"],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "tenantId": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "action": {
+        "type": "string"
+      },
+      "resourceType": {
+        "type": "string"
+      },
+      "resourceId": {
+        "type": "string"
+      },
+      "before": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "after": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "correlationId": {
+        "type": "string"
+      },
+      "occurredAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    }
+  },
+  "AuditPage": {
+    "type": "object",
+    "required": ["data", "page", "pageSize", "total", "hasNext"],
+    "properties": {
+      "data": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AuditEntry"
+        }
+      },
+      "page": {
+        "type": "integer"
+      },
+      "pageSize": {
+        "type": "integer"
+      },
+      "total": {
+        "type": "integer"
+      },
+      "hasNext": {
+        "type": "boolean"
+      }
+    }
+  },
+  "AuditListResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": {
+      "data": {
+        "$ref": "#/components/schemas/AuditPage"
+      }
+    }
+  }
+}

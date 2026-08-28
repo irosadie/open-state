@@ -40,7 +40,11 @@ func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserIn
 		return nil, domain.NewInternal("failed to hash password")
 	}
 
-	user, err := uc.repo.CreateUser(ctx, input.Email, string(hash), input.Name, entities.UserRoleUser, entities.UserStatusActive)
+	// users.role is a deprecated legacy column (ENUM 'USER'/'ADMIN'). The
+	// effective role is tenant-scoped and lives in role_assignments (PRD 81),
+	// defaulting to least-privilege VIEWER when absent. Write the legacy value
+	// here only to satisfy the deprecated column.
+	user, err := uc.repo.CreateUser(ctx, input.Email, string(hash), input.Name, entities.UserRoleLegacy, entities.UserStatusActive)
 	if err != nil {
 		return nil, domain.NewInternal("failed to create user")
 	}

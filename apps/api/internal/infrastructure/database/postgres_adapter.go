@@ -29,6 +29,7 @@ type PostgresAdapter struct {
 	context      repositories.IContextRepository
 	capabilities repositories.ICapabilityRepository
 	audit        repositories.IAuditRepository
+	roles        repositories.IRoleAssignmentRepository
 }
 
 // NewPostgresAdapter returns a PostgresAdapter composing all six pgx repositories.
@@ -45,6 +46,7 @@ func NewPostgresAdapter(pool *pgxpool.Pool) *PostgresAdapter {
 		context:      NewPgxContextRepository(pool),
 		capabilities: NewPgxCapabilityRepository(pool),
 		audit:        NewPgxAuditRepository(pool),
+		roles:        NewPgxRoleAssignmentRepository(pool),
 	}
 }
 
@@ -69,6 +71,9 @@ func (a *PostgresAdapter) Capabilities() repositories.ICapabilityRepository { re
 // Audit returns the append-only audit-trail repository.
 func (a *PostgresAdapter) Audit() repositories.IAuditRepository { return a.audit }
 
+// Roles returns the tenant-scoped RBAC role-assignment repository.
+func (a *PostgresAdapter) Roles() repositories.IRoleAssignmentRepository { return a.roles }
+
 // WithTx runs fn within a single DB transaction, binding all six repositories to
 // that transaction so multi-repository operations (e.g. append an audit entry and
 // emit an outbox event, or a state transition) commit or roll back together
@@ -90,6 +95,7 @@ func (a *PostgresAdapter) WithTx(ctx context.Context, fn func(adapter *PostgresA
 		context:      newPgxContextRepository(q),
 		capabilities: newPgxCapabilityRepository(q),
 		audit:        newPgxAuditRepository(q),
+		roles:        newPgxRoleAssignmentRepository(q),
 	}
 
 	if err := fn(txAdapter); err != nil {

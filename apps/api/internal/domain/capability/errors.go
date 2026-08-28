@@ -4,13 +4,14 @@ package capability
 type ErrorKind string
 
 const (
-	ErrorKindTimeout        ErrorKind = "TIMEOUT"
-	ErrorKindUnauthorized   ErrorKind = "UNAUTHORIZED"
-	ErrorKindValidation     ErrorKind = "VALIDATION"
-	ErrorKindUnavailable    ErrorKind = "UNAVAILABLE"
-	ErrorKindBusiness       ErrorKind = "BUSINESS"
-	ErrorKindExternal       ErrorKind = "EXTERNAL"
-	ErrorKindInternal       ErrorKind = "INTERNAL"
+	ErrorKindTimeout      ErrorKind = "TIMEOUT"
+	ErrorKindUnauthorized ErrorKind = "UNAUTHORIZED"
+	ErrorKindValidation   ErrorKind = "VALIDATION"
+	ErrorKindRateLimited  ErrorKind = "RATE_LIMITED"
+	ErrorKindUnavailable  ErrorKind = "UNAVAILABLE"
+	ErrorKindBusiness     ErrorKind = "BUSINESS"
+	ErrorKindExternal     ErrorKind = "EXTERNAL"
+	ErrorKindInternal     ErrorKind = "INTERNAL"
 )
 
 // CapabilityError is a classified capability failure carrying a kind (PRD §87)
@@ -37,6 +38,8 @@ func CodeForCapabilityEvent(kind ErrorKind) string {
 		return "capability.timeout"
 	case ErrorKindUnauthorized:
 		return "capability.unauthorized"
+	case ErrorKindRateLimited:
+		return "capability.rate_limited"
 	case ErrorKindValidation:
 		return "capability.validation_failed"
 	case ErrorKindUnavailable:

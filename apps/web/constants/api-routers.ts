@@ -27,4 +27,7 @@ export const apiRouters = {
     publish: "/workflows/:id/publish",
     versions: "/workflows/:id/versions",
   },
+  audit: {
+    index: "/audit",
+  },
 }

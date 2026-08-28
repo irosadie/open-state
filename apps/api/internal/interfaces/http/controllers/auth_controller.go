@@ -4,11 +4,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/labstack/echo/v4"
 	"github.com/irosadie/open-state/api/internal/application/dtos"
 	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	usecases "github.com/irosadie/open-state/api/internal/application/use-cases"
 	"github.com/irosadie/open-state/api/internal/interfaces/http/middleware"
+	domain "github.com/irosadie/open-state/go-shared/domain"
+	"github.com/labstack/echo/v4"
 )
 
 type AuthController struct {
@@ -67,8 +68,12 @@ func (ctrl *AuthController) Logout(c echo.Context) error {
 
 func (ctrl *AuthController) Me(c echo.Context) error {
 	userID, _ := c.Get(middleware.UserIDKey).(string)
+	tenantID := c.Request().Header.Get(middleware.TenantHeader)
+	if tenantID == "" {
+		return domain.NewUnauthorized("missing tenant header")
+	}
 
-	user, err := ctrl.authSvc.GetCurrentUser(c.Request().Context(), userID)
+	user, err := ctrl.authSvc.GetCurrentUserForTenant(c.Request().Context(), userID, tenantID)
 	if err != nil {
 		return err
 	}

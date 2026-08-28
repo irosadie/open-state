@@ -3,10 +3,11 @@ package controllers
 import (
 	"net/http"
 
-	"github.com/labstack/echo/v4"
 	"github.com/irosadie/open-state/api/internal/application/dtos"
 	appservices "github.com/irosadie/open-state/api/internal/application/services"
+	"github.com/irosadie/open-state/api/internal/interfaces/http/middleware"
 	domain "github.com/irosadie/open-state/go-shared/domain"
+	"github.com/labstack/echo/v4"
 )
 
 // ProjectHeader carries the project id for project-scoped workflow operations.
@@ -87,11 +88,12 @@ func (ctrl *WorkflowController) Publish(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
 	var req dtos.PublishWorkflowRequest
 	if err := c.Bind(&req); err != nil {
 		return domain.NewValidation("invalid request body")
 	}
-	result, err := ctrl.svc.Publish(c.Request().Context(), tenantID, c.Request().Header.Get(ProjectHeader), c.Param("id"), req)
+	result, err := ctrl.svc.Publish(c.Request().Context(), tenantID, c.Request().Header.Get(ProjectHeader), c.Param("id"), actor, req)
 	if err != nil {
 		return err
 	}

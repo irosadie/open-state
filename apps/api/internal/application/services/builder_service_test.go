@@ -176,7 +176,7 @@ func (f *fakeProjectRepo) ListByTenant(_ context.Context, _ string) ([]entities.
 func newBuilderService() (*BuilderService, *fakeWorkflowRepo, *fakeProjectRepo) {
 	wfRepo := &fakeWorkflowRepo{}
 	projRepo := &fakeProjectRepo{}
-	return NewBuilderService(wfRepo, projRepo), wfRepo, projRepo
+	return NewBuilderService(wfRepo, projRepo, nil), wfRepo, projRepo
 }
 
 var _ repositories.IWorkflowRepository = (*fakeWorkflowRepo)(nil)
@@ -257,7 +257,7 @@ func TestPublishCreatesImmutableVersion(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	version, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, dtos.PublishWorkflowRequest{
+	version, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{
 		Version:    created.Version,
 		Definition: []byte(`{"nodes":[]}`),
 	})
@@ -280,7 +280,7 @@ func TestPublishRequiresDefinition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, dtos.PublishWorkflowRequest{Version: 0}); err == nil {
+	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{Version: 0}); err == nil {
 		t.Fatal("expected validation error for missing definition")
 	}
 }
@@ -293,7 +293,7 @@ func TestListVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, dtos.PublishWorkflowRequest{Version: 0, Definition: []byte(`{}`)}); err != nil {
+	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{Version: 0, Definition: []byte(`{}`)}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	versions, err := svc.ListVersions(ctx, "tenant-1", created.ProjectID, created.ID)

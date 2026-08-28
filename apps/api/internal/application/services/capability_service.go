@@ -26,11 +26,13 @@ type CapabilityService struct {
 	repo             repositories.ICapabilityRepository
 	providerResolver domaincap.ProviderResolver
 	schemaValidator  domaincap.InputSchemaValidator
+	audit            *AuditWriter
+	rateLimiter      domaincap.RateLimiter
 }
 
 // NewCapabilityService builds a CapabilityService.
-func NewCapabilityService(repo repositories.ICapabilityRepository, providerResolver domaincap.ProviderResolver, schemaValidator domaincap.InputSchemaValidator) *CapabilityService {
-	return &CapabilityService{repo: repo, providerResolver: providerResolver, schemaValidator: schemaValidator}
+func NewCapabilityService(repo repositories.ICapabilityRepository, providerResolver domaincap.ProviderResolver, schemaValidator domaincap.InputSchemaValidator, audit *AuditWriter, rateLimiter domaincap.RateLimiter) *CapabilityService {
+	return &CapabilityService{repo: repo, providerResolver: providerResolver, schemaValidator: schemaValidator, audit: audit, rateLimiter: rateLimiter}
 }
 
 // Create registers a new capability for the tenant (PRD §59).
@@ -172,8 +174,9 @@ func (s *CapabilityService) ListBindings(ctx context.Context, tenantID, capabili
 	return out, nil
 }
 
-// Bind scopes a capability to a tenant/workflow/state level (PRD §60).
-func (s *CapabilityService) Bind(ctx context.Context, tenantID, capabilityID string, req dtos.CreateBindingRequest) (*dtos.CapabilityBindingDTO, error) {
+// Bind scopes a capability to a tenant/workflow/state level (PRD §60). On
+// success it appends a binding.created audit entry (PRD 50).
+func (s *CapabilityService) Bind(ctx context.Context, tenantID, capabilityID, actor string, req dtos.CreateBindingRequest) (*dtos.CapabilityBindingDTO, error) {
 	scopeType, err := parseScopeType(req.ScopeType)
 	if err != nil {
 		return nil, err
@@ -190,18 +193,28 @@ func (s *CapabilityService) Bind(ctx context.Context, tenantID, capabilityID str
 	if err != nil {
 		return nil, err
 	}
+	if s.audit != nil {
+		s.audit.Write(ctx, tenantID, actor, entities.AuditActionBindingCreated, "binding", binding.ID,
+			nil, map[string]any{"capabilityId": capabilityID, "scopeType": scopeType, "scopeId": req.ScopeID, "permission": permission}, nil)
+	}
 	return toBindingDTO(binding), nil
 }
 
-// Unbind removes a tenant-scoped binding.
-func (s *CapabilityService) Unbind(ctx context.Context, tenantID, bindingID string) error {
+// Unbind removes a tenant-scoped binding. On success it appends a
+// binding.deleted audit entry (PRD 50).
+func (s *CapabilityService) Unbind(ctx context.Context, tenantID, bindingID, actor string) error {
+	if s.audit != nil {
+		s.audit.Write(ctx, tenantID, actor, entities.AuditActionBindingDeleted, "binding", bindingID, nil, nil, nil)
+	}
 	return s.repo.Unbind(ctx, tenantID, bindingID)
 }
 
 // TestInvoke runs a capability through the security chain in mock/sandbox mode
 // and returns the normalized result (PRD §2064, §153). It never invokes a real
-// provider — the mock provider resolver is forced.
-func (s *CapabilityService) TestInvoke(ctx context.Context, tenantID, capabilityID string, req dtos.TestInvocationRequest) (*dtos.TestInvocationResultDTO, error) {
+// provider — the mock provider resolver is forced. On success it appends a
+// capability.invoked audit entry; on denial/error a capability.denied entry
+// (PRD 50).
+func (s *CapabilityService) TestInvoke(ctx context.Context, tenantID, capabilityID, actor string, req dtos.TestInvocationRequest) (*dtos.TestInvocationResultDTO, error) {
 	cap, err := s.repo.FindByID(ctx, tenantID, capabilityID)
 	if err != nil {
 		return nil, err
@@ -211,7 +224,7 @@ func (s *CapabilityService) TestInvoke(ctx context.Context, tenantID, capability
 		domaincap.NewCapabilityResolver(s.repo),
 		s.providerResolver,
 		s.schemaValidator,
-		nil,
+		s.rateLimiter,
 		domaincap.NewInMemoryIdempotencyStore(),
 	)
 
@@ -226,6 +239,10 @@ func (s *CapabilityService) TestInvoke(ctx context.Context, tenantID, capability
 
 	result, err := invoker.Execute(ctx, inv)
 	if err != nil {
+		if s.audit != nil {
+			s.audit.Write(ctx, tenantID, actor, entities.AuditActionCapabilityDenied, "capability", capabilityID,
+				nil, map[string]any{"reason": err.Error()}, nil)
+		}
 		var ce *domaincap.CapabilityError
 		if errors.As(err, &ce) {
 			// Return the classified capability error as-is so the HTTP boundary
@@ -234,6 +251,10 @@ func (s *CapabilityService) TestInvoke(ctx context.Context, tenantID, capability
 			return nil, ce
 		}
 		return nil, domain.NewInternal("test invocation failed")
+	}
+
+	if s.audit != nil {
+		s.audit.Write(ctx, tenantID, actor, entities.AuditActionCapabilityInvoked, "capability", capabilityID, nil, nil, nil)
 	}
 
 	return &dtos.TestInvocationResultDTO{

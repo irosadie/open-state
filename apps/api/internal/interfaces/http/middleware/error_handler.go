@@ -3,9 +3,9 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/labstack/echo/v4"
 	domaincap "github.com/irosadie/open-state/api/internal/domain/capability"
 	domain "github.com/irosadie/open-state/go-shared/domain"
+	"github.com/labstack/echo/v4"
 )
 
 // errorCodeToHTTP maps DomainError codes to HTTP status codes.
@@ -23,6 +23,7 @@ var errorCodeToHTTP = map[string]int{
 var capabilityKindToHTTP = map[domaincap.ErrorKind]int{
 	domaincap.ErrorKindValidation:   http.StatusUnprocessableEntity,
 	domaincap.ErrorKindUnauthorized: http.StatusForbidden,
+	domaincap.ErrorKindRateLimited:  http.StatusTooManyRequests,
 	domaincap.ErrorKindTimeout:      http.StatusInternalServerError,
 	domaincap.ErrorKindUnavailable:  http.StatusInternalServerError,
 	domaincap.ErrorKindExternal:     http.StatusInternalServerError,
@@ -51,6 +52,9 @@ func ErrorHandler(err error, c echo.Context) {
 		status = capabilityKindToHTTP[ce.Kind]
 		if status == 0 {
 			status = http.StatusInternalServerError
+		}
+		if status == http.StatusTooManyRequests {
+			c.Response().Header().Set("Retry-After", "1")
 		}
 		body = map[string]classifiedCapabilityError{
 			"error": {

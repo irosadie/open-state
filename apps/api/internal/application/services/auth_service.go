@@ -13,6 +13,7 @@ type AuthService struct {
 	loginUC    *usecases.LoginUserUseCase
 	logoutUC   *usecases.LogoutUserUseCase
 	getMeUC    *usecases.GetCurrentUserUseCase
+	authz      *AuthorizationService
 }
 
 func NewAuthService(
@@ -20,12 +21,14 @@ func NewAuthService(
 	loginUC *usecases.LoginUserUseCase,
 	logoutUC *usecases.LogoutUserUseCase,
 	getMeUC *usecases.GetCurrentUserUseCase,
+	authz *AuthorizationService,
 ) *AuthService {
 	return &AuthService{
 		registerUC: registerUC,
 		loginUC:    loginUC,
 		logoutUC:   logoutUC,
 		getMeUC:    getMeUC,
+		authz:      authz,
 	}
 }
 
@@ -58,6 +61,31 @@ func (s *AuthService) GetCurrentUser(ctx context.Context, userID string) (*dtos.
 		return nil, err
 	}
 	return toUserDTO(user), nil
+}
+
+// GetCurrentUserForTenant returns the current user enriched with their effective
+// tenant role and granted permissions (PRD 80, 81). The role and permissions are
+// derived from role_assignments for the given tenant; an absent assignment
+// resolves to the least-privilege VIEWER.
+func (s *AuthService) GetCurrentUserForTenant(ctx context.Context, userID, tenantID string) (*dtos.UserDTO, error) {
+	dto, err := s.GetCurrentUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	role, err := s.authz.RoleForTenant(ctx, userID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	perms, err := s.authz.PermissionsForTenant(ctx, userID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	dto.Role = string(role)
+	dto.Permissions = make([]string, 0, len(perms))
+	for _, p := range perms {
+		dto.Permissions = append(dto.Permissions, string(p))
+	}
+	return dto, nil
 }
 
 func toUserDTO(u *entities.User) *dtos.UserDTO {

@@ -1,13 +1,14 @@
 package http
 
 import (
-	"github.com/labstack/echo/v4"
-	echomw "github.com/labstack/echo/v4/middleware"
+	appservices "github.com/irosadie/open-state/api/internal/application/services"
+	"github.com/irosadie/open-state/api/internal/domain/repositories"
+	domainsvc "github.com/irosadie/open-state/api/internal/domain/services"
 	"github.com/irosadie/open-state/api/internal/interfaces/http/controllers"
 	"github.com/irosadie/open-state/api/internal/interfaces/http/middleware"
 	"github.com/irosadie/open-state/api/internal/interfaces/http/routes"
-	"github.com/irosadie/open-state/api/internal/domain/repositories"
-	"github.com/irosadie/open-state/api/internal/domain/services"
+	"github.com/labstack/echo/v4"
+	echomw "github.com/labstack/echo/v4/middleware"
 )
 
 func CreateApp(
@@ -15,8 +16,13 @@ func CreateApp(
 	systemCtrl *controllers.SystemController,
 	capabilityCtrl *controllers.CapabilityController,
 	workflowCtrl *controllers.WorkflowController,
+	auditCtrl *controllers.AuditController,
 	repo repositories.IAuthRepository,
-	tokenSvc services.TokenService,
+	tokenSvc domainsvc.TokenService,
+	authz *appservices.AuthorizationService,
+	audit *appservices.AuditWriter,
+	loginLimiter domainsvc.RateLimiter,
+	registerLimiter domainsvc.RateLimiter,
 ) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
@@ -30,9 +36,10 @@ func CreateApp(
 
 	// Routes
 	routes.RegisterSystemRoutes(e, systemCtrl)
-	routes.RegisterAuthRoutes(e, authCtrl, repo, tokenSvc)
-	routes.RegisterCapabilityRoutes(e, capabilityCtrl, repo, tokenSvc)
-	routes.RegisterWorkflowRoutes(e, workflowCtrl, repo, tokenSvc)
+	routes.RegisterAuthRoutes(e, authCtrl, repo, tokenSvc, loginLimiter, registerLimiter)
+	routes.RegisterCapabilityRoutes(e, capabilityCtrl, repo, tokenSvc, authz, audit)
+	routes.RegisterWorkflowRoutes(e, workflowCtrl, repo, tokenSvc, authz, audit)
+	routes.RegisterAuditRoutes(e, auditCtrl, repo, tokenSvc, authz, audit)
 
 	return e
 }

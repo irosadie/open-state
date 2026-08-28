@@ -25,11 +25,11 @@ type ProviderResolver interface {
 // CapabilityInvoker orchestrates the full security chain and provider
 // invocation (PRD §153, §62).
 type CapabilityInvoker struct {
-	resolver       *CapabilityResolver
-	providerRes    ProviderResolver
-	schema         InputSchemaValidator
-	rateLimiter    RateLimiter
-	idempotency    IdempotencyStore
+	resolver    *CapabilityResolver
+	providerRes ProviderResolver
+	schema      InputSchemaValidator
+	rateLimiter RateLimiter
+	idempotency IdempotencyStore
 }
 
 // NewCapabilityInvoker builds the invoker with its collaborators.
@@ -65,14 +65,16 @@ func (ci *CapabilityInvoker) Execute(ctx context.Context, inv Invocation) (Invoc
 		}
 	}
 
-	// 3. rate limiting
+	// 3. rate limiting (PRD 62, 83): scope key is tenant + capability so one
+	// tenant/capability cannot abuse the provider.
 	if ci.rateLimiter != nil {
-		ok, rerr := ci.rateLimiter.Allow(ctx, inv.TenantID+":"+inv.CapabilityID)
+		key := "tenant:" + inv.TenantID + ":capability:" + inv.CapabilityID
+		ok, rerr := ci.rateLimiter.Allow(ctx, key)
 		if rerr != nil {
 			return InvocationResult{}, rerr
 		}
 		if !ok {
-			return InvocationResult{}, NewCapabilityError(ErrorKindUnauthorized, "capability.unauthorized", "rate limit exceeded")
+			return InvocationResult{}, NewCapabilityError(ErrorKindRateLimited, "capability.rate_limited", "rate limit exceeded")
 		}
 	}
 

@@ -249,6 +249,15 @@ type Project struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type RoleAssignment struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	TenantID  uuid.UUID `json:"tenant_id"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type State struct {
 	ID                uuid.UUID       `json:"id"`
 	WorkflowVersionID uuid.UUID       `json:"workflow_version_id"`

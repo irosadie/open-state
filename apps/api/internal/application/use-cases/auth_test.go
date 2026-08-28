@@ -160,7 +160,7 @@ func TestLoginUser_Success(t *testing.T) {
 		Email:        "login@example.com",
 		PasswordHash: string(hash),
 		Name:         "Login User",
-		Role:         entities.UserRoleUser,
+		Role:         entities.UserRoleLegacy,
 		Status:       entities.UserStatusActive,
 	}
 
@@ -183,7 +183,7 @@ func TestLoginUser_WrongPassword(t *testing.T) {
 	hash, _ := bcrypt.GenerateFromPassword([]byte("correct"), bcrypt.DefaultCost)
 	repo.users["user-1"] = &entities.User{
 		ID: "user-1", Email: "u@example.com", PasswordHash: string(hash),
-		Role: entities.UserRoleUser, Status: entities.UserStatusActive,
+		Role: entities.UserRoleLegacy, Status: entities.UserStatusActive,
 	}
 
 	uc := usecases.NewLoginUserUseCase(repo, &mockTokenSvc{})
@@ -232,7 +232,7 @@ func TestGetCurrentUser_Success(t *testing.T) {
 	repo := newMockRepo()
 	repo.users["user-1"] = &entities.User{
 		ID: "user-1", Email: "me@example.com", Name: "Me",
-		Role: entities.UserRoleUser, Status: entities.UserStatusActive,
+		Role: entities.UserRoleLegacy, Status: entities.UserStatusActive,
 	}
 
 	uc := usecases.NewGetCurrentUserUseCase(repo)

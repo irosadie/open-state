@@ -2,7 +2,9 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 	"github.com/irosadie/open-state/api/internal/domain/repositories"
@@ -90,6 +92,46 @@ func (r *PgxAuditRepository) ListByResource(ctx context.Context, tenantID, resou
 	return out, nil
 }
 
+func (r *PgxAuditRepository) ListFiltered(ctx context.Context, tenantID string, filter repositories.AuditFilter) ([]entities.AuditLog, error) {
+	rows, err := r.queries.ListAuditFiltered(ctx, db.ListAuditFilteredParams{
+		TenantID:      mustUUID(tenantID),
+		Action:        auditActionNull(filter.Action),
+		ResourceType:  strNull(filter.ResourceType),
+		ResourceID:    strNull(filter.ResourceID),
+		Actor:         strNull(filter.Actor),
+		CorrelationID: strNull(filter.CorrelationID),
+		FromTime:      timeNull(filter.From),
+		ToTime:        timeNull(filter.To),
+		PageOffset:    int32(filter.Offset),
+		PageSize:      int32(filter.Limit),
+	})
+	if err != nil {
+		return nil, mapPgError(err, "list audit filtered")
+	}
+	out := make([]entities.AuditLog, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, *mapAuditLog(row))
+	}
+	return out, nil
+}
+
+func (r *PgxAuditRepository) CountFiltered(ctx context.Context, tenantID string, filter repositories.AuditFilter) (int64, error) {
+	count, err := r.queries.CountAuditFiltered(ctx, db.CountAuditFilteredParams{
+		TenantID:      mustUUID(tenantID),
+		Action:        auditActionNull(filter.Action),
+		ResourceType:  strNull(filter.ResourceType),
+		ResourceID:    strNull(filter.ResourceID),
+		Actor:         strNull(filter.Actor),
+		CorrelationID: strNull(filter.CorrelationID),
+		FromTime:      timeNull(filter.From),
+		ToTime:        timeNull(filter.To),
+	})
+	if err != nil {
+		return 0, mapPgError(err, "count audit filtered")
+	}
+	return count, nil
+}
+
 // ---- mappers ----
 
 func mapAuditLog(row db.AuditLog) *entities.AuditLog {
@@ -123,4 +165,28 @@ func nullRawMessageToPtr(n pqtype.NullRawMessage) *json.RawMessage {
 	}
 	raw := json.RawMessage(n.RawMessage)
 	return &raw
+}
+
+// auditActionNull converts an optional audit action to a nullable string param.
+func auditActionNull(a *entities.AuditAction) sql.NullString {
+	if a == nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: string(*a), Valid: true}
+}
+
+// strNull converts an optional string to a nullable string param.
+func strNull(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: *s, Valid: true}
+}
+
+// timeNull converts an optional time to a nullable timestamp param.
+func timeNull(t *time.Time) sql.NullTime {
+	if t == nil {
+		return sql.NullTime{}
+	}
+	return sql.NullTime{Time: *t, Valid: true}
 }

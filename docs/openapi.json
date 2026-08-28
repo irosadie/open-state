@@ -3,7 +3,7 @@
   "info": {
     "title": "Vibecoding Starter API",
     "version": "0.1.0",
-    "description": "OpenState — Enterprise Conversation State Orchestration Platform API."
+    "description": "OpenState \u2014 Enterprise Conversation State Orchestration Platform API."
   },
   "servers": [
     {
@@ -15,6 +15,10 @@
     {
       "name": "System",
       "description": "Baseline system endpoints for starter health and app info."
+    },
+    {
+      "name": "Audit",
+      "description": "Tenant-scoped audit trail query (PRD 50)."
     }
   ],
   "paths": {
@@ -478,6 +482,16 @@
           },
           "422": {
             "$ref": "#/components/schemas/ValidationError"
+          },
+          "429": {
+            "description": "Rate limit exceeded (capability.rate_limited)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityError"
+                }
+              }
+            }
           }
         }
       }
@@ -739,7 +753,7 @@
           "Workflow"
         ],
         "summary": "Update a workflow draft",
-        "description": "Confirms ownership of a DRAFT workflow at an expected optimistic version, bumping the version counter (PRD §31). Only DRAFT workflows are editable.",
+        "description": "Confirms ownership of a DRAFT workflow at an expected optimistic version, bumping the version counter (PRD \u00a731). Only DRAFT workflows are editable.",
         "parameters": [
           {
             "name": "X-Tenant-ID",
@@ -813,7 +827,7 @@
           "Workflow"
         ],
         "summary": "Publish a workflow version",
-        "description": "Publishes a workflow definition as an immutable, current version (PRD §3.3, §9, §55, §65, §69).",
+        "description": "Publishes a workflow definition as an immutable, current version (PRD \u00a73.3, \u00a79, \u00a755, \u00a765, \u00a769).",
         "parameters": [
           {
             "name": "X-Tenant-ID",
@@ -938,6 +952,120 @@
           },
           "404": {
             "$ref": "#/components/schemas/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "List audit entries",
+        "description": "Returns a filtered, paginated view of the tenant-scoped audit trail (PRD 50), ordered newest first. Requires the audit:read permission.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "correlationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit trail page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
           }
         }
       }
@@ -1467,7 +1595,7 @@
           },
           "version": {
             "type": "integer",
-            "description": "Optimistic-lock version (PRD §31)"
+            "description": "Optimistic-lock version (PRD \u00a731)"
           },
           "createdAt": {
             "type": "string",
@@ -1530,7 +1658,7 @@
             "type": "integer"
           },
           "definition": {
-            "description": "Full WorkflowDefinition envelope stored as JSONB (PRD §68)"
+            "description": "Full WorkflowDefinition envelope stored as JSONB (PRD \u00a768)"
           }
         }
       },
@@ -1575,6 +1703,94 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "AuditEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "tenantId",
+          "actor",
+          "action",
+          "resourceType",
+          "resourceId",
+          "occurredAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AuditPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "pageSize",
+          "total",
+          "hasNext"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuditListResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuditPage"
           }
         }
       }

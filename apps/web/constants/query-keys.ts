@@ -28,4 +28,7 @@ export const queryKeys = {
     publish: "workflowsPublish",
     versions: "workflowsVersions",
   },
+  audit: {
+    list: "auditList",
+  },
 }

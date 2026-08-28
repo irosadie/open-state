@@ -3,10 +3,11 @@ package controllers
 import (
 	"net/http"
 
-	"github.com/labstack/echo/v4"
 	"github.com/irosadie/open-state/api/internal/application/dtos"
 	appservices "github.com/irosadie/open-state/api/internal/application/services"
+	"github.com/irosadie/open-state/api/internal/interfaces/http/middleware"
 	domain "github.com/irosadie/open-state/go-shared/domain"
+	"github.com/labstack/echo/v4"
 )
 
 // TenantHeader is the header carrying the tenant id for tenant-scoped routes.
@@ -110,11 +111,12 @@ func (ctrl *CapabilityController) CreateBinding(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
 	var req dtos.CreateBindingRequest
 	if err := c.Bind(&req); err != nil {
 		return domain.NewValidation("invalid request body")
 	}
-	result, err := ctrl.svc.Bind(c.Request().Context(), tenantID, c.Param("id"), req)
+	result, err := ctrl.svc.Bind(c.Request().Context(), tenantID, c.Param("id"), actor, req)
 	if err != nil {
 		return err
 	}
@@ -126,7 +128,8 @@ func (ctrl *CapabilityController) DeleteBinding(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := ctrl.svc.Unbind(c.Request().Context(), tenantID, c.Param("id")); err != nil {
+	actor, _ := c.Get(middleware.UserIDKey).(string)
+	if err := ctrl.svc.Unbind(c.Request().Context(), tenantID, c.Param("id"), actor); err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, map[string]string{"message": "binding removed"})
@@ -137,11 +140,12 @@ func (ctrl *CapabilityController) TestInvoke(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
 	var req dtos.TestInvocationRequest
 	if err := c.Bind(&req); err != nil {
 		return domain.NewValidation("invalid request body")
 	}
-	result, err := ctrl.svc.TestInvoke(c.Request().Context(), tenantID, c.Param("id"), req)
+	result, err := ctrl.svc.TestInvoke(c.Request().Context(), tenantID, c.Param("id"), actor, req)
 	if err != nil {
 		return err
 	}

@@ -16,12 +16,13 @@ type LoginRequest struct {
 // Auth response DTOs
 
 type UserDTO struct {
-	ID     string  `json:"id"`
-	Email  string  `json:"email"`
-	Name   string  `json:"name"`
-	Role   string  `json:"role"`
-	Status string  `json:"status"`
-	Photo  *string `json:"photo"`
+	ID          string   `json:"id"`
+	Email       string   `json:"email"`
+	Name        string   `json:"name"`
+	Role        string   `json:"role"`
+	Status      string   `json:"status"`
+	Photo       *string  `json:"photo"`
+	Permissions []string `json:"permissions,omitempty"`
 }
 
 type LoginDTO struct {

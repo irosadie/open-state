@@ -5,6 +5,7 @@ export type AuthUserResponse = {
   companyId?: number | null
   photo?: string | null
   role?: string | null
+  permissions?: string[] | null
 }
 
 export type AuthTokensResponse = {

@@ -10,6 +10,7 @@ type Config struct {
 	DatabaseURL string
 	Port        string
 	JWTSecret   string
+	RateLimit   RateLimitConfig
 }
 
 // Load reads required env vars and fails fast if any are missing.
@@ -33,5 +34,6 @@ func Load() (*Config, error) {
 		DatabaseURL: dbURL,
 		Port:        port,
 		JWTSecret:   jwtSecret,
+		RateLimit:   loadRateLimits(),
 	}, nil
 }

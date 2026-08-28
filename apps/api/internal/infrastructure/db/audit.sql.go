@@ -61,6 +61,46 @@ func (q *Queries) AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) 
 	return i, err
 }
 
+const countAuditFiltered = `-- name: CountAuditFiltered :one
+SELECT COUNT(*)
+FROM audit_logs
+WHERE tenant_id = $1
+  AND ($2::text IS NULL OR action = $2)
+  AND ($3::text IS NULL OR resource_type = $3)
+  AND ($4::text IS NULL OR resource_id = $4)
+  AND ($5::text IS NULL OR actor = $5)
+  AND ($6::text IS NULL OR correlation_id = $6)
+  AND ($7::timestamptz IS NULL OR occurred_at >= $7)
+  AND ($8::timestamptz IS NULL OR occurred_at <= $8)
+`
+
+type CountAuditFilteredParams struct {
+	TenantID      uuid.UUID      `json:"tenant_id"`
+	Action        sql.NullString `json:"action"`
+	ResourceType  sql.NullString `json:"resource_type"`
+	ResourceID    sql.NullString `json:"resource_id"`
+	Actor         sql.NullString `json:"actor"`
+	CorrelationID sql.NullString `json:"correlation_id"`
+	FromTime      sql.NullTime   `json:"from_time"`
+	ToTime        sql.NullTime   `json:"to_time"`
+}
+
+func (q *Queries) CountAuditFiltered(ctx context.Context, arg CountAuditFilteredParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAuditFiltered,
+		arg.TenantID,
+		arg.Action,
+		arg.ResourceType,
+		arg.ResourceID,
+		arg.Actor,
+		arg.CorrelationID,
+		arg.FromTime,
+		arg.ToTime,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const listAuditByAction = `-- name: ListAuditByAction :many
 SELECT id, tenant_id, actor, action, resource_type, resource_id, before, after, correlation_id, occurred_at, created_at
 FROM audit_logs
@@ -165,6 +205,80 @@ ORDER BY occurred_at DESC
 
 func (q *Queries) ListAuditByTenant(ctx context.Context, tenantID uuid.UUID) ([]AuditLog, error) {
 	rows, err := q.db.QueryContext(ctx, listAuditByTenant, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AuditLog
+	for rows.Next() {
+		var i AuditLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Actor,
+			&i.Action,
+			&i.ResourceType,
+			&i.ResourceID,
+			&i.Before,
+			&i.After,
+			&i.CorrelationID,
+			&i.OccurredAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAuditFiltered = `-- name: ListAuditFiltered :many
+SELECT id, tenant_id, actor, action, resource_type, resource_id, before, after, correlation_id, occurred_at, created_at
+FROM audit_logs
+WHERE tenant_id = $1
+  AND ($2::text IS NULL OR action = $2)
+  AND ($3::text IS NULL OR resource_type = $3)
+  AND ($4::text IS NULL OR resource_id = $4)
+  AND ($5::text IS NULL OR actor = $5)
+  AND ($6::text IS NULL OR correlation_id = $6)
+  AND ($7::timestamptz IS NULL OR occurred_at >= $7)
+  AND ($8::timestamptz IS NULL OR occurred_at <= $8)
+ORDER BY occurred_at DESC
+LIMIT $10 OFFSET $9
+`
+
+type ListAuditFilteredParams struct {
+	TenantID      uuid.UUID      `json:"tenant_id"`
+	Action        sql.NullString `json:"action"`
+	ResourceType  sql.NullString `json:"resource_type"`
+	ResourceID    sql.NullString `json:"resource_id"`
+	Actor         sql.NullString `json:"actor"`
+	CorrelationID sql.NullString `json:"correlation_id"`
+	FromTime      sql.NullTime   `json:"from_time"`
+	ToTime        sql.NullTime   `json:"to_time"`
+	PageOffset    int32          `json:"page_offset"`
+	PageSize      int32          `json:"page_size"`
+}
+
+func (q *Queries) ListAuditFiltered(ctx context.Context, arg ListAuditFilteredParams) ([]AuditLog, error) {
+	rows, err := q.db.QueryContext(ctx, listAuditFiltered,
+		arg.TenantID,
+		arg.Action,
+		arg.ResourceType,
+		arg.ResourceID,
+		arg.Actor,
+		arg.CorrelationID,
+		arg.FromTime,
+		arg.ToTime,
+		arg.PageOffset,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}
