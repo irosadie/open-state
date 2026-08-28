@@ -1,14 +1,19 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/mark3labs/mcp-go/server"
 
+	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	"github.com/irosadie/open-state/api/internal/domain/capability"
 	capinfra "github.com/irosadie/open-state/api/internal/infrastructure/capability"
+	"github.com/irosadie/open-state/api/internal/infrastructure/config"
+	infradb "github.com/irosadie/open-state/api/internal/infrastructure/database"
+	raginfra "github.com/irosadie/open-state/api/internal/infrastructure/rag"
 	mcpapi "github.com/irosadie/open-state/api/internal/interfaces/mcp"
 )
 
@@ -18,11 +23,40 @@ func main() {
 		port = "8030"
 	}
 
-	// Build the capability invoker. The persistence-backed repository is not
-	// wired in this slice; we use the mock provider (default sandbox, PRD §2064)
-	// so the server boots and declares tools. A nil resolver still lets the
-	// server start; invoke_capability returns an authorization error until the
-	// capability repository is wired (persistence slices).
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("config error: %v", err)
+	}
+
+	ctx := context.Background()
+	pool, err := config.NewPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("database error: %v", err)
+	}
+	defer pool.Close()
+
+	// Composed persistence adapter (ADR-001): provides the repository interfaces
+	// the orchestrator and context compiler depend on.
+	adapter := infradb.NewPostgresAdapter(pool)
+
+	// Orchestrator service: lifecycle, propose-event, instances, history,
+	// allowed capabilities (PRD 25, 38, 42-43, 52, 142).
+	orchestrator := appservices.NewOrchestratorService(
+		adapter.Instances(),
+		adapter.Events(),
+		adapter.Context(),
+		adapter.Capabilities(),
+	)
+
+	// Context compiler: minimal per-turn context with PII redaction (PRD 22, 90).
+	// A stub RAG provider is wired until a concrete backend lands (PRD 171).
+	contextCompiler := appservices.NewContextCompiler(
+		adapter.Context(),
+		raginfra.StubRAGProvider{},
+		raginfra.NewDefaultRedactor(),
+	)
+
+	// Capability invoker (sandbox/mock provider by default, PRD §2064).
 	invoker := capability.NewCapabilityInvoker(
 		nil, // capability resolver not wired in this slice
 		capinfra.MockProviderResolver{},
@@ -32,8 +66,10 @@ func main() {
 	)
 
 	deps := mcpapi.Dependencies{
-		IntentResolver:   stubIntentResolver{},
+		IntentResolver:  stubIntentResolver{},
 		CapabilityInvoker: invoker,
+		Orchestrator:     orchestrator,
+		ContextCompiler:  contextCompiler,
 	}
 
 	srv := mcpapi.NewServer(deps)
