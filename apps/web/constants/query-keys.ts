@@ -8,4 +8,16 @@ export const queryKeys = {
     logout: "authLogout",
     me: "authMe",
   },
+  capabilities: {
+    list: "capabilitiesList",
+    get: "capabilitiesGet",
+    create: "capabilitiesCreate",
+    update: "capabilitiesUpdate",
+    delete: "capabilitiesDelete",
+    bindings: "capabilitiesBindings",
+    test: "capabilitiesTest",
+  },
+  bindings: {
+    delete: "bindingsDelete",
+  },
 }
