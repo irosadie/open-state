@@ -46,7 +46,7 @@
 ## 5. Baseline load test (Skill: api-feature)
 
 - [x] 5.1 Add an in-memory engine throughput test (transitions/sec) via Go benchmark
-- [ ] 5.2 Add an optional Postgres-backed throughput run
+- [x] 5.2 Add an optional Postgres-backed throughput run
 - [x] 5.3 Use a loose lower bound to avoid flakiness; report measured values
 - [x] 5.4 Add a Go test/bench target wired into the repo scripts
 
