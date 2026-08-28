@@ -25,7 +25,7 @@ func RegisterAuthRoutes(e *echo.Echo, ctrl *controllers.AuthController, repo rep
 // binding admin endpoints behind auth (PRD §59-64). The tenant is derived from
 // the X-Tenant-ID header by the controller, never from the request body.
 func RegisterCapabilityRoutes(e *echo.Echo, ctrl *controllers.CapabilityController, repo repositories.IAuthRepository, tokenSvc services.TokenService) {
-	g := e.Group("/capabilities", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+	g := e.Group("/api/capabilities", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
 
 	g.GET("", ctrl.List)
 	g.POST("", ctrl.Create)
@@ -36,8 +36,8 @@ func RegisterCapabilityRoutes(e *echo.Echo, ctrl *controllers.CapabilityControll
 	g.POST("/:id/bindings", ctrl.CreateBinding)
 	g.POST("/:id/test", ctrl.TestInvoke)
 
-	// Binding management is top-level (PRD §60): DELETE /bindings/{id}
-	b := e.Group("/bindings", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+	// Binding management is top-level (PRD §60): DELETE /api/bindings/{id}
+	b := e.Group("/api/bindings", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
 	b.DELETE("/:id", ctrl.DeleteBinding)
 }
 

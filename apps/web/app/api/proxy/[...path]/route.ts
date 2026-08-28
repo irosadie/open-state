@@ -146,6 +146,13 @@ const buildRequestHeaders = (
     headers.Authorization = `Bearer ${accessToken}`
   }
 
+  // Forward the tenant header used by tenant-scoped endpoints (PRD §4, §96).
+  const tenantId = request.headers.get("x-tenant-id")
+
+  if (tenantId) {
+    headers["X-Tenant-ID"] = tenantId
+  }
+
   return headers
 }
 

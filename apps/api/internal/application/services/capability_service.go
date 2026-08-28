@@ -228,7 +228,10 @@ func (s *CapabilityService) TestInvoke(ctx context.Context, tenantID, capability
 	if err != nil {
 		var ce *domaincap.CapabilityError
 		if errors.As(err, &ce) {
-			return nil, mapCapabilityError(ce)
+			// Return the classified capability error as-is so the HTTP boundary
+			// can surface kind/code to callers (PRD §87, §2951). Raw provider
+			// errors are never exposed.
+			return nil, ce
 		}
 		return nil, domain.NewInternal("test invocation failed")
 	}
@@ -276,19 +279,6 @@ func toBindingDTO(b *entities.CapabilityBinding) *dtos.CapabilityBindingDTO {
 		Permission:   string(b.Permission),
 		CreatedAt:    b.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:    b.UpdatedAt.Format(time.RFC3339),
-	}
-}
-
-func mapCapabilityError(ce *domaincap.CapabilityError) error {
-	switch ce.Kind {
-	case domaincap.ErrorKindValidation:
-		return domain.NewValidation(ce.Message)
-	case domaincap.ErrorKindUnauthorized:
-		return domain.NewForbidden(ce.Message)
-	case domaincap.ErrorKindTimeout, domaincap.ErrorKindUnavailable, domaincap.ErrorKindExternal:
-		return domain.NewInternal(ce.Message)
-	default:
-		return domain.NewInternal(ce.Message)
 	}
 }
 
