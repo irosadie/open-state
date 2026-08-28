@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/irosadie/open-state/api/internal/domain/entities"
@@ -21,6 +22,9 @@ func (f *fakeInstanceRepo) Create(_ context.Context, _ string, input repositorie
 		WorkflowVersionID: input.WorkflowVersionID,
 		Status:        entities.WorkflowInstanceRunning,
 		Version:       1,
+	}
+	if input.CorrelationKey != nil {
+		inst.CorrelationKey = sql.NullString{String: *input.CorrelationKey, Valid: true}
 	}
 	if f.instances == nil {
 		f.instances = map[string]*entities.WorkflowInstance{}
@@ -211,6 +215,50 @@ func TestOrchestratorListHistory(t *testing.T) {
 	}
 	if len(history) != 1 {
 		t.Fatalf("expected 1 history event, got %d", len(history))
+	}
+}
+
+func TestOrchestratorGetActiveWorkflow(t *testing.T) {
+	svc, _, _ := newOrchestratorForTest()
+	ctx := context.Background()
+
+	created, _ := svc.StartWorkflow(ctx, "tenant-1", "wf-1", "wv-1", "conv-1")
+
+	active, err := svc.GetActiveWorkflow(ctx, "tenant-1", "conv-1")
+	if err != nil {
+		t.Fatalf("get active: %v", err)
+	}
+	if active.ID != created.ID {
+		t.Fatalf("expected active instance %s, got %s", created.ID, active.ID)
+	}
+
+	// Terminal instances must not be considered active.
+	_, _ = svc.CancelWorkflow(ctx, "tenant-1", created.ID)
+	if _, err := svc.GetActiveWorkflow(ctx, "tenant-1", "conv-1"); err == nil {
+		t.Fatal("expected not-found after cancel")
+	}
+}
+
+func TestOrchestratorReplayWorkflow(t *testing.T) {
+	svc, _, _ := newOrchestratorForTest()
+	ctx := context.Background()
+
+	created, _ := svc.StartWorkflow(ctx, "tenant-1", "wf-1", "wv-1", "conv-1")
+	_, _ = svc.ProposeEvent(ctx, "tenant-1", created.ID, "slot.booked", map[string]any{"court": "A"}, "")
+	_, _ = svc.ProposeEvent(ctx, "tenant-1", created.ID, "slot.paid", map[string]any{"amount": 100}, "")
+
+	snapshot, last, err := svc.ReplayWorkflow(ctx, "tenant-1", created.ID)
+	if err != nil {
+		t.Fatalf("replay: %v", err)
+	}
+	if snapshot["court"] != "A" {
+		t.Fatalf("expected replayed court=A, got %v", snapshot["court"])
+	}
+	if snapshot["amount"] != float64(100) {
+		t.Fatalf("expected replayed amount=100, got %v", snapshot["amount"])
+	}
+	if last == nil || last.Type != "slot.paid" {
+		t.Fatalf("expected last event slot.paid, got %+v", last)
 	}
 }
 

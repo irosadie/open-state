@@ -182,3 +182,56 @@ func (s *OrchestratorService) ListAllowedCapabilities(ctx context.Context, tenan
 	}
 	return out, nil
 }
+
+// GetActiveWorkflow resolves the active (non-terminal) workflow instance for a
+// conversation (PRD 10, 142). A conversation maps to a workflow instance via its
+// correlation_key (PRD 6).
+func (s *OrchestratorService) GetActiveWorkflow(ctx context.Context, tenantID, conversationID string) (*entities.WorkflowInstance, error) {
+	instances, err := s.instances.ListByTenant(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range instances {
+		inst := &instances[i]
+		if !inst.CorrelationKey.Valid || inst.CorrelationKey.String != conversationID {
+			continue
+		}
+		if inst.Status == entities.WorkflowInstanceCompleted ||
+			inst.Status == entities.WorkflowInstanceCancelled ||
+			inst.Status == entities.WorkflowInstanceAborted ||
+			inst.Status == entities.WorkflowInstanceExpired {
+			continue
+		}
+		return inst, nil
+	}
+	return nil, domain.NewNotFound("no active workflow for conversation")
+}
+
+// ReplayWorkflow replays the recorded event history of an instance in deterministic
+// sequence order to reproduce its resulting context/state projection (PRD 52).
+// Without the engine wired, replay merges event payloads in order and returns the
+// reproduced context snapshot plus the last event.
+func (s *OrchestratorService) ReplayWorkflow(ctx context.Context, tenantID, instanceID string) (map[string]any, *entities.Event, error) {
+	if _, err := s.instances.FindByID(ctx, tenantID, instanceID); err != nil {
+		return nil, nil, err
+	}
+	events, err := s.events.ListEventsByInstance(ctx, tenantID, instanceID)
+	if err != nil {
+		return nil, nil, err
+	}
+	contextSnap := map[string]any{}
+	var last *entities.Event
+	for i := range events {
+		e := &events[i]
+		if len(e.Payload) > 0 {
+			var payload map[string]any
+			if err := json.Unmarshal(e.Payload, &payload); err == nil {
+				for k, v := range payload {
+					contextSnap[k] = v
+				}
+			}
+		}
+		last = e
+	}
+	return contextSnap, last, nil
+}

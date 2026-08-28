@@ -11,32 +11,42 @@ import (
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 )
 
-// handleResolveIntent returns the resolved intent's workflow + state projection.
-func handleResolveIntent(ctx context.Context, deps Dependencies, intentID, projectID string) (*mcp.CallToolResult, error) {
-	for _, i := range deps.IntentResolver.ListIntents() {
-		if i.ID == intentID && (projectID == "" || i.ProjectID == projectID) {
-			return mcp.NewToolResultJSON(map[string]any{
-				"intent":       i.ID,
-				"projectId":    i.ProjectID,
-				"workflowSlug": i.WorkflowSlug,
-				"resolved":     true,
-			})
-		}
+// handleResolveIntent resolves an intent to its workflow (PRD 38, 171).
+func handleResolveIntent(ctx context.Context, deps Dependencies, tenantID, projectID, intentID string) (*mcp.CallToolResult, error) {
+	if deps.IntentResolver == nil {
+		return toolUnavailable("intent resolver not configured")
+	}
+	wf, err := deps.IntentResolver.ResolveIntent(ctx, tenantID, projectID, intentID)
+	if err != nil {
+		return toolError(err)
 	}
 	return mcp.NewToolResultJSON(map[string]any{
-		"intent":   intentID,
-		"resolved": false,
-		"reason":   "intent not found",
+		"intent":       intentID,
+		"projectId":    projectID,
+		"workflowId":   wf.ID,
+		"workflowSlug": wf.Slug,
+		"name":         wf.Name,
+		"status":       wf.Status,
+		"resolved":     true,
 	})
 }
 
-// handleGetActiveWorkflow returns an indication of active workflow. In this
-// slice the active-workflow store is not yet wired; it reports none found.
-func handleGetActiveWorkflow(ctx context.Context, _ Dependencies, conversation string) (*mcp.CallToolResult, error) {
+// handleGetActiveWorkflow resolves the active workflow instance for a conversation
+// (PRD 10, 142).
+func handleGetActiveWorkflow(ctx context.Context, deps Dependencies, tenantID, conversation string) (*mcp.CallToolResult, error) {
+	if deps.Orchestrator == nil {
+		return toolUnavailable("orchestrator not configured")
+	}
+	inst, err := deps.Orchestrator.GetActiveWorkflow(ctx, tenantID, conversation)
+	if err != nil {
+		return toolError(err)
+	}
 	return mcp.NewToolResultJSON(map[string]any{
 		"conversation": conversation,
-		"active":       false,
-		"message":      "no active workflow (active-workflow store not wired in this slice)",
+		"active":       true,
+		"instanceId":   inst.ID,
+		"workflow":     inst.WorkflowID,
+		"status":       inst.Status,
 	})
 }
 
@@ -250,6 +260,29 @@ func handleListHistory(ctx context.Context, deps Dependencies, tenantID, instanc
 		})
 	}
 	return mcp.NewToolResultJSON(map[string]any{"history": out})
+}
+
+func handleReplayWorkflow(ctx context.Context, deps Dependencies, tenantID, instanceID string) (*mcp.CallToolResult, error) {
+	if deps.Orchestrator == nil {
+		return toolUnavailable("orchestrator not configured")
+	}
+	contextSnap, last, err := deps.Orchestrator.ReplayWorkflow(ctx, tenantID, instanceID)
+	if err != nil {
+		return toolError(err)
+	}
+	out := map[string]any{
+		"replayed": true,
+		"context":  contextSnap,
+	}
+	if last != nil {
+		out["lastEvent"] = map[string]any{
+			"id":        last.ID,
+			"type":      last.Type,
+			"sequence":  last.Sequence,
+			"timestamp": last.Timestamp,
+		}
+	}
+	return mcp.NewToolResultJSON(out)
 }
 
 func handleCompiledContext(ctx context.Context, deps Dependencies, args map[string]any) (*mcp.CallToolResult, error) {
