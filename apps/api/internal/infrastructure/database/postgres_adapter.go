@@ -9,6 +9,7 @@ import (
 	domain "github.com/irosadie/open-state/go-shared/domain"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
+	"go.opentelemetry.io/otel"
 )
 
 // PostgresAdapter is the composed PostgreSQL-backed persistence port (ADR-001).
@@ -30,6 +31,7 @@ type PostgresAdapter struct {
 	capabilities repositories.ICapabilityRepository
 	audit        repositories.IAuditRepository
 	roles        repositories.IRoleAssignmentRepository
+	identities   repositories.IUserIdentityRepository
 }
 
 // NewPostgresAdapter returns a PostgresAdapter composing all six pgx repositories.
@@ -47,6 +49,7 @@ func NewPostgresAdapter(pool *pgxpool.Pool) *PostgresAdapter {
 		capabilities: NewPgxCapabilityRepository(pool),
 		audit:        NewPgxAuditRepository(pool),
 		roles:        NewPgxRoleAssignmentRepository(pool),
+		identities:   NewPgxUserIdentityRepository(pool),
 	}
 }
 
@@ -74,12 +77,20 @@ func (a *PostgresAdapter) Audit() repositories.IAuditRepository { return a.audit
 // Roles returns the tenant-scoped RBAC role-assignment repository.
 func (a *PostgresAdapter) Roles() repositories.IRoleAssignmentRepository { return a.roles }
 
+// Identities returns the external OIDC identity repository (PRD §79).
+func (a *PostgresAdapter) Identities() repositories.IUserIdentityRepository { return a.identities }
+
 // WithTx runs fn within a single DB transaction, binding all six repositories to
 // that transaction so multi-repository operations (e.g. append an audit entry and
 // emit an outbox event, or a state transition) commit or roll back together
 // (PRD 65, 69). If fn returns an error the transaction is rolled back; otherwise
 // it is committed.
 func (a *PostgresAdapter) WithTx(ctx context.Context, fn func(adapter *PostgresAdapter) error) error {
+	// DB span under the active trace context (PRD §84). No-op without a global
+	// TracerProvider.
+	_, span := otel.Tracer("openstate.db").Start(ctx, "DB WithTx")
+	defer span.End()
+
 	tx, err := a.sqlDB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.NewInternal(err.Error())
@@ -96,6 +107,7 @@ func (a *PostgresAdapter) WithTx(ctx context.Context, fn func(adapter *PostgresA
 		capabilities: newPgxCapabilityRepository(q),
 		audit:        newPgxAuditRepository(q),
 		roles:        newPgxRoleAssignmentRepository(q),
+		identities:   newPgxUserIdentityRepository(q),
 	}
 
 	if err := fn(txAdapter); err != nil {

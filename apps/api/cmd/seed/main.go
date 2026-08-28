@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -44,9 +44,10 @@ var seeds = []seedProject{
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatalf("seed failed: %v", err)
+		slog.Error("seed failed", "error", err.Error())
+		return
 	}
-	log.Println("seed complete")
+	slog.Info("seed complete")
 }
 
 func run() error {
@@ -110,7 +111,7 @@ func seedOne(ctx context.Context, projects repositories.IProjectRepository, work
 		return fmt.Errorf("publish workflow %s: %w", def.Slug, err)
 	}
 
-	log.Printf("seeded intent %s -> workflow %s (project %s)", s.intentID, def.Slug, s.slug)
+	slog.Info("seeded intent", "intent", s.intentID, "workflow", def.Slug, "project", s.slug)
 	return nil
 }
 

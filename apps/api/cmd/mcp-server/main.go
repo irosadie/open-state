@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -15,6 +15,7 @@ import (
 	"github.com/irosadie/open-state/api/internal/infrastructure/config"
 	infradb "github.com/irosadie/open-state/api/internal/infrastructure/database"
 	engineadapter "github.com/irosadie/open-state/api/internal/infrastructure/engineadapter"
+	infralog "github.com/irosadie/open-state/api/internal/infrastructure/logging"
 	raginfra "github.com/irosadie/open-state/api/internal/infrastructure/rag"
 	mcpapi "github.com/irosadie/open-state/api/internal/interfaces/mcp"
 )
@@ -27,13 +28,18 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config error: %v", err)
+		slog.Error("config error", "error", err.Error())
+		return
 	}
+
+	logger := infralog.New(infralog.Config{Format: cfg.LogFormat, Level: cfg.LogLevel})
+	slog.SetDefault(logger)
 
 	ctx := context.Background()
 	pool, err := config.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("database error: %v", err)
+		logger.Error("database error", "error", err.Error())
+		return
 	}
 	defer pool.Close()
 
@@ -101,8 +107,8 @@ func main() {
 	})
 
 	addr := ":" + port
-	log.Printf("MCP server listening on %s (Streamable HTTP at /mcp)", addr)
+	logger.Info("MCP server listening", "addr", addr, "endpoint", "/mcp")
 	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatalf("MCP server error: %v", err)
+		logger.Error("MCP server error", "error", err.Error())
 	}
 }

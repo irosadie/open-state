@@ -3,9 +3,11 @@ package usecases
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 
 	"github.com/hibiken/asynq"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const TypeRuntimeSummary = "runtime:summary"
@@ -27,6 +29,11 @@ func (h *RuntimeSummaryHandler) ProcessTask(ctx context.Context, task *asynq.Tas
 		return err
 	}
 
-	log.Printf("[runtime:summary] processing: %s", payload.Message)
+	// Job span (PRD §84). No-op without a global TracerProvider.
+	_, span := otel.Tracer("openstate.worker").Start(ctx, "process job")
+	defer span.End()
+	span.SetAttributes(attribute.String("task.type", task.Type()))
+
+	slog.Info("processing runtime summary", "task", task.Type(), "message", payload.Message)
 	return nil
 }

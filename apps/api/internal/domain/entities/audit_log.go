@@ -30,6 +30,9 @@ const (
 	// Binding actions (PRD 60): capability-binding mutations.
 	AuditActionBindingCreated AuditAction = "binding.created"
 	AuditActionBindingDeleted AuditAction = "binding.deleted"
+
+	// SSO login (PRD 79).
+	AuditActionSSOLogin AuditAction = "auth.sso_login"
 )
 
 // AuditLog is an append-only, tenant-isolated audit entry (PRD 50). It records an

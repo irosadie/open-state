@@ -3,7 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/hibiken/asynq"
@@ -24,7 +24,7 @@ func NewServer() (*asynq.Server, error) {
 	srv := asynq.NewServer(opt, asynq.Config{
 		Concurrency: 10,
 		ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
-			log.Printf("task %s failed: %v", task.Type(), err)
+			slog.Error("task failed", "task", task.Type(), "error", err.Error())
 		}),
 	})
 

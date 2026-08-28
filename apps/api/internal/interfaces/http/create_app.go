@@ -1,6 +1,8 @@
 package http
 
 import (
+	"log/slog"
+
 	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	"github.com/irosadie/open-state/api/internal/domain/repositories"
 	domainsvc "github.com/irosadie/open-state/api/internal/domain/services"
@@ -17,26 +19,30 @@ func CreateApp(
 	capabilityCtrl *controllers.CapabilityController,
 	workflowCtrl *controllers.WorkflowController,
 	auditCtrl *controllers.AuditController,
+	ssoCtrl *controllers.SSOController,
 	repo repositories.IAuthRepository,
 	tokenSvc domainsvc.TokenService,
 	authz *appservices.AuthorizationService,
 	audit *appservices.AuditWriter,
 	loginLimiter domainsvc.RateLimiter,
 	registerLimiter domainsvc.RateLimiter,
+	logger *slog.Logger,
+	metricsRec middleware.MetricsRecorder,
 ) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
 	e.HTTPErrorHandler = middleware.ErrorHandler
 
 	// Global middleware
-	e.Use(echomw.Logger())
 	e.Use(echomw.Recover())
-	e.Use(echomw.CORS())
 	e.Use(echomw.RequestID())
+	e.Use(middleware.RequestLogger(logger))
+	e.Use(middleware.Metrics(metricsRec))
 
 	// Routes
 	routes.RegisterSystemRoutes(e, systemCtrl)
 	routes.RegisterAuthRoutes(e, authCtrl, repo, tokenSvc, loginLimiter, registerLimiter)
+	routes.RegisterSSORoutes(e, ssoCtrl)
 	routes.RegisterCapabilityRoutes(e, capabilityCtrl, repo, tokenSvc, authz, audit)
 	routes.RegisterWorkflowRoutes(e, workflowCtrl, repo, tokenSvc, authz, audit)
 	routes.RegisterAuditRoutes(e, auditCtrl, repo, tokenSvc, authz, audit)

@@ -2,29 +2,56 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
+
+	"github.com/labstack/echo/v4"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/irosadie/open-state/api/internal/application/services"
 	usecases "github.com/irosadie/open-state/api/internal/application/use-cases"
+	domainsvc "github.com/irosadie/open-state/api/internal/domain/services"
 	infracap "github.com/irosadie/open-state/api/internal/infrastructure/capability"
 	"github.com/irosadie/open-state/api/internal/infrastructure/config"
 	infradb "github.com/irosadie/open-state/api/internal/infrastructure/database"
+	infralog "github.com/irosadie/open-state/api/internal/infrastructure/logging"
+	inframetrics "github.com/irosadie/open-state/api/internal/infrastructure/metrics"
+	infroidc "github.com/irosadie/open-state/api/internal/infrastructure/oidc"
 	infrl "github.com/irosadie/open-state/api/internal/infrastructure/ratelimit"
 	infrasvc "github.com/irosadie/open-state/api/internal/infrastructure/services"
+	infratrace "github.com/irosadie/open-state/api/internal/infrastructure/tracing"
 	"github.com/irosadie/open-state/api/internal/interfaces/http"
 	"github.com/irosadie/open-state/api/internal/interfaces/http/controllers"
+	httpmw "github.com/irosadie/open-state/api/internal/interfaces/http/middleware"
 )
 
 func main() {
+	ctx := context.Background()
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config error: %v", err)
+		slog.Error("config error", "error", err.Error())
+		return
 	}
 
-	ctx := context.Background()
+	logger := infralog.New(infralog.Config{Format: cfg.LogFormat, Level: cfg.LogLevel})
+	slog.SetDefault(logger)
+
+	// OpenTelemetry tracing (PRD §84). No-op when no OTLP endpoint is set.
+	traceShutdown := infratrace.Setup(ctx, infratrace.Config{
+		OTLPEndpoint: cfg.OTel.OTLPEndpoint,
+		ServiceName:  cfg.OTel.ServiceName,
+	}, logger)
+	defer func() { _ = traceShutdown(context.Background()) }()
+
+	// Prometheus metrics (PRD §84): RED + runtime + application metrics.
+	var metricsRegistry *inframetrics.Registry
+	if cfg.MetricsEnabled {
+		metricsRegistry = inframetrics.New()
+	}
+
 	pool, err := config.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("database error: %v", err)
+		logger.Error("database error", "error", err.Error())
+		return
 	}
 	defer pool.Close()
 
@@ -47,7 +74,7 @@ func main() {
 
 	// Audit writer (PRD 50): append-only, tenant-isolated audit trail for
 	// important operations and authorization denials.
-	auditWriter := services.NewAuditWriter(adapter.Audit())
+	auditWriter := services.NewAuditWriter(adapter.Audit(), logger, metricsRegistry)
 
 	// Audit query service + controller (PRD 50): filtered, paginated audit trail.
 	auditSvc := services.NewAuditService(adapter.Audit())
@@ -76,6 +103,33 @@ func main() {
 	// Services
 	authSvc := services.NewAuthService(registerUC, loginUC, logoutUC, getMeUC, authzSvc)
 
+	// SSO providers (PRD §79): build OIDC adapters for enabled providers only.
+	ssoProviders := make(map[string]domainsvc.OIDCProvider)
+	for name, pc := range map[string]config.OIDCProviderConfig{
+		"google": cfg.SSO.Google,
+		"github": cfg.SSO.GitHub,
+		"entra":  cfg.SSO.Entra,
+	} {
+		if !pc.Enabled() {
+			continue
+		}
+		provider, err := infroidc.New(ctx, infroidc.ProviderConfig{
+			Name:         name,
+			ClientID:     pc.ClientID,
+			ClientSecret: pc.ClientSecret,
+			IssuerURL:    pc.IssuerURL,
+			RedirectURI:  pc.RedirectURI,
+			Scopes:       pc.Scopes,
+		})
+		if err != nil {
+			logger.Warn("sso provider disabled", "provider", name, "error", err.Error())
+			continue
+		}
+		ssoProviders[name] = provider
+	}
+	ssoSvc := services.NewSSOService(adapter.Identities(), authRepo, adapter.Roles(), tokenSvc, ssoProviders, auditWriter)
+	ssoCtrl := controllers.NewSSOController(ssoSvc, cfg.SSO.BaseURL)
+
 	// Controllers
 	authCtrl := controllers.NewAuthController(authSvc)
 	systemCtrl := controllers.NewSystemController(healthUC, appInfoUC)
@@ -84,10 +138,29 @@ func main() {
 	auditCtrl := controllers.NewAuditController(auditSvc)
 
 	// Echo app
-	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, workflowCtrl, auditCtrl, authRepo, tokenSvc, authzSvc, auditWriter, loginLimiter, registerLimiter)
+	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, workflowCtrl, auditCtrl, ssoCtrl, authRepo, tokenSvc, authzSvc, auditWriter, loginLimiter, registerLimiter, logger, metricsRegistry)
 
-	log.Printf("starting server on :%s", cfg.Port)
+	// Distributed tracing middleware (PRD §84): server span per request + traceparent
+	// extraction. Applied after CreateApp to keep the interfaces layer free of
+	// infrastructure imports.
+	e.Use(infratrace.NewHTTPTrace(logger).Middleware())
+
+	// Hardened CORS + security headers (PRD §74, §139). Applied after CreateApp.
+	e.Use(httpmw.CORS(httpmw.CORSConfig{AllowedOrigins: cfg.Security.AllowedOrigins}))
+	e.Use(httpmw.SecurityHeaders(httpmw.SecurityHeadersConfig{
+		ContentSecurityPolicy: cfg.Security.CSP,
+		EnableHSTS:            cfg.Security.EnableHSTS,
+		HSTSMaxAge:            cfg.Security.HSTSMaxAge,
+	}))
+
+	// Prometheus metrics endpoint (PRD §84).
+	if metricsRegistry != nil {
+		e.GET("/metrics", echo.WrapHandler(promhttp.HandlerFor(metricsRegistry.Prometheus(), promhttp.HandlerOpts{})))
+		logger.Info("metrics endpoint enabled", "path", "/metrics")
+	}
+
+	logger.Info("starting server", "port", cfg.Port)
 	if err := e.Start(":" + cfg.Port); err != nil {
-		log.Fatalf("server error: %v", err)
+		logger.Error("server error", "error", err.Error())
 	}
 }

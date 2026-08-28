@@ -327,6 +327,16 @@ type User struct {
 	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
+type UserIdentity struct {
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	Provider        string    `json:"provider"`
+	SubjectID       string    `json:"subject_id"`
+	AutoProvisioned bool      `json:"auto_provisioned"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
 type Workflow struct {
 	ID             uuid.UUID      `json:"id"`
 	TenantID       uuid.UUID      `json:"tenant_id"`

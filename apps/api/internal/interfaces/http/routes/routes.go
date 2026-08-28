@@ -67,6 +67,14 @@ func RegisterAuditRoutes(e *echo.Echo, ctrl *controllers.AuditController, repo r
 	g.GET("", ctrl.List, middleware.RequirePermission(authz, "audit:read", audit))
 }
 
+// RegisterSSORoutes registers the external OIDC SSO login endpoints (PRD §79).
+func RegisterSSORoutes(e *echo.Echo, ctrl *controllers.SSOController) {
+	auth := e.Group("/api/auth/sso")
+	auth.GET("/providers", ctrl.Providers)
+	auth.GET("/:provider", ctrl.Start)
+	auth.GET("/:provider/callback", ctrl.Callback)
+}
+
 func RegisterSystemRoutes(e *echo.Echo, ctrl *controllers.SystemController) {
 	e.GET("/health", ctrl.Health)
 	e.GET("/", ctrl.AppInfo)
