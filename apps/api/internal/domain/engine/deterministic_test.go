@@ -281,3 +281,48 @@ func TestAllowedTransitions(t *testing.T) {
 		t.Errorf("expected a 'datetime.selected' transition from select_time, got %+v", transitions)
 	}
 }
+
+func TestCurrentStateInfo(t *testing.T) {
+	repos := newFakeRepos()
+	def := padelDef()
+	def.Nodes = append(def.Nodes, WorkflowNode{ID: "s_info", Kind: NodeKindState, Name: "INFO", Description: "collect info", Instructions: "ask the user", RequiredContext: []string{"customer.id"}, Capabilities: []string{"customer.lookup"}})
+	def.EntryNodeID = "s_info"
+	_ = repos.Workflows.Save(context.Background(), def)
+	eng := NewEngine(repos)
+	inst, _ := eng.StartWorkflow(context.Background(), "t", "project-padel", "c", def, "workflow.started")
+
+	info, err := eng.CurrentStateInfo(context.Background(), "t", inst.ID)
+	if err != nil {
+		t.Fatalf("current state info: %v", err)
+	}
+	if info.StateID != "s_info" || info.Purpose != "collect info" || info.Instructions != "ask the user" {
+		t.Errorf("unexpected info: %+v", info)
+	}
+	if len(info.RequiredContext) != 1 || info.RequiredContext[0] != "customer.id" {
+		t.Errorf("unexpected requiredContext: %+v", info.RequiredContext)
+	}
+}
+
+func TestReplay(t *testing.T) {
+	repos := newFakeRepos()
+	def := padelDef()
+	_ = repos.Workflows.Save(context.Background(), def)
+	eng := NewEngine(repos)
+	inst, _ := eng.StartWorkflow(context.Background(), "t", "project-padel", "c", def, "workflow.started")
+
+	evts := []Event{
+		{ID: "e0", Type: "workflow.started", Source: SourceSystem},
+		{ID: "e1", Type: "datetime.selected", Source: SourceUser, Payload: map[string]any{"booking.date": "2026-08-27"}},
+		{ID: "e2", Type: "slot.available", Source: SourceMCP, Payload: map[string]any{"slot.available": true}},
+	}
+	replayed, err := eng.Replay(context.Background(), "t", inst.ID, evts)
+	if err != nil {
+		t.Fatalf("replay: %v", err)
+	}
+	if replayed.CurrentStateID != "confirm" {
+		t.Errorf("expected replayed state confirm, got %q", replayed.CurrentStateID)
+	}
+	if replayed.Context["booking.date"] != "2026-08-27" {
+		t.Errorf("expected replayed context booking.date, got %v", replayed.Context)
+	}
+}

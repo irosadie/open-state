@@ -176,6 +176,22 @@ func (o *mockOrchestrator) GetAllowedTransitions(ctx context.Context, _, instanc
 	return o.eng.AllowedTransitions(ctx, "demo", instanceID)
 }
 
+func (o *mockOrchestrator) CurrentStateInfo(ctx context.Context, _, instanceID string) (*engine.StateInfo, error) {
+	return o.eng.CurrentStateInfo(ctx, "demo", instanceID)
+}
+
+func (o *mockOrchestrator) ReplayState(ctx context.Context, _, instanceID string) (map[string]any, string, error) {
+	events := []engine.Event{
+		{ID: "e0", Type: "order.started", Source: engine.SourceSystem},
+		{ID: "e1", Type: "product.requested", Source: engine.SourceUser, Payload: map[string]any{"product.sku": "latte"}},
+	}
+	replayed, err := o.eng.Replay(ctx, "demo", instanceID, events)
+	if err != nil {
+		return nil, "", err
+	}
+	return replayed.Context, replayed.CurrentStateID, nil
+}
+
 func toEntitiesInstance(i *engine.WorkflowInstance) *entities.WorkflowInstance {
 	stateID := i.CurrentStateID
 	return &entities.WorkflowInstance{

@@ -177,6 +177,39 @@ func (e *Engine) AllowedTransitions(ctx context.Context, tenantID, instanceID st
 	return out, nil
 }
 
+// StateInfo is the current node's purpose/instructions/context for a client.
+type StateInfo struct {
+	StateID        string
+	Purpose        string
+	Instructions   string
+	RequiredContext []string
+	Capabilities   []string
+}
+
+// CurrentStateInfo returns the current node's purpose (description), instructions,
+// required context, and capabilities from the pinned workflow definition (PRD 12, 14).
+func (e *Engine) CurrentStateInfo(ctx context.Context, tenantID, instanceID string) (*StateInfo, error) {
+	instance, err := e.repos.Instances.Get(ctx, tenantID, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	def, err := e.loadDefinition(ctx, tenantID, instance.ProjectID, instance.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	node, ok := nodeByID(def, instance.CurrentStateID)
+	if !ok {
+		return nil, domain.NewNotFound("current state not found in workflow")
+	}
+	return &StateInfo{
+		StateID:         node.ID,
+		Purpose:         node.Description,
+		Instructions:    node.Instructions,
+		RequiredContext: node.RequiredContext,
+		Capabilities:    node.Capabilities,
+	}, nil
+}
+
 func nodeByID(def *WorkflowDefinition, id string) (WorkflowNode, bool) {
 	for _, n := range def.Nodes {
 		if n.ID == id {

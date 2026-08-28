@@ -59,6 +59,14 @@ func (fakeOrchestrator) GetAllowedTransitions(context.Context, string, string) (
 	return nil, nil
 }
 
+func (fakeOrchestrator) CurrentStateInfo(context.Context, string, string) (*engine.StateInfo, error) {
+	return &engine.StateInfo{}, nil
+}
+
+func (fakeOrchestrator) ReplayState(context.Context, string, string) (map[string]any, string, error) {
+	return map[string]any{}, "", nil
+}
+
 type fakeIntentResolver struct{}
 
 func (fakeIntentResolver) ListIntents(context.Context, string, string) ([]entities.Workflow, error) {

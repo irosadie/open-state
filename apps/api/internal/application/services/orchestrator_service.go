@@ -153,6 +153,51 @@ func (s *OrchestratorService) GetAllowedTransitions(ctx context.Context, tenantI
 	return s.engine.AllowedTransitions(ctx, tenantID, instanceID)
 }
 
+// CurrentStateInfo returns the current node's purpose/instructions/context when an
+// engine is wired; otherwise an empty StateInfo.
+func (s *OrchestratorService) CurrentStateInfo(ctx context.Context, tenantID, instanceID string) (*engine.StateInfo, error) {
+	if s.engine == nil {
+		return &engine.StateInfo{StateID: instanceID}, nil
+	}
+	return s.engine.CurrentStateInfo(ctx, tenantID, instanceID)
+}
+
+// ReplayState replays the recorded events through the engine to reproduce the
+// resulting context and current state (PRD 52). When no engine is wired, it falls
+// back to the merge-based context snapshot with an empty state key.
+func (s *OrchestratorService) ReplayState(ctx context.Context, tenantID, instanceID string) (map[string]any, string, error) {
+	if s.engine == nil {
+		snap, _, err := s.ReplayWorkflow(ctx, tenantID, instanceID)
+		return snap, "", err
+	}
+	events, err := s.events.ListEventsByInstance(ctx, tenantID, instanceID)
+	if err != nil {
+		return nil, "", err
+	}
+	engineEvents := make([]engine.Event, 0, len(events))
+	for i := range events {
+		e := &events[i]
+		var payload map[string]any
+		if len(e.Payload) > 0 {
+			_ = json.Unmarshal(e.Payload, &payload)
+		}
+		engineEvents = append(engineEvents, engine.Event{
+			ID:          e.EventID,
+			TenantID:    tenantID,
+			Type:        e.Type,
+			Source:      engine.EventSource(e.Source),
+			WorkflowInstanceID: instanceID,
+			Payload:     payload,
+			Timestamp:   e.Timestamp,
+		})
+	}
+	replayed, err := s.engine.Replay(ctx, tenantID, instanceID, engineEvents)
+	if err != nil {
+		return nil, "", err
+	}
+	return replayed.Context, replayed.CurrentStateID, nil
+}
+
 // ProposeEvent validates the instance is active and, when an engine is wired, runs
 // the engine's `event → guard → transition` evaluation and persists the resulting
 // state (PRD 38, §34). Without an engine, it falls back to appending the event to

@@ -54,6 +54,8 @@ type OrchestratorPort interface {
 	ListHistory(ctx context.Context, tenantID, instanceID string) ([]entities.Event, error)
 	ReplayWorkflow(ctx context.Context, tenantID, instanceID string) (map[string]any, *entities.Event, error)
 	ProposeEvent(ctx context.Context, tenantID, instanceID, eventType string, payload map[string]any, correlationID string) (*entities.Event, error)
+	CurrentStateInfo(ctx context.Context, tenantID, instanceID string) (*engine.StateInfo, error)
+	ReplayState(ctx context.Context, tenantID, instanceID string) (map[string]any, string, error)
 	ListAllowedCapabilities(ctx context.Context, tenantID string, scopeType entities.BindingScopeType, scopeID string) ([]entities.Capability, error)
 }
 

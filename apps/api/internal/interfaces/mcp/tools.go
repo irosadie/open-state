@@ -142,6 +142,13 @@ func handleGetCurrentState(ctx context.Context, deps Dependencies, tenantID, ins
 		}
 		out["allowedTransitions"] = list
 	}
+
+	// Purpose/instructions/context of the current node (PRD 12, 14).
+	if info, ierr := deps.Orchestrator.CurrentStateInfo(ctx, tenantID, instanceID); ierr == nil {
+		out["purpose"] = info.Purpose
+		out["instructions"] = info.Instructions
+		out["requiredContext"] = info.RequiredContext
+	}
 	return mcp.NewToolResultJSON(out)
 }
 
@@ -279,21 +286,14 @@ func handleReplayWorkflow(ctx context.Context, deps Dependencies, tenantID, inst
 	if deps.Orchestrator == nil {
 		return toolUnavailable("orchestrator not configured")
 	}
-	contextSnap, last, err := deps.Orchestrator.ReplayWorkflow(ctx, tenantID, instanceID)
+	contextSnap, stateKey, err := deps.Orchestrator.ReplayState(ctx, tenantID, instanceID)
 	if err != nil {
 		return toolError(err)
 	}
 	out := map[string]any{
-		"replayed": true,
-		"context":  contextSnap,
-	}
-	if last != nil {
-		out["lastEvent"] = map[string]any{
-			"id":        last.ID,
-			"type":      last.Type,
-			"sequence":  last.Sequence,
-			"timestamp": last.Timestamp,
-		}
+		"replayed":   true,
+		"context":    contextSnap,
+		"stateKey":   stateKey,
 	}
 	return mcp.NewToolResultJSON(out)
 }
