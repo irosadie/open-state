@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/irosadie/open-state/api/internal/domain/engine"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 	"github.com/irosadie/open-state/api/internal/domain/repositories"
 	domain "github.com/irosadie/open-state/go-shared/domain"
@@ -259,6 +260,164 @@ func TestOrchestratorReplayWorkflow(t *testing.T) {
 	}
 	if last == nil || last.Type != "slot.paid" {
 		t.Fatalf("expected last event slot.paid, got %+v", last)
+	}
+}
+
+// ---- Engine-backed propose test ------------------------------------------
+
+// fakeEngineWorkflowRepo satisfies engine.WorkflowRepository with an in-memory def.
+type fakeEngineWorkflowRepo struct{ defs map[string]*engine.WorkflowDefinition }
+
+func (f *fakeEngineWorkflowRepo) GetBySlug(_ context.Context, _, projectID, slug string) (*engine.WorkflowDefinition, error) {
+	d, ok := f.defs[projectID+"/"+slug]
+	if !ok {
+		return nil, domain.NewNotFound("workflow not found")
+	}
+	return d, nil
+}
+func (f *fakeEngineWorkflowRepo) Save(_ context.Context, d *engine.WorkflowDefinition) error {
+	if f.defs == nil {
+		f.defs = map[string]*engine.WorkflowDefinition{}
+	}
+	f.defs[d.ProjectID+"/"+d.Slug] = d
+	return nil
+}
+
+// fakeEngineInstanceRepo tracks the engine instance's current state.
+type fakeEngineInstanceRepo struct {
+	instances map[string]*engine.WorkflowInstance
+}
+
+func (f *fakeEngineInstanceRepo) Create(_ context.Context, i *engine.WorkflowInstance) error {
+	if f.instances == nil {
+		f.instances = map[string]*engine.WorkflowInstance{}
+	}
+	cp := *i
+	f.instances[i.ID] = &cp
+	return nil
+}
+func (f *fakeEngineInstanceRepo) Get(_ context.Context, _, id string) (*engine.WorkflowInstance, error) {
+	i, ok := f.instances[id]
+	if !ok {
+		return nil, domain.NewNotFound("instance not found")
+	}
+	cp := *i
+	return &cp, nil
+}
+func (f *fakeEngineInstanceRepo) UpdateWithVersion(_ context.Context, i *engine.WorkflowInstance, expected int) error {
+	cur, ok := f.instances[i.ID]
+	if !ok {
+		return domain.NewNotFound("instance not found")
+	}
+	if cur.Version != expected {
+		return domain.NewConflict("version conflict")
+	}
+	cp := *i
+	f.instances[i.ID] = &cp
+	return nil
+}
+
+// fakeEngineEventRepo records engine events + idempotency.
+type fakeEngineEventRepo struct {
+	processed map[string]bool
+}
+
+func (f *fakeEngineEventRepo) Append(context.Context, *engine.Event) error { return nil }
+func (f *fakeEngineEventRepo) IsProcessed(_ context.Context, _, key string) (bool, error) {
+	return f.processed[key], nil
+}
+func (f *fakeEngineEventRepo) MarkProcessed(_ context.Context, _, key, _ string) error {
+	if f.processed == nil {
+		f.processed = map[string]bool{}
+	}
+	f.processed[key] = true
+	return nil
+}
+
+// fakeEngineProjectRepo satisfies engine.ProjectRepository.
+type fakeEngineProjectRepo struct{}
+
+func (fakeEngineProjectRepo) Get(context.Context, string, string) (*engine.Project, error) {
+	return &engine.Project{ID: "proj"}, nil
+}
+func (fakeEngineProjectRepo) Save(context.Context, *engine.Project) error { return nil }
+
+func engineBackedOrchestrator() (*OrchestratorService, *fakeEngineInstanceRepo) {
+	def := &engine.WorkflowDefinition{
+		Slug: "wf", ProjectID: "proj", Name: "WF", SchemaVersion: 1,
+		Status: engine.WorkflowPublished, EntryNodeID: "start",
+		Nodes: []engine.WorkflowNode{
+			{ID: "start", Kind: engine.NodeKindStart, Name: "START"},
+			{ID: "s1", Kind: engine.NodeKindState, Name: "S1"},
+		},
+		Transitions: []engine.TransitionDefinition{
+			{ID: "t0", SourceStateID: "start", Event: "go", TargetStateID: "s1", Priority: 1},
+		},
+		Policy: engine.WorkflowPolicy{Interruptible: "NEVER", Priority: 1},
+	}
+	wfRepo := &fakeEngineWorkflowRepo{}
+	_ = wfRepo.Save(context.Background(), def)
+	instRepo := &fakeEngineInstanceRepo{}
+	eng := engine.NewEngine(engine.EngineRepositories{
+		Projects:  fakeEngineProjectRepo{},
+		Workflows: wfRepo,
+		Instances: instRepo,
+		Events:    &fakeEngineEventRepo{},
+	})
+	// The engine-backed orchestrator uses persistence fakes for the pre-checks,
+	// and the in-memory engine repos for the actual transition.
+	persistInstRepo := &fakeInstanceRepo{}
+	evtRepo := &fakeEventRepo{}
+	svc := NewEngineOrchestratorService(persistInstRepo, evtRepo, &fakeContextRepo{}, &fakeCapRepo{}, eng)
+	return svc, instRepo
+}
+
+func TestOrchestratorProposeEventEngineBacked(t *testing.T) {
+	svc, engineInstRepo := engineBackedOrchestrator()
+	ctx := context.Background()
+
+	// Create a persisted instance (active) so ProposeEvent's pre-check passes.
+	created, err := svc.StartWorkflow(ctx, "tenant-1", "wf-1", "wv-1", "conv-1")
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	// Register the same instance id in the engine instance repo at "start".
+	_ = engineInstRepo.Create(ctx, &engine.WorkflowInstance{
+		ID: created.ID, TenantID: "tenant-1", WorkflowID: "wf", ProjectID: "proj",
+		WorkflowVersionID: "wv-1", Status: engine.InstanceRunning, CurrentStateID: "start", Version: 1,
+	})
+
+	// A valid event "go" transitions start -> s1.
+	evt, err := svc.ProposeEvent(ctx, "tenant-1", created.ID, "go", nil, "")
+	if err != nil {
+		t.Fatalf("engine-backed propose: %v", err)
+	}
+	if evt.Type != "go" {
+		t.Fatalf("expected event type go, got %s", evt.Type)
+	}
+	got, _ := engineInstRepo.Get(ctx, "tenant-1", created.ID)
+	if got.CurrentStateID != "s1" {
+		t.Fatalf("expected engine state s1, got %q", got.CurrentStateID)
+	}
+}
+
+func TestOrchestratorProposeEventEngineBackedRejects(t *testing.T) {
+	svc, engineInstRepo := engineBackedOrchestrator()
+	ctx := context.Background()
+
+	created, _ := svc.StartWorkflow(ctx, "tenant-1", "wf-1", "wv-1", "conv-1")
+	_ = engineInstRepo.Create(ctx, &engine.WorkflowInstance{
+		ID: created.ID, TenantID: "tenant-1", WorkflowID: "wf", ProjectID: "proj",
+		WorkflowVersionID: "wv-1", Status: engine.InstanceRunning, CurrentStateID: "start", Version: 1,
+	})
+
+	// "not_allowed" is not a valid event from "start" -> engine must reject.
+	if _, err := svc.ProposeEvent(ctx, "tenant-1", created.ID, "not_allowed", nil, ""); err == nil {
+		t.Fatal("expected engine rejection for disallowed event")
+	}
+	got, _ := engineInstRepo.Get(ctx, "tenant-1", created.ID)
+	if got.CurrentStateID != "start" {
+		t.Fatalf("expected state unchanged at start, got %q", got.CurrentStateID)
 	}
 }
 

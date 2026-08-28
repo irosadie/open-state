@@ -10,9 +10,11 @@ import (
 
 	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	"github.com/irosadie/open-state/api/internal/domain/capability"
+	"github.com/irosadie/open-state/api/internal/domain/engine"
 	capinfra "github.com/irosadie/open-state/api/internal/infrastructure/capability"
 	"github.com/irosadie/open-state/api/internal/infrastructure/config"
 	infradb "github.com/irosadie/open-state/api/internal/infrastructure/database"
+	engineadapter "github.com/irosadie/open-state/api/internal/infrastructure/engineadapter"
 	raginfra "github.com/irosadie/open-state/api/internal/infrastructure/rag"
 	mcpapi "github.com/irosadie/open-state/api/internal/interfaces/mcp"
 )
@@ -39,13 +41,19 @@ func main() {
 	// the orchestrator and context compiler depend on.
 	adapter := infradb.NewPostgresAdapter(pool)
 
+	// Engine adapter + runtime engine: wires the domain state machine into the
+	// MCP propose/current-state path (PRD 170).
+	engAdapter := engineadapter.New(pool, adapter.Projects(), adapter.Workflows(), adapter.Instances(), adapter.Events())
+	runtimeEngine := engine.NewEngine(engAdapter.Repos())
+
 	// Orchestrator service: lifecycle, propose-event, instances, history,
-	// allowed capabilities (PRD 25, 38, 42-43, 52, 142).
-	orchestrator := appservices.NewOrchestratorService(
+	// allowed capabilities (PRD 25, 38, 42-43, 52, 142). Engine-backed.
+	orchestrator := appservices.NewEngineOrchestratorService(
 		adapter.Instances(),
 		adapter.Events(),
 		adapter.Context(),
 		adapter.Capabilities(),
+		runtimeEngine,
 	)
 
 	// Context compiler: minimal per-turn context with PII redaction (PRD 22, 90).

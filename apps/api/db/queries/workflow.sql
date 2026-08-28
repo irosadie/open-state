@@ -67,6 +67,14 @@ FROM workflow_versions
 WHERE workflow_id = $1 AND version_no = $2 AND tenant_id = $3 AND project_id = $4
 LIMIT 1;
 
+-- name: FindWorkflowVersionByID :one
+SELECT wv.id, wv.workflow_id, wv.tenant_id, wv.project_id, wv.version_no, wv.definition, wv.status, wv.is_current, wv.created_at, wv.updated_at,
+       w.slug AS workflow_slug
+FROM workflow_versions wv
+JOIN workflows w ON w.id = wv.workflow_id
+WHERE wv.id = $1 AND wv.tenant_id = $2
+LIMIT 1;
+
 -- name: FindCurrentWorkflowVersion :one
 SELECT id, workflow_id, tenant_id, project_id, version_no, definition, status, is_current, created_at, updated_at
 FROM workflow_versions

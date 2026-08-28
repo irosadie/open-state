@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -403,6 +404,53 @@ func (q *Queries) FindWorkflowBySlug(ctx context.Context, arg FindWorkflowBySlug
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const findWorkflowVersionByID = `-- name: FindWorkflowVersionByID :one
+SELECT wv.id, wv.workflow_id, wv.tenant_id, wv.project_id, wv.version_no, wv.definition, wv.status, wv.is_current, wv.created_at, wv.updated_at,
+       w.slug AS workflow_slug
+FROM workflow_versions wv
+JOIN workflows w ON w.id = wv.workflow_id
+WHERE wv.id = $1 AND wv.tenant_id = $2
+LIMIT 1
+`
+
+type FindWorkflowVersionByIDParams struct {
+	ID       uuid.UUID `json:"id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+type FindWorkflowVersionByIDRow struct {
+	ID           uuid.UUID       `json:"id"`
+	WorkflowID   uuid.UUID       `json:"workflow_id"`
+	TenantID     uuid.UUID       `json:"tenant_id"`
+	ProjectID    uuid.UUID       `json:"project_id"`
+	VersionNo    int32           `json:"version_no"`
+	Definition   json.RawMessage `json:"definition"`
+	Status       string          `json:"status"`
+	IsCurrent    bool            `json:"is_current"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+	WorkflowSlug string          `json:"workflow_slug"`
+}
+
+func (q *Queries) FindWorkflowVersionByID(ctx context.Context, arg FindWorkflowVersionByIDParams) (FindWorkflowVersionByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, findWorkflowVersionByID, arg.ID, arg.TenantID)
+	var i FindWorkflowVersionByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.WorkflowID,
+		&i.TenantID,
+		&i.ProjectID,
+		&i.VersionNo,
+		&i.Definition,
+		&i.Status,
+		&i.IsCurrent,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.WorkflowSlug,
 	)
 	return i, err
 }

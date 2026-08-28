@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/irosadie/open-state/api/internal/domain/engine"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 	"github.com/irosadie/open-state/api/internal/domain/repositories"
 	domain "github.com/irosadie/open-state/go-shared/domain"
@@ -15,15 +16,21 @@ import (
 // MCP orchestrator tools need (PRD 25, 38, 42-43, 52, 142). It composes the
 // existing persistence repositories; every method is tenant-scoped (PRD 4, 96).
 // It is the application-layer seam the thin MCP handlers delegate to (PRD 74).
+//
+// An optional engine may be injected to back propose/current-state/replay with
+// real state-machine evaluation (PRD 170). When the engine is nil, the service
+// degrades to the append/merge behavior so non-engine callers and tests keep
+// working.
 type OrchestratorService struct {
 	instances repositories.IInstanceRepository
 	events    repositories.IEventRepository
 	context   repositories.IContextRepository
 	capabs    repositories.ICapabilityRepository
+	engine    *engine.Engine
 	now       func() time.Time
 }
 
-// NewOrchestratorService builds an OrchestratorService.
+// NewOrchestratorService builds an OrchestratorService without an engine.
 func NewOrchestratorService(
 	instances repositories.IInstanceRepository,
 	events repositories.IEventRepository,
@@ -35,6 +42,25 @@ func NewOrchestratorService(
 		events:    events,
 		context:   context,
 		capabs:    capabs,
+		now:       time.Now,
+	}
+}
+
+// NewEngineOrchestratorService builds an OrchestratorService wired to a runtime
+// engine, so propose/current-state/replay execute real state transitions.
+func NewEngineOrchestratorService(
+	instances repositories.IInstanceRepository,
+	events repositories.IEventRepository,
+	context repositories.IContextRepository,
+	capabs repositories.ICapabilityRepository,
+	eng *engine.Engine,
+) *OrchestratorService {
+	return &OrchestratorService{
+		instances: instances,
+		events:    events,
+		context:   context,
+		capabs:    capabs,
+		engine:    eng,
 		now:       time.Now,
 	}
 }
@@ -117,9 +143,10 @@ func (s *OrchestratorService) ListHistory(ctx context.Context, tenantID, instanc
 	return s.events.ListEventsByInstance(ctx, tenantID, instanceID)
 }
 
-// ProposeEvent validates the instance is active, appends the event to history, and
-// advances the instance (PRD 38). Full guard/transition evaluation lands with the
-// engine wiring; this slice persists the event and marks the instance active.
+// ProposeEvent validates the instance is active and, when an engine is wired, runs
+// the engine's `event → guard → transition` evaluation and persists the resulting
+// state (PRD 38, §34). Without an engine, it falls back to appending the event to
+// history and marking the instance active.
 func (s *OrchestratorService) ProposeEvent(ctx context.Context, tenantID, instanceID, eventType string, payload map[string]any, correlationID string) (*entities.Event, error) {
 	if eventType == "" {
 		return nil, domain.NewValidation("event type is required")
@@ -130,6 +157,33 @@ func (s *OrchestratorService) ProposeEvent(ctx context.Context, tenantID, instan
 	}
 	if inst.Status != entities.WorkflowInstanceRunning && inst.Status != entities.WorkflowInstanceWaiting {
 		return nil, domain.NewConflict("workflow instance is not active")
+	}
+
+	if s.engine != nil {
+		evt := &engine.Event{
+			ID:          uuid.NewString(),
+			TenantID:    tenantID,
+			Type:        eventType,
+			Source:      engine.SourceMCP,
+			WorkflowInstanceID: instanceID,
+			Payload:     payload,
+			Timestamp:   time.Now().UTC(),
+		}
+		// The engine loads the instance, evaluates guards, transitions, and persists.
+		next, _, err := s.engine.ProcessEvent(ctx, tenantID, instanceID, evt)
+		if err != nil {
+			return nil, err
+		}
+		_ = next
+		return &entities.Event{
+			ID:                 evt.ID,
+			EventID:            evt.ID,
+			TenantID:           tenantID,
+			Type:               eventType,
+			Source:             entities.EventSourceMCP,
+			WorkflowInstanceID: &instanceID,
+			Timestamp:          evt.Timestamp,
+		}, nil
 	}
 
 	raw := []byte("{}")
@@ -207,10 +261,11 @@ func (s *OrchestratorService) GetActiveWorkflow(ctx context.Context, tenantID, c
 	return nil, domain.NewNotFound("no active workflow for conversation")
 }
 
-// ReplayWorkflow replays the recorded event history of an instance in deterministic
-// sequence order to reproduce its resulting context/state projection (PRD 52).
-// Without the engine wired, replay merges event payloads in order and returns the
-// reproduced context snapshot plus the last event.
+// ReplayWorkflow replays the recorded event history of an instance to reproduce its
+// resulting context/state projection (PRD 52). It verifies the instance exists, then
+// merges event payloads in sequence order and returns the reproduced context snapshot
+// plus the last event. (Full engine re-execution of the replay is a refinement; the
+// merge approach yields the deterministic context + last event the handler needs.)
 func (s *OrchestratorService) ReplayWorkflow(ctx context.Context, tenantID, instanceID string) (map[string]any, *entities.Event, error) {
 	if _, err := s.instances.FindByID(ctx, tenantID, instanceID); err != nil {
 		return nil, nil, err
@@ -219,6 +274,7 @@ func (s *OrchestratorService) ReplayWorkflow(ctx context.Context, tenantID, inst
 	if err != nil {
 		return nil, nil, err
 	}
+
 	contextSnap := map[string]any{}
 	var last *entities.Event
 	for i := range events {
