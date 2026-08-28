@@ -1,0 +1,67 @@
+{
+  "Workflow": {
+    "type": "object",
+    "required": ["id", "tenantId", "projectId", "slug", "name", "status", "currentVersion", "version", "createdAt", "updatedAt"],
+    "properties": {
+      "id": { "type": "string" },
+      "tenantId": { "type": "string" },
+      "projectId": { "type": "string" },
+      "slug": { "type": "string" },
+      "name": { "type": "string" },
+      "description": { "type": ["string", "null"] },
+      "status": {
+        "type": "string",
+        "enum": ["DRAFT", "VALIDATING", "VALID", "PUBLISHED", "ARCHIVED"]
+      },
+      "currentVersion": { "type": "integer" },
+      "version": { "type": "integer", "description": "Optimistic-lock version (PRD §31)" },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "CreateWorkflowRequest": {
+    "type": "object",
+    "required": ["slug", "name"],
+    "properties": {
+      "projectId": { "type": "string", "description": "Optional; defaults to the tenant's default project" },
+      "slug": { "type": "string" },
+      "name": { "type": "string" },
+      "description": { "type": "string" }
+    }
+  },
+  "UpdateWorkflowRequest": {
+    "type": "object",
+    "required": ["version"],
+    "properties": {
+      "name": { "type": "string" },
+      "description": { "type": "string" },
+      "version": { "type": "integer", "description": "Expected optimistic version; conflicts return 409" }
+    }
+  },
+  "PublishWorkflowRequest": {
+    "type": "object",
+    "required": ["version", "definition"],
+    "properties": {
+      "version": { "type": "integer" },
+      "definition": {
+        "description": "Full WorkflowDefinition envelope stored as JSONB (PRD §68)"
+      }
+    }
+  },
+  "WorkflowVersion": {
+    "type": "object",
+    "required": ["id", "workflowId", "versionNo", "status", "isCurrent", "createdAt", "updatedAt"],
+    "properties": {
+      "id": { "type": "string" },
+      "workflowId": { "type": "string" },
+      "versionNo": { "type": "integer" },
+      "status": {
+        "type": "string",
+        "enum": ["DRAFT", "VALIDATING", "VALID", "PUBLISHED", "ARCHIVED"]
+      },
+      "isCurrent": { "type": "boolean" },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  }
+}

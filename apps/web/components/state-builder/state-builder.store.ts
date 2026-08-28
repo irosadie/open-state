@@ -17,15 +17,25 @@ import {
   validateWorkflow,
 } from "./types/workflow.utils"
 import { getLayoutedNodes } from "./utils/auto-layout"
-import { loadDraft, saveDraft } from "./utils/pglite-store"
+import {
+  loadApiId,
+  loadApiVersion,
+  loadDraftLocal,
+  saveApiId,
+  saveApiVersion,
+  saveDraftLocal,
+} from "./utils/draft-bridge"
 import { toast } from "./utils/toast"
+import {
+  createWorkflowApi,
+  publishWorkflowApi,
+  updateWorkflowApi,
+} from "./utils/workflow-api"
 import { padelBookingWorkflow } from "./workflows"
 import { ALL_WORKFLOWS } from "./workflows/intent-resolver"
 
 /** Maksimal histori undo yang disimpan */
 const MAX_HISTORY = 50
-/** Slug default workflow (draft yang di-persist) */
-const DEFAULT_SLUG = padelBookingWorkflow.slug
 
 /** Daftar workflow contoh yang bisa di-load (single source: intent-resolver) */
 export const EXAMPLE_WORKFLOWS: WorkflowDefinition[] = ALL_WORKFLOWS
@@ -47,6 +57,12 @@ interface StateBuilderState {
   isSaving: boolean
   lastSavedAt: string | null
   searchQuery: string
+
+  /** Authoritative API workflow id (null until first successful API save) */
+  apiWorkflowId: string | null
+  /** Optimistic version tracked from the API response */
+  apiVersion: number
+
   setSaving: (v: boolean) => void
 
   // actions
@@ -74,6 +90,8 @@ interface StateBuilderState {
   clearAll: () => void
   setSearchQuery: (q: string) => void
   persist: () => Promise<void>
+  publish: () => Promise<void>
+
   resetValidation: () => void
   revalidate: () => void
 }
@@ -143,24 +161,21 @@ function tracked(
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 
-/** Auto-save ke PGlite (debounce 800ms) */
+/** Auto-save (debounce 800ms): local bridge first, then API */
 function schedulePersist() {
   if (persistTimer) clearTimeout(persistTimer)
   persistTimer = setTimeout(() => {
     const state = useStateBuilderStore.getState()
+    state.setSaving(true)
     void state
       .persist()
       .then(() => {
-        const s = useStateBuilderStore.getState()
-        s.setSaving?.(false)
+        useStateBuilderStore.getState().setSaving(false)
       })
       .catch((err) => {
         toast.error(`Gagal menyimpan draft: ${(err as Error).message}`)
-        const s = useStateBuilderStore.getState()
-        s.setSaving?.(false)
+        useStateBuilderStore.getState().setSaving(false)
       })
-    const s = useStateBuilderStore.getState()
-    s.setSaving?.(true)
   }, 800)
 }
 
@@ -183,10 +198,15 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
     isSaving: false,
     lastSavedAt: null,
     searchQuery: "",
+    apiWorkflowId: null,
+    apiVersion: 0,
 
     hydrate: async () => {
       try {
-        const draft = await loadDraft(DEFAULT_SLUG)
+        // Load draft body from local bridge (localStorage)
+        const draft = loadDraftLocal()
+        const apiId = loadApiId()
+        const apiVer = loadApiVersion()
         if (draft) {
           const { nodes: n, edges: e } = materialize(draft, true)
           set({
@@ -194,7 +214,11 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
             nodes: n,
             edges: e,
             validation: validateWorkflow(draft),
+            apiWorkflowId: apiId,
+            apiVersion: apiVer ?? 0,
           })
+        } else {
+          set({ apiWorkflowId: apiId, apiVersion: apiVer ?? 0 })
         }
       } catch (err) {
         toast.error(`Gagal memuat draft: ${(err as Error).message}`)
@@ -399,7 +423,11 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
         selectedNodeId: null,
         selectedEdgeId: null,
         validation: validateWorkflow(wf),
+        // Clear API id when loading a new workflow — needs a fresh create
+        apiWorkflowId: null,
+        apiVersion: 0,
       })
+      saveApiId(null)
       void schedulePersist()
     },
 
@@ -428,7 +456,10 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
         selectedNodeId: null,
         selectedEdgeId: null,
         validation: validateWorkflow(fresh),
+        apiWorkflowId: null,
+        apiVersion: 0,
       })
+      saveApiId(null)
       void schedulePersist()
     },
 
@@ -446,10 +477,65 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
     setSaving: (v) => set({ isSaving: v }),
 
     persist: async () => {
-      const { workflow, nodes, edges } = get()
+      const { workflow, nodes, edges, apiWorkflowId, apiVersion } = get()
       const snapshot = buildSnapshot(workflow, nodes, edges)
-      await saveDraft(snapshot)
+
+      // 1. Always save the draft body to the local bridge first (non-blocking
+      //    for the API call; ensures the graph survives refresh even if offline).
+      saveDraftLocal(snapshot)
+
+      // 2. Sync the workflow root to the API.
+      if (!apiWorkflowId) {
+        // First save — create the workflow root via the Builder API.
+        const created = await createWorkflowApi({
+          slug: snapshot.slug,
+          name: snapshot.name,
+          description: snapshot.description,
+        })
+        set({ apiWorkflowId: created.id, apiVersion: created.version })
+        saveApiId(created.id)
+        saveApiVersion(created.version)
+      } else {
+        // Subsequent save — bump the optimistic version.
+        const updated = await updateWorkflowApi({
+          id: apiWorkflowId,
+          version: apiVersion,
+        })
+        set({ apiVersion: updated.version })
+        saveApiVersion(updated.version)
+      }
+
       set({ isSaving: false, lastSavedAt: new Date().toISOString() })
+    },
+
+    publish: async () => {
+      const { workflow, nodes, edges, apiWorkflowId, apiVersion } = get()
+      const snapshot = buildSnapshot(workflow, nodes, edges)
+
+      // Ensure there's an API workflow root before publishing.
+      let id = apiWorkflowId
+      let ver = apiVersion
+      if (!id) {
+        const created = await createWorkflowApi({
+          slug: snapshot.slug,
+          name: snapshot.name,
+          description: snapshot.description,
+        })
+        id = created.id
+        ver = created.version
+        set({ apiWorkflowId: id, apiVersion: ver })
+        saveApiId(id)
+        saveApiVersion(ver)
+      }
+
+      await publishWorkflowApi({
+        id,
+        version: ver,
+        definition: snapshot,
+      })
+      // After publish, update the local version tracking.
+      set({ apiVersion: ver + 1, lastSavedAt: new Date().toISOString() })
+      saveApiVersion(ver + 1)
     },
 
     resetValidation: () => set({ validation: null }),

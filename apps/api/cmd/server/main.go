@@ -51,6 +51,9 @@ func main() {
 	// Capability admin service (tenant-scoped registry + bindings + sandbox test)
 	capSvc := services.NewCapabilityService(adapter.Capabilities(), infracap.MockProviderResolver{}, infracap.JSONSchemaValidator{})
 
+	// Builder API service (workflow-definition drafts + publish + versions, PRD 146)
+	builderSvc := services.NewBuilderService(adapter.Workflows(), adapter.Projects())
+
 	// Services
 	authSvc := services.NewAuthService(registerUC, loginUC, logoutUC, getMeUC)
 
@@ -58,9 +61,10 @@ func main() {
 	authCtrl := controllers.NewAuthController(authSvc)
 	systemCtrl := controllers.NewSystemController(healthUC, appInfoUC)
 	capCtrl := controllers.NewCapabilityController(capSvc)
+	workflowCtrl := controllers.NewWorkflowController(builderSvc)
 
 	// Echo app
-	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, authRepo, tokenSvc)
+	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, workflowCtrl, authRepo, tokenSvc)
 
 	log.Printf("starting server on :%s", cfg.Port)
 	if err := e.Start(":" + cfg.Port); err != nil {

@@ -20,4 +20,12 @@ export const queryKeys = {
   bindings: {
     delete: "bindingsDelete",
   },
+  workflows: {
+    list: "workflowsList",
+    get: "workflowsGet",
+    create: "workflowsCreate",
+    update: "workflowsUpdate",
+    publish: "workflowsPublish",
+    versions: "workflowsVersions",
+  },
 }

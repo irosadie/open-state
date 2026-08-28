@@ -22,6 +22,7 @@ type PostgresAdapter struct {
 	pool         *pgxpool.Pool
 	sqlDB        *sql.DB
 	queries      *db.Queries
+	projects     repositories.IProjectRepository
 	workflows    repositories.IWorkflowRepository
 	instances    repositories.IInstanceRepository
 	events       repositories.IEventRepository
@@ -37,6 +38,7 @@ func NewPostgresAdapter(pool *pgxpool.Pool) *PostgresAdapter {
 		pool:         pool,
 		sqlDB:        sqlDB,
 		queries:      db.New(sqlDB),
+		projects:     NewPgxProjectRepository(pool),
 		workflows:    NewPgxWorkflowRepository(pool),
 		instances:    NewPgxInstanceRepository(pool),
 		events:       NewPgxEventRepository(pool),
@@ -45,6 +47,9 @@ func NewPostgresAdapter(pool *pgxpool.Pool) *PostgresAdapter {
 		audit:        NewPgxAuditRepository(pool),
 	}
 }
+
+// Projects returns the project repository (business areas, PRD §3.1.1).
+func (a *PostgresAdapter) Projects() repositories.IProjectRepository { return a.projects }
 
 // Workflows returns the workflow-definition repository.
 func (a *PostgresAdapter) Workflows() repositories.IWorkflowRepository { return a.workflows }

@@ -1,0 +1,111 @@
+package controllers
+
+import (
+	"net/http"
+
+	"github.com/labstack/echo/v4"
+	"github.com/irosadie/open-state/api/internal/application/dtos"
+	appservices "github.com/irosadie/open-state/api/internal/application/services"
+	domain "github.com/irosadie/open-state/go-shared/domain"
+)
+
+// ProjectHeader carries the project id for project-scoped workflow operations.
+// It is optional: when absent, the service falls back to the tenant's default
+// project (PRD §3.1.1). The tenant always comes from X-Tenant-ID.
+const ProjectHeader = "X-Project-ID"
+
+// WorkflowController exposes the Builder API (PRD 146): workflow definition draft
+// CRUD, publish, and version listing. It parses requests, calls the service, and
+// formats responses. It contains no business logic (PRD §74).
+type WorkflowController struct {
+	svc *appservices.BuilderService
+}
+
+// NewWorkflowController builds a WorkflowController.
+func NewWorkflowController(svc *appservices.BuilderService) *WorkflowController {
+	return &WorkflowController{svc: svc}
+}
+
+func (ctrl *WorkflowController) Create(c echo.Context) error {
+	tenantID, err := tenantFromHeader(c)
+	if err != nil {
+		return err
+	}
+	var req dtos.CreateWorkflowRequest
+	if err := c.Bind(&req); err != nil {
+		return domain.NewValidation("invalid request body")
+	}
+	result, err := ctrl.svc.CreateDraft(c.Request().Context(), tenantID, req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, map[string]interface{}{"data": result})
+}
+
+func (ctrl *WorkflowController) List(c echo.Context) error {
+	tenantID, err := tenantFromHeader(c)
+	if err != nil {
+		return err
+	}
+	result, err := ctrl.svc.List(c.Request().Context(), tenantID, c.QueryParam("projectId"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": result.Data})
+}
+
+func (ctrl *WorkflowController) Get(c echo.Context) error {
+	tenantID, err := tenantFromHeader(c)
+	if err != nil {
+		return err
+	}
+	result, err := ctrl.svc.Get(c.Request().Context(), tenantID, c.Request().Header.Get(ProjectHeader), c.Param("id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": result})
+}
+
+func (ctrl *WorkflowController) Update(c echo.Context) error {
+	tenantID, err := tenantFromHeader(c)
+	if err != nil {
+		return err
+	}
+	var req dtos.UpdateWorkflowRequest
+	if err := c.Bind(&req); err != nil {
+		return domain.NewValidation("invalid request body")
+	}
+	result, err := ctrl.svc.UpdateDraft(c.Request().Context(), tenantID, c.Request().Header.Get(ProjectHeader), c.Param("id"), req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": result})
+}
+
+func (ctrl *WorkflowController) Publish(c echo.Context) error {
+	tenantID, err := tenantFromHeader(c)
+	if err != nil {
+		return err
+	}
+	var req dtos.PublishWorkflowRequest
+	if err := c.Bind(&req); err != nil {
+		return domain.NewValidation("invalid request body")
+	}
+	result, err := ctrl.svc.Publish(c.Request().Context(), tenantID, c.Request().Header.Get(ProjectHeader), c.Param("id"), req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, map[string]interface{}{"data": result})
+}
+
+func (ctrl *WorkflowController) ListVersions(c echo.Context) error {
+	tenantID, err := tenantFromHeader(c)
+	if err != nil {
+		return err
+	}
+	result, err := ctrl.svc.ListVersions(c.Request().Context(), tenantID, c.Request().Header.Get(ProjectHeader), c.Param("id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": result})
+}

@@ -19,4 +19,12 @@ export const apiRouters = {
   bindings: {
     delete: "/bindings/:id",
   },
+  workflows: {
+    index: "/workflows",
+    create: "/workflows",
+    show: "/workflows/:id",
+    update: "/workflows/:id",
+    publish: "/workflows/:id/publish",
+    versions: "/workflows/:id/versions",
+  },
 }

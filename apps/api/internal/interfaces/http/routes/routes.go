@@ -41,6 +41,20 @@ func RegisterCapabilityRoutes(e *echo.Echo, ctrl *controllers.CapabilityControll
 	b.DELETE("/:id", ctrl.DeleteBinding)
 }
 
+// RegisterWorkflowRoutes registers the tenant+project-scoped Builder API
+// (PRD 146) behind auth. The tenant comes from the X-Tenant-ID header; the
+// project is optional and defaults to the tenant's default project.
+func RegisterWorkflowRoutes(e *echo.Echo, ctrl *controllers.WorkflowController, repo repositories.IAuthRepository, tokenSvc services.TokenService) {
+	g := e.Group("/api/workflows", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+
+	g.GET("", ctrl.List)
+	g.POST("", ctrl.Create)
+	g.GET("/:id", ctrl.Get)
+	g.PATCH("/:id", ctrl.Update)
+	g.POST("/:id/publish", ctrl.Publish)
+	g.GET("/:id/versions", ctrl.ListVersions)
+}
+
 func RegisterSystemRoutes(e *echo.Echo, ctrl *controllers.SystemController) {
 	e.GET("/health", ctrl.Health)
 	e.GET("/", ctrl.AppInfo)

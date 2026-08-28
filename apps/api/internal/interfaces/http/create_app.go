@@ -14,6 +14,7 @@ func CreateApp(
 	authCtrl *controllers.AuthController,
 	systemCtrl *controllers.SystemController,
 	capabilityCtrl *controllers.CapabilityController,
+	workflowCtrl *controllers.WorkflowController,
 	repo repositories.IAuthRepository,
 	tokenSvc services.TokenService,
 ) *echo.Echo {
@@ -31,6 +32,7 @@ func CreateApp(
 	routes.RegisterSystemRoutes(e, systemCtrl)
 	routes.RegisterAuthRoutes(e, authCtrl, repo, tokenSvc)
 	routes.RegisterCapabilityRoutes(e, capabilityCtrl, repo, tokenSvc)
+	routes.RegisterWorkflowRoutes(e, workflowCtrl, repo, tokenSvc)
 
 	return e
 }
