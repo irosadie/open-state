@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	domain "github.com/irosadie/open-state/go-shared/domain"
 	"github.com/irosadie/open-state/api/internal/application/use-cases"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
+	domain "github.com/irosadie/open-state/go-shared/domain"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -17,6 +17,19 @@ import (
 type mockAuthRepo struct {
 	users    map[string]*entities.User
 	sessions map[string]*entities.AuthSession
+}
+
+type mockRoleRepo struct {
+	assignments map[string]entities.UserRole
+}
+
+func newMockRoleRepo() *mockRoleRepo {
+	return &mockRoleRepo{assignments: make(map[string]entities.UserRole)}
+}
+
+func (m *mockRoleRepo) Assign(_ context.Context, userID, tenantID string, role entities.UserRole) (*entities.RoleAssignment, error) {
+	m.assignments[userID+":"+tenantID] = role
+	return &entities.RoleAssignment{UserID: userID, TenantID: tenantID, Role: role}, nil
 }
 
 func newMockRepo() *mockAuthRepo {
@@ -104,7 +117,8 @@ func (m *mockTokenSvc) HashToken(token string) string {
 
 func TestRegisterUser_Success(t *testing.T) {
 	repo := newMockRepo()
-	uc := usecases.NewRegisterUserUseCase(repo, &mockTokenSvc{})
+	roles := newMockRoleRepo()
+	uc := usecases.NewRegisterUserUseCase(repo, roles, &mockTokenSvc{})
 
 	user, err := uc.Execute(context.Background(), usecases.RegisterUserInput{
 		Email:    "test@example.com",
@@ -118,11 +132,14 @@ func TestRegisterUser_Success(t *testing.T) {
 	if user.Email != "test@example.com" {
 		t.Errorf("expected email test@example.com, got %s", user.Email)
 	}
+	if role := roles.assignments[user.ID+":00000000-0000-0000-0000-000000000001"]; role != entities.UserRoleViewer {
+		t.Errorf("expected default VIEWER role, got %s", role)
+	}
 }
 
 func TestRegisterUser_DuplicateEmail(t *testing.T) {
 	repo := newMockRepo()
-	uc := usecases.NewRegisterUserUseCase(repo, &mockTokenSvc{})
+	uc := usecases.NewRegisterUserUseCase(repo, newMockRoleRepo(), &mockTokenSvc{})
 
 	_, _ = uc.Execute(context.Background(), usecases.RegisterUserInput{
 		Email: "dup@example.com", Password: "password123", Name: "User",
@@ -140,7 +157,7 @@ func TestRegisterUser_DuplicateEmail(t *testing.T) {
 
 func TestRegisterUser_MissingFields(t *testing.T) {
 	repo := newMockRepo()
-	uc := usecases.NewRegisterUserUseCase(repo, &mockTokenSvc{})
+	uc := usecases.NewRegisterUserUseCase(repo, newMockRoleRepo(), &mockTokenSvc{})
 
 	_, err := uc.Execute(context.Background(), usecases.RegisterUserInput{
 		Email: "", Password: "", Name: "",

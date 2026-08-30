@@ -1,6 +1,6 @@
 interface:
-  display_name: "DB Prisma Schema"
+  display_name: "DB sqlc Schema"
   short_description: "Modify sqlc schema with safe PostgreSQL migration"
-  default_prompt: "Use $db-prisma-schema to update Prisma schema changes with safe PostgreSQL migration guidance for this repository."
+  default_prompt: "Use $db-sqlc-schema to update SQL migrations and sqlc queries, regenerate Go code, and synchronize affected domain and repository layers."
 policy:
   allow_implicit_invocation: true

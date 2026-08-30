@@ -14,6 +14,9 @@
 
 .claude/skills/{skill-name}/
 └── SKILL.md              → Claude wrapper (pointer to source of truth)
+
+.opencode/skill/{skill-name}/
+└── SKILL.md              → OpenCode wrapper (pointer to source of truth)
 ```
 
 ## Files Modified
@@ -22,6 +25,7 @@
 .agents/skills/manifest.json   → add new skill entry
 .agents/AGENTS.md              → add to Skill Registry + SKILL references
 CLAUDE.md                      → add to Skill Registry table
+opencode.md                    → update generated OpenCode skill list
 ```
 
 ## Commands
@@ -30,6 +34,7 @@ CLAUDE.md                      → add to Skill Registry table
 bun run skills:create -- --name {scope}-{capability} --scope {scope} --description "{description}" --when "{when used}"
 bun run skills:sync-registry
 bun run skills:sync-claude
+bun run skills:sync-opencode
 bun run skills:sync
 bun run skills:validate
 ```
@@ -84,7 +89,7 @@ description: {One-sentence description}
 - [ ] All files end with a newline (EOF)
 ```
 
-## Claude Wrapper Pattern (`.claude/skills/{name}/SKILL.md`)
+## Compatibility Wrapper Pattern (`.claude/skills/{name}/SKILL.md` and `.opencode/skill/{name}/SKILL.md`)
 
 ```markdown
 ---

@@ -13,6 +13,7 @@ describe("Create Workflow Schema Validation", () => {
       slug: "padel-booking",
       name: "Padel Booking",
       description: "booking flow",
+      definition: { nodes: [], transitions: [] },
     })
 
     expect(result.success).toBe(true)
@@ -36,6 +37,7 @@ describe("Update Workflow Schema Validation", () => {
     const result = updateWorkflowSchema.safeParse({
       name: "Padel Booking v2",
       version: 3,
+      definition: { nodes: [], transitions: [] },
     })
 
     expect(result.success).toBe(true)
@@ -58,14 +60,13 @@ describe("Publish Workflow Schema Validation", () => {
   it("validates a valid publish", () => {
     const result = publishWorkflowSchema.safeParse({
       version: 1,
-      definition: { nodes: [] },
     })
 
     expect(result.success).toBe(true)
   })
 
-  it("rejects missing definition", () => {
-    const result = publishWorkflowSchema.safeParse({ version: 1 })
+  it("rejects negative version", () => {
+    const result = publishWorkflowSchema.safeParse({ version: -1 })
 
     expect(result.success).toBe(false)
   })

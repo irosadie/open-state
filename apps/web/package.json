@@ -7,11 +7,12 @@
     "dev": "next dev --port 3020",
     "build": "next build",
     "start": "next start --port 3020",
-    "lint": "biome check app auth.ts auth.test.ts components configs constants hooks next.config.ts providers proxy.ts services tailwind.config.ts test types utils vitest.config.ts",
-    "format": "biome format --write app auth.ts auth.test.ts components configs constants hooks next.config.ts providers proxy.ts services tailwind.config.ts test types utils vitest.config.ts",
+    "lint": "biome check app auth.ts auth.test.ts components configs constants hooks next.config.ts playwright.config.ts providers proxy.ts services tailwind.config.ts test types utils vitest.config.ts e2e",
+    "format": "biome format --write app auth.ts auth.test.ts components configs constants hooks next.config.ts playwright.config.ts providers proxy.ts services tailwind.config.ts test types utils vitest.config.ts e2e",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:smoke": "vitest run app/page.smoke.test.tsx"
+    "test:smoke": "vitest run app/page.smoke.test.tsx",
+    "test:e2e": "playwright test --config=playwright.config.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -49,6 +50,7 @@
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",
+    "@playwright/test": "^1.51.1",
     "@types/dagre": "^0.7.54",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.14.1",

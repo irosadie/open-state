@@ -15,17 +15,17 @@ type Permission string
 // concrete "workflow:<verb>" permission.
 var RolePermissionMatrix = map[entities.UserRole][]Permission{
 	entities.UserRoleOwner: {
-		"workflow:*", "capability:*", "binding:*", "user:*", "audit:*", "tenant:*",
+		"workflow:*", "capability:*", "binding:*", "user:*", "audit:*", "tenant:*", "instance:*", "debug:*",
 	},
 	entities.UserRoleAdmin: {
-		"workflow:*", "capability:*", "binding:*", "audit:*",
+		"workflow:*", "capability:*", "binding:*", "audit:*", "instance:*", "debug:*",
 	},
 	entities.UserRoleEditor: {
 		"workflow:read", "workflow:create", "workflow:update", "workflow:publish", "workflow:simulate",
 		"capability:read", "binding:read",
 	},
 	entities.UserRoleOperator: {
-		"instance:read", "instance:retry", "instance:suspend", "instance:resume",
+		"instance:read", "instance:retry", "instance:suspend", "instance:resume", "debug:read",
 		"workflow:read", "capability:read", "binding:read",
 	},
 	entities.UserRoleViewer: {

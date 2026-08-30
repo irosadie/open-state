@@ -17,7 +17,7 @@ type fakeWorkflowRepo struct {
 	versions  map[string][]*entities.WorkflowVersion
 }
 
-func (f *fakeWorkflowRepo) Create(_ context.Context, tenantID, projectID, slug, name string, description *string) (*entities.Workflow, error) {
+func (f *fakeWorkflowRepo) Create(_ context.Context, tenantID, projectID, slug, name string, description *string, draftDefinition []byte) (*entities.Workflow, error) {
 	if f.workflows == nil {
 		f.workflows = map[string]*entities.Workflow{}
 	}
@@ -28,12 +28,29 @@ func (f *fakeWorkflowRepo) Create(_ context.Context, tenantID, projectID, slug, 
 	}
 	w := &entities.Workflow{
 		ID: "wf-1", TenantID: tenantID, ProjectID: projectID, Slug: slug, Name: name,
-		Status: entities.WorkflowDraft, Version: 0,
+		Status: entities.WorkflowDraft, Version: 0, DraftDefinition: draftDefinition,
 	}
 	if description != nil {
 		w.Description = sql.NullString{String: *description, Valid: true}
 	}
 	f.workflows[w.ID] = w
+	return w, nil
+}
+
+func (f *fakeWorkflowRepo) UpdateDraft(_ context.Context, _, _, id, name string, description *string, draftDefinition []byte, expectedVersion int) (*entities.Workflow, error) {
+	w, ok := f.workflows[id]
+	if !ok {
+		return nil, domain.NewNotFound("workflow not found")
+	}
+	if w.Version != expectedVersion {
+		return nil, domain.NewConflict("optimistic lock conflict: resource changed")
+	}
+	w.Name = name
+	w.DraftDefinition = draftDefinition
+	if description != nil {
+		w.Description = sql.NullString{String: *description, Valid: true}
+	}
+	w.Version++
 	return w, nil
 }
 
@@ -115,7 +132,12 @@ func (f *fakeWorkflowRepo) ListVersions(_ context.Context, _, _, workflowID stri
 	return out, nil
 }
 
-func (f *fakeWorkflowRepo) FindVersionByNumber(_ context.Context, _, _, _ string, _ int) (*entities.WorkflowVersion, error) {
+func (f *fakeWorkflowRepo) FindVersionByNumber(_ context.Context, _, _, workflowID string, versionNo int) (*entities.WorkflowVersion, error) {
+	for _, version := range f.versions[workflowID] {
+		if version.VersionNo == versionNo {
+			return version, nil
+		}
+	}
 	return nil, domain.NewNotFound("workflow version not found")
 }
 
@@ -148,6 +170,8 @@ type fakeProjectRepo struct {
 	projects map[string]*entities.Project
 }
 
+var validWorkflowDefinition = []byte(`{"nodes":[{"id":"start","kind":"START"},{"id":"end","kind":"END"}],"transitions":[{"id":"t1","sourceStateId":"start","targetStateId":"end"}]}`)
+
 func (f *fakeProjectRepo) Create(_ context.Context, tenantID, name, slug string, status entities.ProjectStatus) (*entities.Project, error) {
 	if f.projects == nil {
 		f.projects = map[string]*entities.Project{}
@@ -157,7 +181,12 @@ func (f *fakeProjectRepo) Create(_ context.Context, tenantID, name, slug string,
 	return p, nil
 }
 
-func (f *fakeProjectRepo) FindByID(_ context.Context, _, _ string) (*entities.Project, error) {
+func (f *fakeProjectRepo) FindByID(_ context.Context, tenantID, id string) (*entities.Project, error) {
+	for _, project := range f.projects {
+		if project.ID == id && project.TenantID == tenantID {
+			return project, nil
+		}
+	}
 	return nil, domain.NewNotFound("project not found")
 }
 
@@ -188,6 +217,7 @@ func TestCreateDraft(t *testing.T) {
 
 	dto, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{
 		Slug: "padel", Name: "Padel Booking", Description: "booking flow",
+		Definition: validWorkflowDefinition,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -204,11 +234,28 @@ func TestCreateDraftDuplicateSlug(t *testing.T) {
 	svc, _, _ := newBuilderService()
 	ctx := context.Background()
 
-	if _, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A"}); err != nil {
+	if _, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A", Definition: validWorkflowDefinition}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "B"}); err == nil {
+	if _, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "B", Definition: validWorkflowDefinition}); err == nil {
 		t.Fatal("expected duplicate slug to fail")
+	}
+}
+
+func TestCreateDraftRejectsCrossTenantProject(t *testing.T) {
+	svc, _, projectRepo := newBuilderService()
+	ctx := context.Background()
+	project, err := projectRepo.Create(ctx, "tenant-2", "Other", "other", entities.ProjectActive)
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{
+		ProjectID:  project.ID,
+		Slug:       "padel",
+		Name:       "Padel",
+		Definition: validWorkflowDefinition,
+	}); err == nil {
+		t.Fatal("expected cross-tenant project to be rejected")
 	}
 }
 
@@ -228,7 +275,7 @@ func TestUpdateDraftOptimisticLock(t *testing.T) {
 	svc, wfRepo, _ := newBuilderService()
 	ctx := context.Background()
 
-	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A"})
+	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A", Definition: validWorkflowDefinition})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -239,7 +286,7 @@ func TestUpdateDraftOptimisticLock(t *testing.T) {
 		t.Fatal("expected optimistic lock conflict on stale version")
 	}
 	// current version -> success, version bumped
-	updated, err := svc.UpdateDraft(ctx, "tenant-1", created.ProjectID, created.ID, dtos.UpdateWorkflowRequest{Version: created.Version})
+	updated, err := svc.UpdateDraft(ctx, "tenant-1", created.ProjectID, created.ID, dtos.UpdateWorkflowRequest{Name: "A", Definition: validWorkflowDefinition, Version: created.Version})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -248,19 +295,36 @@ func TestUpdateDraftOptimisticLock(t *testing.T) {
 	}
 }
 
+func TestUpdateDraftRetainsDescriptionWhenOmitted(t *testing.T) {
+	svc, _, _ := newBuilderService()
+	ctx := context.Background()
+	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{
+		Slug: "padel", Name: "A", Description: "keep me", Definition: validWorkflowDefinition,
+	})
+	if err != nil {
+		t.Fatalf("unexpected create error: %v", err)
+	}
+	updated, err := svc.UpdateDraft(ctx, "tenant-1", created.ProjectID, created.ID, dtos.UpdateWorkflowRequest{
+		Name: "A", Definition: validWorkflowDefinition, Version: created.Version,
+	})
+	if err != nil {
+		t.Fatalf("unexpected update error: %v", err)
+	}
+	if updated.Description == nil || *updated.Description != "keep me" {
+		t.Fatalf("expected omitted description to be retained, got %v", updated.Description)
+	}
+}
+
 func TestPublishCreatesImmutableVersion(t *testing.T) {
 	svc, _, _ := newBuilderService()
 	ctx := context.Background()
 
-	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A"})
+	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A", Definition: validWorkflowDefinition})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	version, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{
-		Version:    created.Version,
-		Definition: []byte(`{"nodes":[]}`),
-	})
+	version, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{Version: created.Version})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -272,16 +336,17 @@ func TestPublishCreatesImmutableVersion(t *testing.T) {
 	}
 }
 
-func TestPublishRequiresDefinition(t *testing.T) {
-	svc, _, _ := newBuilderService()
+func TestPublishRequiresValidDraft(t *testing.T) {
+	svc, wfRepo, _ := newBuilderService()
 	ctx := context.Background()
 
-	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A"})
+	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A", Definition: validWorkflowDefinition})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{Version: 0}); err == nil {
-		t.Fatal("expected validation error for missing definition")
+	wfRepo.workflows[created.ID].DraftDefinition = []byte(`{"nodes":[]}`)
+	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{Version: created.Version}); err == nil {
+		t.Fatal("expected validation error for invalid draft")
 	}
 }
 
@@ -289,11 +354,11 @@ func TestListVersions(t *testing.T) {
 	svc, _, _ := newBuilderService()
 	ctx := context.Background()
 
-	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A"})
+	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A", Definition: validWorkflowDefinition})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{Version: 0, Definition: []byte(`{}`)}); err != nil {
+	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{Version: 0}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	versions, err := svc.ListVersions(ctx, "tenant-1", created.ProjectID, created.ID)
@@ -302,5 +367,30 @@ func TestListVersions(t *testing.T) {
 	}
 	if len(versions) != 1 {
 		t.Fatalf("expected 1 version, got %d", len(versions))
+	}
+}
+
+func TestCompareVersions(t *testing.T) {
+	svc, wfRepo, _ := newBuilderService()
+	ctx := context.Background()
+	created, err := svc.CreateDraft(ctx, "tenant-1", dtos.CreateWorkflowRequest{Slug: "padel", Name: "A", Definition: validWorkflowDefinition})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{Version: 0}); err != nil {
+		t.Fatalf("unexpected error publishing v1: %v", err)
+	}
+	updatedDefinition := []byte(`{"nodes":[{"id":"start","kind":"START"},{"id":"end","kind":"END"},{"id":"extra","kind":"STATE"}],"transitions":[{"id":"t1","sourceStateId":"start","targetStateId":"end"}]}`)
+	wfRepo.workflows[created.ID].DraftDefinition = updatedDefinition
+	wfRepo.workflows[created.ID].Version = 1
+	if _, err := svc.Publish(ctx, "tenant-1", created.ProjectID, created.ID, "actor-1", dtos.PublishWorkflowRequest{Version: 1}); err != nil {
+		t.Fatalf("unexpected error publishing v2: %v", err)
+	}
+	diff, err := svc.CompareVersions(ctx, "tenant-1", created.ProjectID, created.ID, 1, 2)
+	if err != nil {
+		t.Fatalf("unexpected compare error: %v", err)
+	}
+	if len(diff.Nodes.Added) != 1 || diff.Nodes.Added[0].ID != "extra" {
+		t.Fatalf("unexpected node diff: %+v", diff.Nodes)
 	}
 }

@@ -26,6 +26,7 @@ const KIND_META: Record<
 /** Props yang diterima custom node dari React Flow (hanya yang kita pakai) */
 interface BaseNodeProps {
   data: FlowNodeData
+  selected?: boolean
 }
 
 /** Handle atas (target) — dipakai di hampir semua node */
@@ -75,14 +76,17 @@ function NodeHeader({
 /**
  * START / END — bentuk OVAL (terminator), khas flowchart.
  */
-function TerminatorNode({ data }: BaseNodeProps) {
+function TerminatorNode({ data, selected }: BaseNodeProps) {
   const isEnd = data.kind === "END"
   const color = nodeKindColor(data.kind)
   const meta = KIND_META[data.kind]
   const Icon = meta.icon
 
   return (
-    <div className="group relative">
+    <div
+      data-testid={`workflow-node-${data.id}`}
+      className={`group relative ${selected ? "rounded-full ring-4 ring-violet-300 ring-offset-2" : ""}`}
+    >
       {!isEnd ? <TargetHandle /> : null}
       <div
         className="flex min-w-[140px] items-center gap-2 rounded-full border-2 px-5 py-2.5 shadow-sm transition-shadow group-hover:shadow-md"
@@ -104,10 +108,13 @@ function TerminatorNode({ data }: BaseNodeProps) {
 /**
  * STATE — bentuk KOTAK (process), khas flowchart.
  */
-function StateNode({ data }: BaseNodeProps) {
+function StateNode({ data, selected }: BaseNodeProps) {
   const color = nodeKindColor(data.kind)
   return (
-    <div className="group relative min-w-[200px]">
+    <div
+      data-testid={`workflow-node-${data.id}`}
+      className={`group relative min-w-[200px] ${selected ? "rounded-md ring-4 ring-violet-300 ring-offset-2" : ""}`}
+    >
       <TargetHandle />
       <div
         className="rounded-md border-2 bg-white px-3 py-2 shadow-sm transition-shadow group-hover:shadow-md"
@@ -146,12 +153,15 @@ function StateNode({ data }: BaseNodeProps) {
  * DECISION — bentuk BELAH KETUPAT (diamond), khas flowchart.
  * Menggunakan clip-path polygon. Teks berada di dalam diamond.
  */
-function DecisionNode({ data }: BaseNodeProps) {
+function DecisionNode({ data, selected }: BaseNodeProps) {
   const color = nodeKindColor(data.kind)
   const clip = "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)"
 
   return (
-    <div className="group relative">
+    <div
+      data-testid={`workflow-node-${data.id}`}
+      className={`group relative ${selected ? "rounded-xl ring-4 ring-violet-300 ring-offset-2" : ""}`}
+    >
       <TargetHandle />
       <div className="relative h-[120px] w-[220px]">
         {/* layer border (diamond berwarna, di belakang) */}
@@ -189,10 +199,13 @@ function DecisionNode({ data }: BaseNodeProps) {
  * EVENT — bentuk PARALLELOGRAM (input/output), khas flowchart.
  * Kotak dengan sisi miring kiri-kanan.
  */
-function EventNode({ data }: BaseNodeProps) {
+function EventNode({ data, selected }: BaseNodeProps) {
   const color = nodeKindColor(data.kind)
   return (
-    <div className="group relative min-w-[200px]">
+    <div
+      data-testid={`workflow-node-${data.id}`}
+      className={`group relative min-w-[200px] ${selected ? "rounded-md ring-4 ring-violet-300 ring-offset-2" : ""}`}
+    >
       <TargetHandle />
       <div
         className="rounded-md border-2 border-dashed bg-white px-3 py-2 shadow-sm transition-shadow group-hover:shadow-md"

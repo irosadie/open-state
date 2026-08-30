@@ -41,9 +41,17 @@ func (r *PgxRoleAssignmentRepository) Assign(ctx context.Context, userID, tenant
 }
 
 func (r *PgxRoleAssignmentRepository) FindRoleByUserAndTenant(ctx context.Context, userID, tenantID string) (entities.UserRole, error) {
+	uid, err := parseAdminUUID(userID)
+	if err != nil {
+		return "", err
+	}
+	tid, err := parseAdminUUID(tenantID)
+	if err != nil {
+		return "", err
+	}
 	row, err := r.queries.FindRoleByUserAndTenant(ctx, db.FindRoleByUserAndTenantParams{
-		UserID:   mustUUID(userID),
-		TenantID: mustUUID(tenantID),
+		UserID:   uid,
+		TenantID: tid,
 	})
 	if err != nil {
 		return "", mapPgError(err, "find role by user and tenant")

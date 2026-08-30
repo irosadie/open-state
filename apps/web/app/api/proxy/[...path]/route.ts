@@ -153,6 +153,12 @@ const buildRequestHeaders = (
     headers["X-Tenant-ID"] = tenantId
   }
 
+  const correlationId = request.headers.get("x-correlation-id")
+
+  if (correlationId) {
+    headers["X-Correlation-ID"] = correlationId
+  }
+
   return headers
 }
 

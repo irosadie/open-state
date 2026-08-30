@@ -173,6 +173,37 @@ func (q *Queries) ClaimOutboxEvents(ctx context.Context, arg ClaimOutboxEventsPa
 	return items, nil
 }
 
+const countEventsFiltered = `-- name: CountEventsFiltered :one
+SELECT COUNT(*)
+FROM events
+WHERE tenant_id = $1
+  AND ($2::uuid IS NULL OR workflow_instance_id = $2)
+  AND ($3::text IS NULL OR type = $3)
+  AND ($4::text IS NULL OR source = $4)
+  AND ($5::text IS NULL OR correlation_id = $5)
+`
+
+type CountEventsFilteredParams struct {
+	TenantID           uuid.UUID      `json:"tenant_id"`
+	WorkflowInstanceID uuid.NullUUID  `json:"workflow_instance_id"`
+	Type               sql.NullString `json:"type"`
+	Source             sql.NullString `json:"source"`
+	CorrelationID      sql.NullString `json:"correlation_id"`
+}
+
+func (q *Queries) CountEventsFiltered(ctx context.Context, arg CountEventsFilteredParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countEventsFiltered,
+		arg.TenantID,
+		arg.WorkflowInstanceID,
+		arg.Type,
+		arg.Source,
+		arg.CorrelationID,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const findEventByID = `-- name: FindEventByID :one
 SELECT id, tenant_id, event_id, type, source, aggregate_id, workflow_instance_id, sequence, timestamp, payload, correlation_id, causation_id, idempotency_key, created_at
 FROM events
@@ -370,6 +401,74 @@ ORDER BY sequence
 
 func (q *Queries) ListEventsByTenant(ctx context.Context, tenantID uuid.UUID) ([]Event, error) {
 	rows, err := q.db.QueryContext(ctx, listEventsByTenant, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Event
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.EventID,
+			&i.Type,
+			&i.Source,
+			&i.AggregateID,
+			&i.WorkflowInstanceID,
+			&i.Sequence,
+			&i.Timestamp,
+			&i.Payload,
+			&i.CorrelationID,
+			&i.CausationID,
+			&i.IdempotencyKey,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEventsFiltered = `-- name: ListEventsFiltered :many
+SELECT id, tenant_id, event_id, type, source, aggregate_id, workflow_instance_id, sequence, timestamp, payload, correlation_id, causation_id, idempotency_key, created_at
+FROM events
+WHERE tenant_id = $1
+  AND ($2::uuid IS NULL OR workflow_instance_id = $2)
+  AND ($3::text IS NULL OR type = $3)
+  AND ($4::text IS NULL OR source = $4)
+  AND ($5::text IS NULL OR correlation_id = $5)
+ORDER BY sequence DESC
+LIMIT $7 OFFSET $6
+`
+
+type ListEventsFilteredParams struct {
+	TenantID           uuid.UUID      `json:"tenant_id"`
+	WorkflowInstanceID uuid.NullUUID  `json:"workflow_instance_id"`
+	Type               sql.NullString `json:"type"`
+	Source             sql.NullString `json:"source"`
+	CorrelationID      sql.NullString `json:"correlation_id"`
+	PageOffset         int32          `json:"page_offset"`
+	PageSize           int32          `json:"page_size"`
+}
+
+func (q *Queries) ListEventsFiltered(ctx context.Context, arg ListEventsFilteredParams) ([]Event, error) {
+	rows, err := q.db.QueryContext(ctx, listEventsFiltered,
+		arg.TenantID,
+		arg.WorkflowInstanceID,
+		arg.Type,
+		arg.Source,
+		arg.CorrelationID,
+		arg.PageOffset,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}

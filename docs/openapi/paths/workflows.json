@@ -41,7 +41,7 @@
     "post": {
       "tags": ["Workflow"],
       "summary": "Create a workflow draft",
-      "description": "Creates a workflow definition draft (status=DRAFT) scoped to the tenant.",
+      "description": "Creates a workflow definition draft (status=DRAFT) with its complete editable graph scoped to the tenant.",
       "parameters": [
         {
           "name": "X-Tenant-ID",
@@ -74,6 +74,47 @@
         },
         "401": { "$ref": "#/components/schemas/UnauthorizedError" },
         "409": { "$ref": "#/components/schemas/ConflictError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    }
+  },
+  "/workflows/simulate": {
+    "post": {
+      "tags": ["Workflow"],
+      "summary": "Simulate a workflow draft",
+      "description": "Runs an unsaved workflow snapshot in an isolated deterministic sandbox. Capability requests are mock plans only; no runtime instance, event, audit record, LLM, MCP, or live provider is created or invoked (PRD §53).",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/SimulateWorkflowRequest" }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Deterministic sandbox trace",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                  "data": { "$ref": "#/components/schemas/SimulationResult" }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
         "422": { "$ref": "#/components/schemas/ValidationError" }
       }
     }
@@ -124,7 +165,7 @@
     "patch": {
       "tags": ["Workflow"],
       "summary": "Update a workflow draft",
-      "description": "Confirms ownership of a DRAFT workflow at an expected optimistic version, bumping the version counter (PRD §31). Only DRAFT workflows are editable.",
+      "description": "Atomically replaces an editable workflow's metadata and complete graph at an expected optimistic version (PRD §31).",
       "parameters": [
         {
           "name": "X-Tenant-ID",
@@ -178,7 +219,7 @@
     "post": {
       "tags": ["Workflow"],
       "summary": "Publish a workflow version",
-      "description": "Publishes a workflow definition as an immutable, current version (PRD §3.3, §9, §55, §65, §69).",
+      "description": "Validates the persisted workflow draft and publishes it as an immutable, current version (PRD §3.3, §9, §55, §65, §69).",
       "parameters": [
         {
           "name": "X-Tenant-ID",
@@ -272,6 +313,48 @@
         },
         "401": { "$ref": "#/components/schemas/UnauthorizedError" },
         "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    }
+  },
+  "/workflows/{id}/versions/{versionNo}": {
+    "get": {
+      "tags": ["Workflow"],
+      "summary": "Get an immutable workflow version",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string" } },
+        { "name": "X-Project-ID", "in": "header", "required": false, "schema": { "type": "string" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+        { "name": "versionNo", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+      ],
+      "responses": {
+        "200": {
+          "description": "Immutable workflow version",
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/WorkflowVersion" } } } } }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    }
+  },
+  "/workflows/{id}/versions/compare": {
+    "get": {
+      "tags": ["Workflow"],
+      "summary": "Compare immutable workflow versions",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string" } },
+        { "name": "X-Project-ID", "in": "header", "required": false, "schema": { "type": "string" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+        { "name": "baseVersion", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+        { "name": "targetVersion", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+      ],
+      "responses": {
+        "200": {
+          "description": "Semantic graph diff",
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/WorkflowDiff" } } } } }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
       }
     }
   }

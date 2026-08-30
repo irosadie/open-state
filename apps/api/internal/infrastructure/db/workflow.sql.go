@@ -177,18 +177,19 @@ func (q *Queries) CreateTransitionGuard(ctx context.Context, arg CreateTransitio
 }
 
 const createWorkflow = `-- name: CreateWorkflow :one
-INSERT INTO workflows (tenant_id, project_id, slug, name, description, status)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at
+INSERT INTO workflows (tenant_id, project_id, slug, name, description, status, draft_definition)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
 `
 
 type CreateWorkflowParams struct {
-	TenantID    uuid.UUID      `json:"tenant_id"`
-	ProjectID   uuid.UUID      `json:"project_id"`
-	Slug        string         `json:"slug"`
-	Name        string         `json:"name"`
-	Description sql.NullString `json:"description"`
-	Status      string         `json:"status"`
+	TenantID        uuid.UUID       `json:"tenant_id"`
+	ProjectID       uuid.UUID       `json:"project_id"`
+	Slug            string          `json:"slug"`
+	Name            string          `json:"name"`
+	Description     sql.NullString  `json:"description"`
+	Status          string          `json:"status"`
+	DraftDefinition json.RawMessage `json:"draft_definition"`
 }
 
 func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) (Workflow, error) {
@@ -199,6 +200,7 @@ func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) 
 		arg.Name,
 		arg.Description,
 		arg.Status,
+		arg.DraftDefinition,
 	)
 	var i Workflow
 	err := row.Scan(
@@ -213,6 +215,7 @@ func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) 
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DraftDefinition,
 	)
 	return i, err
 }
@@ -345,7 +348,7 @@ func (q *Queries) FindProjectBySlug(ctx context.Context, arg FindProjectBySlugPa
 }
 
 const findWorkflowByID = `-- name: FindWorkflowByID :one
-SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at
+SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
 FROM workflows
 WHERE id = $1 AND tenant_id = $2 AND project_id = $3
 LIMIT 1
@@ -372,12 +375,13 @@ func (q *Queries) FindWorkflowByID(ctx context.Context, arg FindWorkflowByIDPara
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DraftDefinition,
 	)
 	return i, err
 }
 
 const findWorkflowBySlug = `-- name: FindWorkflowBySlug :one
-SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at
+SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
 FROM workflows
 WHERE slug = $1 AND tenant_id = $2 AND project_id = $3
 LIMIT 1
@@ -404,6 +408,7 @@ func (q *Queries) FindWorkflowBySlug(ctx context.Context, arg FindWorkflowBySlug
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DraftDefinition,
 	)
 	return i, err
 }
@@ -725,7 +730,7 @@ func (q *Queries) ListWorkflowVersions(ctx context.Context, arg ListWorkflowVers
 }
 
 const listWorkflowsByTenant = `-- name: ListWorkflowsByTenant :many
-SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at
+SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
 FROM workflows
 WHERE tenant_id = $1 AND project_id = $2
 ORDER BY created_at DESC
@@ -757,6 +762,7 @@ func (q *Queries) ListWorkflowsByTenant(ctx context.Context, arg ListWorkflowsBy
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DraftDefinition,
 		); err != nil {
 			return nil, err
 		}
@@ -794,11 +800,60 @@ func (q *Queries) SetCurrentWorkflowVersion(ctx context.Context, arg SetCurrentW
 	return err
 }
 
+const updateWorkflowDraft = `-- name: UpdateWorkflowDraft :one
+UPDATE workflows
+SET name = $4,
+    description = $5,
+    draft_definition = $6,
+    version = version + 1,
+    updated_at = NOW()
+WHERE id = $1 AND tenant_id = $2 AND project_id = $3 AND version = $7
+RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
+`
+
+type UpdateWorkflowDraftParams struct {
+	ID              uuid.UUID       `json:"id"`
+	TenantID        uuid.UUID       `json:"tenant_id"`
+	ProjectID       uuid.UUID       `json:"project_id"`
+	Name            string          `json:"name"`
+	Description     sql.NullString  `json:"description"`
+	DraftDefinition json.RawMessage `json:"draft_definition"`
+	Version         int32           `json:"version"`
+}
+
+func (q *Queries) UpdateWorkflowDraft(ctx context.Context, arg UpdateWorkflowDraftParams) (Workflow, error) {
+	row := q.db.QueryRowContext(ctx, updateWorkflowDraft,
+		arg.ID,
+		arg.TenantID,
+		arg.ProjectID,
+		arg.Name,
+		arg.Description,
+		arg.DraftDefinition,
+		arg.Version,
+	)
+	var i Workflow
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ProjectID,
+		&i.Slug,
+		&i.Name,
+		&i.Description,
+		&i.Status,
+		&i.CurrentVersion,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DraftDefinition,
+	)
+	return i, err
+}
+
 const updateWorkflowStatus = `-- name: UpdateWorkflowStatus :one
 UPDATE workflows
 SET status = $4, updated_at = NOW()
 WHERE id = $1 AND tenant_id = $2 AND project_id = $3 AND version = $5
-RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at
+RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
 `
 
 type UpdateWorkflowStatusParams struct {
@@ -830,6 +885,7 @@ func (q *Queries) UpdateWorkflowStatus(ctx context.Context, arg UpdateWorkflowSt
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DraftDefinition,
 	)
 	return i, err
 }
@@ -838,7 +894,7 @@ const updateWorkflowVersion = `-- name: UpdateWorkflowVersion :one
 UPDATE workflows
 SET version = version + 1, current_version = $4, updated_at = NOW()
 WHERE id = $1 AND tenant_id = $2 AND project_id = $3 AND version = $5
-RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at
+RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
 `
 
 type UpdateWorkflowVersionParams struct {
@@ -870,6 +926,7 @@ func (q *Queries) UpdateWorkflowVersion(ctx context.Context, arg UpdateWorkflowV
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DraftDefinition,
 	)
 	return i, err
 }

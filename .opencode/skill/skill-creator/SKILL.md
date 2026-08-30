@@ -1,6 +1,6 @@
 ---
 name: "skill-creator"
-description: "Create a new skill from scratch with full structure — SKILL.md, references, templates, openai.yaml, Claude wrapper, and registration in manifest + AGENTS.md + CLAUDE.md."
+description: "Create a new skill from scratch with full structure — SKILL.md, references, templates, openai.yaml, Claude/OpenCode wrappers, and registration in manifest + AGENTS.md + CLAUDE.md."
 ---
 
 Source of truth lives at `.agents/skills/skill-creator/SKILL.md`.

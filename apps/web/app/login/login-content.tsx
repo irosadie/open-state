@@ -4,6 +4,8 @@ import { Button } from "$/components/button"
 import { Input } from "$/components/input"
 import { PanelCard } from "$/components/panel-card"
 import { authConfig } from "$/configs/auth"
+import { useAuthorization } from "$/providers/authorization-provider"
+import { resolveAuthorizedPath } from "$/utils/rbac"
 import { type LoginProps, loginSchema } from "@openstate/schemas"
 import { signIn, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -16,7 +18,7 @@ import {
 } from "react"
 
 const sanitizeCallbackUrl = (value: string | null) => {
-  if (value?.startsWith("/")) {
+  if (value?.startsWith("/") && !value.startsWith("//")) {
     return value
   }
 
@@ -28,7 +30,8 @@ type LoginErrors = Partial<Record<keyof LoginProps, string>>
 export default function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { status } = useSession()
+  const { status: sessionStatus } = useSession()
+  const authorization = useAuthorization()
   const [isPending, startTransition] = useTransition()
   const [formError, setFormError] = useState("")
   const [fieldErrors, setFieldErrors] = useState<LoginErrors>({})
@@ -42,11 +45,20 @@ export default function LoginContent() {
     [searchParams],
   )
 
+  const authorizedPath = useMemo(
+    () => resolveAuthorizedPath(callbackUrl, authorization.permissions),
+    [authorization.permissions, callbackUrl],
+  )
+
   useEffect(() => {
-    if (status === "authenticated") {
-      router.replace(callbackUrl)
+    if (
+      sessionStatus === "authenticated" &&
+      authorization.status === "ready" &&
+      authorizedPath
+    ) {
+      router.replace(authorizedPath)
     }
-  }, [callbackUrl, router, status])
+  }, [authorizedPath, authorization.status, router, sessionStatus])
 
   const handleChange = (field: keyof LoginProps, value: string) => {
     setForm((current) => ({
@@ -92,9 +104,6 @@ export default function LoginContent() {
           setFormError(result.error)
           return
         }
-
-        router.replace(result?.url || callbackUrl)
-        router.refresh()
       })()
     })
   }
@@ -109,6 +118,7 @@ export default function LoginContent() {
         <form className="space-y-4" onSubmit={handleSubmit}>
           <Input
             autoComplete="email"
+            data-testid="login-email"
             label="Email"
             name="email"
             type="email"
@@ -120,6 +130,7 @@ export default function LoginContent() {
           />
           <Input
             autoComplete="current-password"
+            data-testid="login-password"
             label="Password"
             name="password"
             type="password"
@@ -131,11 +142,22 @@ export default function LoginContent() {
           />
 
           {formError ? (
-            <p className="text-sm text-danger-500">{formError}</p>
+            <p className="text-sm text-danger-500" data-testid="login-error">
+              {formError}
+            </p>
+          ) : null}
+
+          {sessionStatus === "authenticated" &&
+          authorization.status === "ready" &&
+          !authorizedPath ? (
+            <p className="text-sm text-danger-500">
+              Your account has no accessible application area.
+            </p>
           ) : null}
 
           <Button
             className="w-full justify-center"
+            data-testid="login-submit"
             type="submit"
             loading={isPending}
           >

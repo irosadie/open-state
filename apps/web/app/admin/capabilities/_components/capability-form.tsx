@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 
+import { PermissionGate } from "$/components/auth-guard/permission-gate"
 import { Button } from "$/components/button"
 import {
   Dialog,
@@ -216,14 +217,16 @@ export function CapabilityFormDialog({
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              intent="primary"
-              loading={isPending}
-              onClick={() => void handleSubmit()}
-            >
-              Create
-            </Button>
+            <PermissionGate action="capability:create">
+              <Button
+                type="button"
+                intent="primary"
+                loading={isPending}
+                onClick={() => void handleSubmit()}
+              >
+                Create
+              </Button>
+            </PermissionGate>
           </DialogFooter>
         </div>
       </DialogContent>

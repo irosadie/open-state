@@ -1,21 +1,25 @@
 package domain
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Error codes
 const (
-	ErrNotFound    = "NOT_FOUND"
+	ErrNotFound     = "NOT_FOUND"
 	ErrUnauthorized = "UNAUTHORIZED"
-	ErrForbidden   = "FORBIDDEN"
-	ErrConflict    = "CONFLICT"
-	ErrValidation  = "VALIDATION"
-	ErrInternal    = "INTERNAL"
+	ErrForbidden    = "FORBIDDEN"
+	ErrConflict     = "CONFLICT"
+	ErrValidation   = "VALIDATION"
+	ErrInternal     = "INTERNAL"
 )
 
 // DomainError is a typed error carrying a code and message.
 type DomainError struct {
 	Code    string
 	Message string
+	Details json.RawMessage
 }
 
 func (e *DomainError) Error() string {
@@ -40,6 +44,12 @@ func NewConflict(msg string) *DomainError {
 
 func NewValidation(msg string) *DomainError {
 	return &DomainError{Code: ErrValidation, Message: msg}
+}
+
+// NewValidationWithDetails preserves machine-readable validation issues while
+// keeping the common DomainError contract for callers that only need a message.
+func NewValidationWithDetails(msg string, details json.RawMessage) *DomainError {
+	return &DomainError{Code: ErrValidation, Message: msg, Details: details}
 }
 
 func NewInternal(msg string) *DomainError {

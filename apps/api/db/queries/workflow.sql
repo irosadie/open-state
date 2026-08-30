@@ -22,24 +22,24 @@ WHERE tenant_id = $1
 ORDER BY created_at DESC;
 
 -- name: CreateWorkflow :one
-INSERT INTO workflows (tenant_id, project_id, slug, name, description, status)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at;
+INSERT INTO workflows (tenant_id, project_id, slug, name, description, status, draft_definition)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition;
 
 -- name: FindWorkflowByID :one
-SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at
+SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
 FROM workflows
 WHERE id = $1 AND tenant_id = $2 AND project_id = $3
 LIMIT 1;
 
 -- name: FindWorkflowBySlug :one
-SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at
+SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
 FROM workflows
 WHERE slug = $1 AND tenant_id = $2 AND project_id = $3
 LIMIT 1;
 
 -- name: ListWorkflowsByTenant :many
-SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at
+SELECT id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition
 FROM workflows
 WHERE tenant_id = $1 AND project_id = $2
 ORDER BY created_at DESC;
@@ -48,13 +48,23 @@ ORDER BY created_at DESC;
 UPDATE workflows
 SET status = $4, updated_at = NOW()
 WHERE id = $1 AND tenant_id = $2 AND project_id = $3 AND version = $5
-RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at;
+RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition;
+
+-- name: UpdateWorkflowDraft :one
+UPDATE workflows
+SET name = $4,
+    description = $5,
+    draft_definition = $6,
+    version = version + 1,
+    updated_at = NOW()
+WHERE id = $1 AND tenant_id = $2 AND project_id = $3 AND version = $7
+RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition;
 
 -- name: UpdateWorkflowVersion :one
 UPDATE workflows
 SET version = version + 1, current_version = $4, updated_at = NOW()
 WHERE id = $1 AND tenant_id = $2 AND project_id = $3 AND version = $5
-RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at;
+RETURNING id, tenant_id, project_id, slug, name, description, status, current_version, version, created_at, updated_at, draft_definition;
 
 -- name: CreateWorkflowVersion :one
 INSERT INTO workflow_versions (workflow_id, tenant_id, project_id, version_no, definition, status, is_current)

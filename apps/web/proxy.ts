@@ -4,7 +4,9 @@ import { getToken } from "next-auth/jwt"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-const PROTECTED_PATHS = [authConfig.defaultRedirectPath]
+const PUBLIC_PATHS = new Set([authConfig.loginPath, "/register"])
+
+const isPublicPath = (pathname: string) => PUBLIC_PATHS.has(pathname)
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -14,12 +16,9 @@ export async function proxy(request: NextRequest) {
     secureCookie: serverAuthConfig.secureCookies,
   })
 
-  const isProtectedRoute = PROTECTED_PATHS.some((path) =>
-    pathname.startsWith(path),
-  )
-  const isLoginPage = pathname === authConfig.loginPath
+  const isProtectedRoute = !isPublicPath(pathname)
   const callbackUrl =
-    pathname.startsWith("/") && pathname !== authConfig.loginPath
+    pathname.startsWith("/") && !isPublicPath(pathname)
       ? pathname
       : authConfig.defaultRedirectPath
 
@@ -31,15 +30,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  if (isLoginPage && token) {
-    return NextResponse.redirect(
-      new URL(authConfig.defaultRedirectPath, request.url),
-    )
-  }
-
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ["/login"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 }

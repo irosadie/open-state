@@ -52,6 +52,7 @@ export const createWorkflowSchema = z.object({
   slug: z.string().min(1, "Slug is required"),
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
+  definition: z.record(z.string(), z.unknown()),
 })
 
 export type CreateWorkflowSchemaProps = z.infer<typeof createWorkflowSchema>
@@ -61,6 +62,7 @@ export const updateWorkflowSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   version: z.number().int().min(0),
+  definition: z.record(z.string(), z.unknown()),
 })
 
 export type UpdateWorkflowSchemaProps = z.infer<typeof updateWorkflowSchema>
@@ -68,10 +70,6 @@ export type UpdateWorkflowSchemaProps = z.infer<typeof updateWorkflowSchema>
 // Publish a workflow definition to an immutable, current version (PRD §3.3, §9, §55).
 export const publishWorkflowSchema = z.object({
   version: z.number().int().min(0),
-  definition: z.unknown().refine(
-    (v) => typeof v === "object" && v !== null,
-    { message: "Definition is required" },
-  ),
 })
 
 export type PublishWorkflowSchemaProps = z.infer<typeof publishWorkflowSchema>

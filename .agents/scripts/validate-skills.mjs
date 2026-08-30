@@ -1,14 +1,17 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
   agentsRoot,
   claudeSkillsRoot,
+  createSkillWrapperContent,
   extractMarkedSection,
   listSkillRecords,
   packageJsonPath,
   parseSkillFrontmatter,
   readManifest,
   readText,
+  opencodeSkillsRoot,
+  renderOpenCodeSkillList,
   renderSkillReferenceList,
   renderSkillRegistryTable,
   repoRoot,
@@ -17,8 +20,9 @@ import {
 const errors = [];
 const requiredScripts = {
   'skills:create': 'node .agents/scripts/create-skill.mjs',
-  'skills:sync': 'bun run skills:sync-registry && bun run skills:sync-claude',
+  'skills:sync': 'bun run skills:sync-registry && bun run skills:sync-claude && bun run skills:sync-opencode',
   'skills:sync-claude': 'node .agents/scripts/sync-claude-skills.mjs',
+  'skills:sync-opencode': 'node .agents/scripts/sync-opencode-skills.mjs',
   'skills:sync-registry': 'node .agents/scripts/sync-skill-registry.mjs',
   'skills:validate': 'node .agents/scripts/validate-skills.mjs',
 };
@@ -107,22 +111,56 @@ function validateSkillFiles(skill) {
   if (!/^policy:\n/m.test(yaml)) {
     addError(`${skill.name} openai.yaml missing policy block`);
   }
+  const defaultPrompt = yaml.match(/^\s{2}default_prompt:\s+"(.+)"$/m)?.[1] ?? '';
+  if (!defaultPrompt.includes(`$${skill.name}`)) {
+    addError(`${skill.name} openai.yaml default_prompt should invoke $${skill.name}`);
+  }
   if (!isDelegate && !/^\s{2}allow_implicit_invocation:\s+true$/m.test(yaml)) {
     addError(`${skill.name} openai.yaml should set policy.allow_implicit_invocation: true`);
   }
 
-  const wrapperPath = path.join(claudeSkillsRoot, skill.name, 'SKILL.md');
-  if (!existsSync(wrapperPath)) {
-    addError(`${skill.name} missing Claude wrapper: ${path.relative(repoRoot, wrapperPath)}`);
-    return;
+}
+
+function listWrapperDirectories(root) {
+  if (!existsSync(root)) {
+    return [];
   }
 
-  const wrapper = parseSkillFrontmatter(readText(wrapperPath), wrapperPath);
-  if (wrapper.name !== skill.name) {
-    addError(`${skill.name} Claude wrapper name mismatch`);
-  }
-  if (wrapper.description !== skill.description) {
-    addError(`${skill.name} Claude wrapper description mismatch`);
+  return readdirSync(root).filter((entry) => statSync(path.join(root, entry)).isDirectory());
+}
+
+function validateCompatibilityWrappers(skills) {
+  const targets = [
+    ['Claude', claudeSkillsRoot],
+    ['OpenCode', opencodeSkillsRoot],
+  ];
+  const expectedNames = new Set(skills.map((skill) => skill.name));
+
+  for (const [label, root] of targets) {
+    for (const skill of skills) {
+      const wrapperPath = path.join(root, skill.name, 'SKILL.md');
+      if (!existsSync(wrapperPath)) {
+        addError(`${skill.name} missing ${label} wrapper: ${path.relative(repoRoot, wrapperPath)}`);
+        continue;
+      }
+
+      const wrapper = parseSkillFrontmatter(readText(wrapperPath), wrapperPath);
+      if (wrapper.name !== skill.name) {
+        addError(`${skill.name} ${label} wrapper name mismatch`);
+      }
+      if (wrapper.description !== skill.description) {
+        addError(`${skill.name} ${label} wrapper description mismatch`);
+      }
+      if (readText(wrapperPath) !== createSkillWrapperContent(skill)) {
+        addError(`${skill.name} ${label} wrapper is out of sync with source`);
+      }
+    }
+
+    for (const directory of listWrapperDirectories(root)) {
+      if (!expectedNames.has(directory)) {
+        addError(`${label} wrapper has no source skill: ${path.relative(repoRoot, path.join(root, directory))}`);
+      }
+    }
   }
 }
 
@@ -167,8 +205,10 @@ function validateManifest(skills) {
 function validateRegistries(manifestEntries) {
   const agents = readText(path.join(agentsRoot, 'AGENTS.md'));
   const claude = readText(path.join(repoRoot, 'CLAUDE.md'));
+  const opencode = readText(path.join(repoRoot, 'opencode.md'));
   const expectedRegistry = renderSkillRegistryTable(manifestEntries).trim();
   const expectedSkillLinks = renderSkillReferenceList(manifestEntries).trim();
+  const expectedOpenCodeSkills = renderOpenCodeSkillList(manifestEntries).trim();
 
   if (!agents.includes('## Skill Registry')) {
     addError('.agents/AGENTS.md missing Skill Registry section');
@@ -184,6 +224,9 @@ function validateRegistries(manifestEntries) {
   }
   if (!claude.includes('<!-- skill-registry:start -->') || !claude.includes('<!-- skill-registry:end -->')) {
     addError('CLAUDE.md missing skill registry markers');
+  }
+  if (!opencode.includes('<!-- skill-links:start -->') || !opencode.includes('<!-- skill-links:end -->')) {
+    addError('opencode.md missing skill links markers');
   }
 
   try {
@@ -212,6 +255,15 @@ function validateRegistries(manifestEntries) {
   } catch (error) {
     addError(error.message);
   }
+
+  try {
+    const actualOpenCodeSkills = extractMarkedSection(opencode, '<!-- skill-links:start -->', '<!-- skill-links:end -->');
+    if (actualOpenCodeSkills !== expectedOpenCodeSkills) {
+      addError('opencode.md skill list is out of sync with manifest.json');
+    }
+  } catch (error) {
+    addError(error.message);
+  }
 }
 
 validatePackageScripts();
@@ -224,6 +276,7 @@ validateRegistries(manifest.skills ?? []);
 for (const skill of skills) {
   validateSkillFiles(skill);
 }
+validateCompatibilityWrappers(skills);
 
 if (errors.length > 0) {
   console.error(`Skill validation failed with ${errors.length} issue(s):`);

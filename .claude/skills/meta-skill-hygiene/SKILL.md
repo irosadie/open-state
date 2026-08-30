@@ -1,6 +1,6 @@
 ---
 name: "meta-skill-hygiene"
-description: "Audit, sync, and maintain skill metadata consistency across this repo. Use when skills, the registry, Claude wrappers, or agent metadata change."
+description: "Audit, sync, and maintain skill metadata consistency across this repo. Use when skills, the registry, Claude/OpenCode wrappers, or agent metadata change."
 ---
 
 Source of truth lives at `.agents/skills/meta-skill-hygiene/SKILL.md`.

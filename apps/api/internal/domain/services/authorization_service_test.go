@@ -38,6 +38,10 @@ func TestHasPermission(t *testing.T) {
 		{"viewer workflow read", entities.UserRoleViewer, "workflow:read", true},
 		{"viewer workflow create denied", entities.UserRoleViewer, "workflow:create", false},
 		{"operator instance retry", entities.UserRoleOperator, "instance:retry", true},
+		{"operator debug read", entities.UserRoleOperator, "debug:read", true},
+		{"operator instance read", entities.UserRoleOperator, "instance:read", true},
+		{"viewer debug read denied", entities.UserRoleViewer, "debug:read", false},
+		{"admin instance read", entities.UserRoleAdmin, "instance:read", true},
 		{"unknown role denied", entities.UserRole("NOPE"), "workflow:read", false},
 		{"audit read viewer", entities.UserRoleViewer, "audit:read", true},
 	}

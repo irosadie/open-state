@@ -1,0 +1,127 @@
+{
+  "RuntimeWorkflow": {
+    "type": "object",
+    "required": ["id", "name", "slug", "versionId", "version"],
+    "properties": {
+      "id": { "type": "string" },
+      "name": { "type": "string" },
+      "slug": { "type": "string" },
+      "versionId": { "type": "string" },
+      "version": { "type": "integer" }
+    }
+  },
+  "RuntimeState": {
+    "type": "object",
+    "required": ["id", "key", "name", "status", "enteredAt"],
+    "properties": {
+      "id": { "type": "string" },
+      "key": { "type": "string" },
+      "name": { "type": "string" },
+      "status": { "type": "string" },
+      "enteredAt": { "type": "string", "format": "date-time" },
+      "exitedAt": { "type": "string", "format": "date-time", "nullable": true }
+    }
+  },
+  "RuntimeInstanceSummary": {
+    "type": "object",
+    "required": ["id", "workflow", "status", "lastActivityAt"],
+    "properties": {
+      "id": { "type": "string" },
+      "workflow": { "$ref": "#/components/schemas/RuntimeWorkflow" },
+      "status": { "type": "string" },
+      "currentState": { "$ref": "#/components/schemas/RuntimeState", "nullable": true },
+      "correlationId": { "type": "string", "nullable": true },
+      "lastActivityAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "RuntimeInstanceList": {
+    "type": "object",
+    "required": ["data", "page", "pageSize", "total", "hasNext"],
+    "properties": {
+      "data": { "type": "array", "items": { "$ref": "#/components/schemas/RuntimeInstanceSummary" } },
+      "page": { "type": "integer" },
+      "pageSize": { "type": "integer" },
+      "total": { "type": "integer" },
+      "hasNext": { "type": "boolean" }
+    }
+  },
+  "RuntimeContext": {
+    "type": "object",
+    "required": ["available", "missing", "redacted"],
+    "properties": {
+      "available": { "type": "object", "additionalProperties": true },
+      "missing": { "type": "array", "items": { "type": "string" } },
+      "redacted": { "type": "boolean" }
+    }
+  },
+  "RuntimeTimelineEntry": {
+    "type": "object",
+    "required": ["id", "kind", "type", "label", "status", "sequence", "occurredAt"],
+    "properties": {
+      "id": { "type": "string" },
+      "kind": { "type": "string", "enum": ["STATE", "EVENT", "DECISION"] },
+      "type": { "type": "string" },
+      "label": { "type": "string" },
+      "status": { "type": "string" },
+      "sequence": { "type": "integer", "format": "int64" },
+      "occurredAt": { "type": "string", "format": "date-time" },
+      "correlationId": { "type": "string", "nullable": true },
+      "reasonCode": { "type": "string", "nullable": true }
+    }
+  },
+  "RuntimeInstanceDetail": {
+    "type": "object",
+    "required": ["summary", "context", "timeline", "auditCorrelationIds"],
+    "properties": {
+      "summary": { "$ref": "#/components/schemas/RuntimeInstanceSummary" },
+      "currentState": { "$ref": "#/components/schemas/RuntimeState", "nullable": true },
+      "context": { "$ref": "#/components/schemas/RuntimeContext" },
+      "timeline": { "type": "array", "items": { "$ref": "#/components/schemas/RuntimeTimelineEntry" } },
+      "auditCorrelationIds": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "RuntimeTraceEntry": {
+    "type": "object",
+    "required": ["id", "sequence", "stage", "source", "status", "occurredAt", "attributes"],
+    "properties": {
+      "id": { "type": "string" },
+      "turnId": { "type": "string", "nullable": true },
+      "sequence": { "type": "integer", "format": "int64" },
+      "stage": { "type": "string" },
+      "source": { "type": "string", "enum": ["OPENSTATE", "EXTERNAL_PROVIDER"] },
+      "status": { "type": "string" },
+      "occurredAt": { "type": "string", "format": "date-time" },
+      "correlationId": { "type": "string", "nullable": true },
+      "durationMs": { "type": "integer", "format": "int64", "nullable": true },
+      "reasonCode": { "type": "string", "nullable": true },
+      "errorCode": { "type": "string", "nullable": true },
+      "providerAlias": { "type": "string", "nullable": true },
+      "providerReference": { "type": "string", "nullable": true },
+      "summary": { "type": "string", "nullable": true },
+      "attributes": { "type": "object", "additionalProperties": true }
+    }
+  },
+  "RuntimeTrace": {
+    "type": "object",
+    "required": ["available", "data"],
+    "properties": {
+      "available": { "type": "boolean" },
+      "data": { "type": "array", "items": { "$ref": "#/components/schemas/RuntimeTraceEntry" } }
+    }
+  },
+  "RuntimeInstanceListResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/RuntimeInstanceList" } }
+  },
+  "RuntimeInstanceDetailResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/RuntimeInstanceDetail" } }
+  },
+  "RuntimeTraceResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/RuntimeTrace" } }
+  }
+}

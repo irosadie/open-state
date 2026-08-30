@@ -3,7 +3,10 @@
 import Link from "next/link"
 import { useMemo } from "react"
 
-import { ActionsDropdown } from "$/components/actions-dropdown"
+import {
+  ActionsDropdown,
+  type ActionsDropdownProps,
+} from "$/components/actions-dropdown"
 import { EmptyState } from "$/components/empty-state"
 import { StatusBadge } from "$/components/status-badge"
 import { type ColumnDef, Table } from "$/components/table"
@@ -17,7 +20,7 @@ import { BoxesIcon } from "lucide-react"
 type CapabilitiesTableProps = {
   data: CapabilityResponse[]
   isLoading?: boolean
-  onDisable: (id: string) => void
+  onDisable?: (id: string) => void
 }
 
 const statusVariant: Record<
@@ -86,23 +89,26 @@ export function CapabilitiesTable({
       {
         id: "actions",
         header: "",
-        cell: (info) => (
-          <ActionsDropdown
-            actions={[
-              {
-                label: "View",
-                onClick: () => {
-                  window.location.href = `/admin/capabilities/${info.row.original.id}`
-                },
+        cell: (info) => {
+          const actions: ActionsDropdownProps["actions"] = [
+            {
+              label: "View",
+              onClick: () => {
+                window.location.href = `/admin/capabilities/${info.row.original.id}`
               },
-              {
-                label: "Disable",
-                onClick: () => onDisable(info.row.original.id),
-                destructive: true,
-              },
-            ]}
-          />
-        ),
+            },
+          ]
+
+          if (onDisable) {
+            actions.push({
+              label: "Disable",
+              onClick: () => onDisable(info.row.original.id),
+              destructive: true,
+            })
+          }
+
+          return <ActionsDropdown actions={actions} />
+        },
       },
     ],
     [onDisable],

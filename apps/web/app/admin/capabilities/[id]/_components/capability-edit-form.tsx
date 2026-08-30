@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 
+import { PermissionGate } from "$/components/auth-guard/permission-gate"
 import { Button } from "$/components/button"
 import { Input } from "$/components/input"
 import { Select } from "$/components/select"
@@ -190,14 +191,16 @@ export function CapabilityEditForm({
         >
           Cancel
         </Button>
-        <Button
-          type="button"
-          intent="primary"
-          loading={isPending}
-          onClick={() => void handleSave()}
-        >
-          Save
-        </Button>
+        <PermissionGate action="capability:update">
+          <Button
+            type="button"
+            intent="primary"
+            loading={isPending}
+            onClick={() => void handleSave()}
+          >
+            Save
+          </Button>
+        </PermissionGate>
       </div>
     </div>
   )

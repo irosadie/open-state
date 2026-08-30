@@ -47,6 +47,12 @@ func main() {
 	if cfg.MetricsEnabled {
 		metricsRegistry = inframetrics.New()
 	}
+	var metricsRecorder httpmw.MetricsRecorder
+	var auditMetrics services.AuditMetrics
+	if metricsRegistry != nil {
+		metricsRecorder = metricsRegistry
+		auditMetrics = metricsRegistry
+	}
 
 	pool, err := config.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -74,10 +80,16 @@ func main() {
 
 	// Audit writer (PRD 50): append-only, tenant-isolated audit trail for
 	// important operations and authorization denials.
-	auditWriter := services.NewAuditWriter(adapter.Audit(), logger, metricsRegistry)
+	auditWriter := services.NewAuditWriter(adapter.Audit(), logger, auditMetrics)
 
 	// Audit query service + controller (PRD 50): filtered, paginated audit trail.
 	auditSvc := services.NewAuditService(adapter.Audit())
+	runtimeInspectorSvc := services.NewRuntimeInspectorService(
+		adapter.Instances(), adapter.RuntimeRead(), adapter.Events(), adapter.Context(), adapter.Audit(), adapter.RuntimeTraces(),
+	)
+	orchestratorSvc := services.NewOrchestratorService(adapter.Instances(), adapter.Events(), adapter.Context(), adapter.Capabilities())
+	adminIdentitySvc := services.NewAdminIdentityService(adapter.Admin(), auditWriter)
+	adminRuntimeSvc := services.NewAdminRuntimeService(orchestratorSvc, adapter.EventBrowser(), auditWriter)
 
 	// Rate limiters (PRD 83): token-bucket per operation, in-memory. Login and
 	// register protect the public auth endpoints from brute-force/mass-registration;
@@ -87,7 +99,7 @@ func main() {
 	capabilityLimiter := infrl.NewTokenBucket(infrl.Config{Rate: cfg.RateLimit.Capability.Rate, Burst: cfg.RateLimit.Capability.Burst})
 
 	// Use cases
-	registerUC := usecases.NewRegisterUserUseCase(authRepo, tokenSvc)
+	registerUC := usecases.NewRegisterUserUseCase(authRepo, adapter.Roles(), tokenSvc)
 	loginUC := usecases.NewLoginUserUseCase(authRepo, tokenSvc)
 	logoutUC := usecases.NewLogoutUserUseCase(authRepo, tokenSvc)
 	getMeUC := usecases.NewGetCurrentUserUseCase(authRepo)
@@ -99,6 +111,7 @@ func main() {
 
 	// Builder API service (workflow-definition drafts + publish + versions, PRD 146)
 	builderSvc := services.NewBuilderService(adapter.Workflows(), adapter.Projects(), auditWriter)
+	simulationSvc := services.NewSimulationService()
 
 	// Services
 	authSvc := services.NewAuthService(registerUC, loginUC, logoutUC, getMeUC, authzSvc)
@@ -134,11 +147,14 @@ func main() {
 	authCtrl := controllers.NewAuthController(authSvc)
 	systemCtrl := controllers.NewSystemController(healthUC, appInfoUC)
 	capCtrl := controllers.NewCapabilityController(capSvc)
-	workflowCtrl := controllers.NewWorkflowController(builderSvc)
+	workflowCtrl := controllers.NewWorkflowController(builderSvc, simulationSvc)
 	auditCtrl := controllers.NewAuditController(auditSvc)
+	adminIdentityCtrl := controllers.NewAdminIdentityController(adminIdentitySvc)
+	adminRuntimeCtrl := controllers.NewAdminRuntimeController(adminRuntimeSvc)
+	runtimeInspectorCtrl := controllers.NewRuntimeInspectorController(runtimeInspectorSvc)
 
 	// Echo app
-	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, workflowCtrl, auditCtrl, ssoCtrl, authRepo, tokenSvc, authzSvc, auditWriter, loginLimiter, registerLimiter, logger, metricsRegistry)
+	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, workflowCtrl, auditCtrl, ssoCtrl, authRepo, tokenSvc, authzSvc, auditWriter, loginLimiter, registerLimiter, logger, metricsRecorder, adminIdentityCtrl, adminRuntimeCtrl, runtimeInspectorCtrl)
 
 	// Distributed tracing middleware (PRD §84): server span per request + traceparent
 	// extraction. Applied after CreateApp to keep the interfaces layer free of

@@ -1,9 +1,12 @@
 "use client"
 
+import { PermissionGate } from "$/components/auth-guard/permission-gate"
 import {
   CheckCircle2,
   Download,
   FilePlus2,
+  FlaskConical,
+  GitCompare,
   LayoutGrid,
   Redo2,
   Save,
@@ -32,6 +35,9 @@ interface ToolbarProps {
   onValidate: () => void
   onAutoLayout: () => void
   onSave: () => void
+  onPublish: () => void
+  onSimulate: () => void
+  onVersions: () => void
   onExport: () => void
   onImport: () => void
   onNew: () => void
@@ -42,6 +48,10 @@ interface ToolbarProps {
   canUndo: boolean
   canRedo: boolean
   isSaving: boolean
+  saveError: string | null
+  saveConflict: boolean
+  isPublishing: boolean
+  hasWorkflowId: boolean
   lastSavedAt: string | null
   stats: ToolbarStats
   onNewStart: () => void
@@ -53,6 +63,9 @@ export function Toolbar({
   onValidate,
   onAutoLayout,
   onSave,
+  onPublish,
+  onSimulate,
+  onVersions,
   onExport,
   onImport,
   onNew,
@@ -62,6 +75,10 @@ export function Toolbar({
   canUndo,
   canRedo,
   isSaving,
+  saveError,
+  saveConflict,
+  isPublishing,
+  hasWorkflowId,
   lastSavedAt,
   stats,
   examples,
@@ -86,9 +103,13 @@ export function Toolbar({
 
   const saveLabel = isSaving
     ? "Menyimpan…"
-    : lastSavedAt
-      ? `Tersimpan ${new Date(lastSavedAt).toLocaleTimeString()}`
-      : "Belum tersimpan"
+    : saveError
+      ? saveConflict
+        ? "Konflik — muat ulang"
+        : "Gagal menyimpan"
+      : lastSavedAt
+        ? `Tersimpan ${new Date(lastSavedAt).toLocaleTimeString()}`
+        : "Belum tersimpan"
 
   return (
     <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2">
@@ -114,7 +135,10 @@ export function Toolbar({
 
       {/* Kanan: aksi */}
       <div className="flex items-center gap-1.5">
-        <span className="mr-1 hidden text-[11px] text-slate-400 tablet:inline">
+        <span
+          className="mr-1 hidden text-[11px] text-slate-400 tablet:inline"
+          data-testid="builder-save-status"
+        >
           {saveLabel}
         </span>
 
@@ -205,19 +229,57 @@ export function Toolbar({
         <button
           type="button"
           onClick={onValidate}
+          data-testid="builder-validate"
           className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
         >
           <ShieldCheck className="h-4 w-4" />
           <span className="hidden laptop:inline">Validate</span>
         </button>
 
+        <PermissionGate
+          action={hasWorkflowId ? "workflow:update" : "workflow:create"}
+        >
+          <button
+            type="button"
+            onClick={onSave}
+            data-testid="builder-save"
+            className="flex items-center gap-1.5 rounded-md bg-primary-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-600"
+          >
+            <Save className="h-4 w-4" />
+            Save
+          </button>
+        </PermissionGate>
+        <PermissionGate action="workflow:simulate">
+          <button
+            type="button"
+            onClick={onSimulate}
+            className="flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-100"
+          >
+            <FlaskConical className="h-4 w-4" />
+            <span className="hidden laptop:inline">Simulate</span>
+          </button>
+        </PermissionGate>
+        <PermissionGate action="workflow:publish">
+          <button
+            type="button"
+            onClick={onPublish}
+            data-testid="builder-publish"
+            disabled={isSaving || isPublishing || !hasWorkflowId}
+            className="flex items-center gap-1.5 rounded-md bg-success-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {isPublishing ? "Publishing…" : "Publish"}
+          </button>
+        </PermissionGate>
         <button
           type="button"
-          onClick={onSave}
-          className="flex items-center gap-1.5 rounded-md bg-primary-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-600"
+          onClick={onVersions}
+          data-testid="builder-versions"
+          disabled={!hasWorkflowId}
+          className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Save className="h-4 w-4" />
-          Save
+          <GitCompare className="h-4 w-4" />
+          <span className="hidden laptop:inline">Versions</span>
         </button>
       </div>
     </div>

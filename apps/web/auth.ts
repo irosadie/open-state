@@ -7,6 +7,9 @@ import type { NextAuthOptions, User } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 
 type AuthEnvelope<T> = T | { data: T }
+type BackendAuthLoginResponse = AuthLoginResponse & {
+  accessToken?: string
+}
 
 const loginProxyUrl = `${serverAuthConfig.appBaseUrl}${authConfig.proxyApiBasePath}${authConfig.backendLoginPath}`
 
@@ -43,23 +46,24 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const { data } = await axios.post<AuthEnvelope<AuthLoginResponse>>(
-            loginProxyUrl,
-            parsedCredentials.data,
-            {
-              headers: {
-                "Content-Type": "application/json",
-              },
+          const { data } = await axios.post<
+            AuthEnvelope<BackendAuthLoginResponse>
+          >(loginProxyUrl, parsedCredentials.data, {
+            headers: {
+              "Content-Type": "application/json",
             },
-          )
+          })
 
           const result = unwrapData(data)
 
-          if (!result.user || !result.tokens) {
+          const accessToken = result.tokens?.accessToken ?? result.accessToken
+
+          if (!result.user || !accessToken) {
             throw new Error("Invalid response from auth server")
           }
 
-          const accessTokenExpires = Date.now() + result.tokens.expiresIn * 1000
+          const accessTokenExpires =
+            Date.now() + (result.tokens?.expiresIn ?? 24 * 60 * 60) * 1000
 
           const authUser: User = {
             id: result.user.id,
@@ -67,8 +71,8 @@ export const authOptions: NextAuthOptions = {
             name: result.user.name,
             photo: result.user.photo ?? undefined,
             companyId: result.user.companyId ?? 0,
-            accessToken: result.tokens.accessToken,
-            refreshToken: result.tokens.refreshToken,
+            accessToken,
+            refreshToken: result.tokens?.refreshToken,
             accessTokenExpires,
             image: result.user.photo ?? undefined,
           }

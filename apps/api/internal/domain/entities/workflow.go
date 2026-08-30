@@ -2,6 +2,7 @@ package entities
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 )
 
@@ -18,15 +19,16 @@ const (
 
 // Workflow is a persisted workflow definition root, tenant+project-isolated (PRD §4, §96, §3.1.1).
 type Workflow struct {
-	ID             string
-	TenantID       string
-	ProjectID      string
-	Slug           string
-	Name           string
-	Description    sql.NullString
-	Status         WorkflowStatus
-	CurrentVersion int
-	Version        int // optimistic lock (PRD §31)
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID              string
+	TenantID        string
+	ProjectID       string
+	Slug            string
+	Name            string
+	Description     sql.NullString
+	Status          WorkflowStatus
+	CurrentVersion  int
+	Version         int // optimistic lock (PRD §31)
+	DraftDefinition json.RawMessage
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }

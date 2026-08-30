@@ -32,11 +32,16 @@ type PostgresAdapter struct {
 	audit        repositories.IAuditRepository
 	roles        repositories.IRoleAssignmentRepository
 	identities   repositories.IUserIdentityRepository
+	admin        repositories.IAdminRepository
+	eventBrowser repositories.IEventBrowserRepository
+	runtimeRead  repositories.IRuntimeReadRepository
+	traces       repositories.IRuntimeTraceRepository
 }
 
 // NewPostgresAdapter returns a PostgresAdapter composing all six pgx repositories.
 func NewPostgresAdapter(pool *pgxpool.Pool) *PostgresAdapter {
 	sqlDB := stdlib.OpenDBFromPool(pool)
+	eventRepo := NewPgxEventRepository(pool)
 	return &PostgresAdapter{
 		pool:         pool,
 		sqlDB:        sqlDB,
@@ -44,12 +49,16 @@ func NewPostgresAdapter(pool *pgxpool.Pool) *PostgresAdapter {
 		projects:     NewPgxProjectRepository(pool),
 		workflows:    NewPgxWorkflowRepository(pool),
 		instances:    NewPgxInstanceRepository(pool),
-		events:       NewPgxEventRepository(pool),
+		events:       eventRepo,
 		context:      NewPgxContextRepository(pool),
 		capabilities: NewPgxCapabilityRepository(pool),
 		audit:        NewPgxAuditRepository(pool),
 		roles:        NewPgxRoleAssignmentRepository(pool),
 		identities:   NewPgxUserIdentityRepository(pool),
+		admin:        NewPgxAdminRepository(pool),
+		eventBrowser: eventRepo,
+		runtimeRead:  NewPgxRuntimeReadRepository(pool),
+		traces:       NewPgxRuntimeTraceRepository(pool),
 	}
 }
 
@@ -80,6 +89,19 @@ func (a *PostgresAdapter) Roles() repositories.IRoleAssignmentRepository { retur
 // Identities returns the external OIDC identity repository (PRD §79).
 func (a *PostgresAdapter) Identities() repositories.IUserIdentityRepository { return a.identities }
 
+// Admin returns tenant profile and membership administration persistence.
+func (a *PostgresAdapter) Admin() repositories.IAdminRepository { return a.admin }
+
+// EventBrowser returns the read-only, paginated event query surface.
+func (a *PostgresAdapter) EventBrowser() repositories.IEventBrowserRepository { return a.eventBrowser }
+
+// RuntimeRead returns the tenant-scoped definition and state projections used
+// by Runtime Inspector.
+func (a *PostgresAdapter) RuntimeRead() repositories.IRuntimeReadRepository { return a.runtimeRead }
+
+// RuntimeTraces returns the append-only trace repository.
+func (a *PostgresAdapter) RuntimeTraces() repositories.IRuntimeTraceRepository { return a.traces }
+
 // WithTx runs fn within a single DB transaction, binding all six repositories to
 // that transaction so multi-repository operations (e.g. append an audit entry and
 // emit an outbox event, or a state transition) commit or roll back together
@@ -108,6 +130,10 @@ func (a *PostgresAdapter) WithTx(ctx context.Context, fn func(adapter *PostgresA
 		audit:        newPgxAuditRepository(q),
 		roles:        newPgxRoleAssignmentRepository(q),
 		identities:   newPgxUserIdentityRepository(q),
+		admin:        newPgxAdminRepository(q, a.sqlDB),
+		eventBrowser: newPgxEventRepository(q),
+		runtimeRead:  newPgxRuntimeReadRepository(q),
+		traces:       newPgxRuntimeTraceRepository(q),
 	}
 
 	if err := fn(txAdapter); err != nil {

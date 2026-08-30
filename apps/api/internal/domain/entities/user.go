@@ -26,6 +26,26 @@ const (
 	UserStatusSuspended UserStatus = "SUSPENDED"
 )
 
+// TenantRoles is the complete role set accepted by tenant membership
+// administration. Keeping this list in the domain prevents arbitrary strings
+// from reaching role_assignments.
+var TenantRoles = []UserRole{
+	UserRoleOwner,
+	UserRoleAdmin,
+	UserRoleEditor,
+	UserRoleOperator,
+	UserRoleViewer,
+}
+
+func IsTenantRole(role UserRole) bool {
+	for _, allowed := range TenantRoles {
+		if role == allowed {
+			return true
+		}
+	}
+	return false
+}
+
 type User struct {
 	ID           string
 	Email        string

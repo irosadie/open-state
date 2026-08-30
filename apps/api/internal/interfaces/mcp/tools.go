@@ -8,6 +8,7 @@ import (
 
 	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	"github.com/irosadie/open-state/api/internal/domain/capability"
+	"github.com/irosadie/open-state/api/internal/domain/engine"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 )
 
@@ -41,6 +42,15 @@ func handleGetActiveWorkflow(ctx context.Context, deps Dependencies, tenantID, c
 	if err != nil {
 		return toolError(err)
 	}
+	recordRuntimeTrace(ctx, deps, tenantID, inst.ID, appservices.TraceRecordInput{
+		Stage:         entities.RuntimeTraceStageWorkflowLookup,
+		Status:        entities.RuntimeTraceStatusSucceeded,
+		CorrelationID: traceStringPtr(conversation),
+		Attributes: map[string]any{
+			"workflow_id": inst.WorkflowID,
+			"status":      inst.Status,
+		},
+	})
 	return mcp.NewToolResultJSON(map[string]any{
 		"conversation": conversation,
 		"active":       true,
@@ -102,11 +112,11 @@ func handleInvokeCapability(ctx context.Context, deps Dependencies, req mcp.Call
 		})
 	}
 	return mcp.NewToolResultJSON(map[string]any{
-		"ok":             true,
-		"data":           res.Data,
-		"fromMock":       res.FromMock,
+		"ok":              true,
+		"data":            res.Data,
+		"fromMock":        res.FromMock,
 		"capabilityEvent": res.CapabilityEvent,
-		"invoked":        true,
+		"invoked":         true,
 	})
 }
 
@@ -120,6 +130,14 @@ func handleGetCurrentState(ctx context.Context, deps Dependencies, tenantID, ins
 	if err != nil {
 		return toolError(err)
 	}
+	recordRuntimeTrace(ctx, deps, tenantID, instanceID, appservices.TraceRecordInput{
+		Stage:  entities.RuntimeTraceStageStateLookup,
+		Status: entities.RuntimeTraceStatusSucceeded,
+		Attributes: map[string]any{
+			"state_instance_id": stateInstanceID(stateInst),
+			"instance_status":   inst.Status,
+		},
+	})
 	out := map[string]any{
 		"instanceId": inst.ID,
 		"status":     inst.Status,
@@ -135,9 +153,9 @@ func handleGetCurrentState(ctx context.Context, deps Dependencies, tenantID, ins
 		list := make([]map[string]any, 0, len(transitions))
 		for _, t := range transitions {
 			list = append(list, map[string]any{
-				"event":    t.Event,
+				"event":         t.Event,
 				"targetStateId": t.TargetStateID,
-				"priority": t.Priority,
+				"priority":      t.Priority,
 			})
 		}
 		out["allowedTransitions"] = list
@@ -163,10 +181,10 @@ func handleGetAllowedCapabilities(ctx context.Context, deps Dependencies, tenant
 	out := make([]map[string]any, 0, len(caps))
 	for _, c := range caps {
 		out = append(out, map[string]any{
-			"id":      c.ID,
-			"name":    c.Name,
-			"type":    c.ProviderType,
-			"status":  c.Status,
+			"id":     c.ID,
+			"name":   c.Name,
+			"type":   c.ProviderType,
+			"status": c.Status,
 		})
 	}
 	return mcp.NewToolResultJSON(map[string]any{"capabilities": out})
@@ -188,8 +206,17 @@ func handleProposeEvent(ctx context.Context, deps Dependencies, req mcp.CallTool
 	}
 	evt, err := deps.Orchestrator.ProposeEvent(ctx, tenantID, instanceID, eventType, payload, "")
 	if err != nil {
+		recordRuntimeTraceError(ctx, deps, tenantID, instanceID, entities.RuntimeTraceStageEventHandling, err)
 		return toolError(err)
 	}
+	recordRuntimeTrace(ctx, deps, tenantID, instanceID, appservices.TraceRecordInput{
+		Stage:  entities.RuntimeTraceStageEventHandling,
+		Status: entities.RuntimeTraceStatusSucceeded,
+		Attributes: map[string]any{
+			"event_id":   evt.ID,
+			"event_type": eventType,
+		},
+	})
 	return mcp.NewToolResultJSON(map[string]any{
 		"ok":        true,
 		"eventId":   evt.ID,
@@ -206,6 +233,15 @@ func handleStartWorkflow(ctx context.Context, deps Dependencies, tenantID, workf
 	if err != nil {
 		return toolError(err)
 	}
+	recordRuntimeTrace(ctx, deps, tenantID, inst.ID, appservices.TraceRecordInput{
+		Stage:         entities.RuntimeTraceStageWorkflowLookup,
+		Status:        entities.RuntimeTraceStatusSucceeded,
+		CorrelationID: traceStringPtr(correlation),
+		Attributes: map[string]any{
+			"workflow_id": workflowID,
+			"version_id":  versionID,
+		},
+	})
 	return mcp.NewToolResultJSON(map[string]any{
 		"ok":         true,
 		"instanceId": inst.ID,
@@ -252,10 +288,10 @@ func handleListInstances(ctx context.Context, deps Dependencies, tenantID string
 	out := make([]map[string]any, 0, len(insts))
 	for _, i := range insts {
 		out = append(out, map[string]any{
-			"id":     i.ID,
+			"id":       i.ID,
 			"workflow": i.WorkflowID,
-			"status": i.Status,
-			"version": i.Version,
+			"status":   i.Status,
+			"version":  i.Version,
 		})
 	}
 	return mcp.NewToolResultJSON(map[string]any{"instances": out})
@@ -272,10 +308,10 @@ func handleListHistory(ctx context.Context, deps Dependencies, tenantID, instanc
 	out := make([]map[string]any, 0, len(events))
 	for _, e := range events {
 		out = append(out, map[string]any{
-			"id":       e.ID,
-			"type":     e.Type,
-			"sequence": e.Sequence,
-			"source":   e.Source,
+			"id":        e.ID,
+			"type":      e.Type,
+			"sequence":  e.Sequence,
+			"source":    e.Source,
 			"timestamp": e.Timestamp,
 		})
 	}
@@ -291,9 +327,9 @@ func handleReplayWorkflow(ctx context.Context, deps Dependencies, tenantID, inst
 		return toolError(err)
 	}
 	out := map[string]any{
-		"replayed":   true,
-		"context":    contextSnap,
-		"stateKey":   stateKey,
+		"replayed": true,
+		"context":  contextSnap,
+		"stateKey": stateKey,
 	}
 	return mcp.NewToolResultJSON(out)
 }
@@ -303,15 +339,28 @@ func handleCompiledContext(ctx context.Context, deps Dependencies, args map[stri
 		return toolUnavailable("context compiler not configured")
 	}
 	compiled, err := deps.ContextCompiler.Compile(ctx, appservices.CompileArgs{
-		TenantID:       str(args, "tenant"),
-		ConversationID: str(args, "conversation"),
+		TenantID:           str(args, "tenant"),
+		ConversationID:     str(args, "conversation"),
 		WorkflowInstanceID: str(args, "instance"),
-		OwnerType:      str(args, "ownerType"),
-		OwnerID:        str(args, "ownerId"),
-		Query:          str(args, "query"),
+		OwnerType:          str(args, "ownerType"),
+		OwnerID:            str(args, "ownerId"),
+		Query:              str(args, "query"),
 	})
 	if err != nil {
+		recordRuntimeTraceError(ctx, deps, str(args, "tenant"), str(args, "instance"), entities.RuntimeTraceStageContextResolution, err)
 		return toolError(err)
+	}
+	if instanceID := str(args, "instance"); instanceID != "" {
+		recordRuntimeTrace(ctx, deps, str(args, "tenant"), instanceID, appservices.TraceRecordInput{
+			Stage:         entities.RuntimeTraceStageContextResolution,
+			Status:        entities.RuntimeTraceStatusSucceeded,
+			CorrelationID: traceStringPtr(str(args, "conversation")),
+			Attributes: map[string]any{
+				"available_count": len(compiled.Available),
+				"missing_count":   len(compiled.Missing),
+				"redacted":        compiled.Redacted,
+			},
+		})
 	}
 	return mcp.NewToolResultJSON(map[string]any{
 		"available": compiled.Available,
@@ -321,6 +370,48 @@ func handleCompiledContext(ctx context.Context, deps Dependencies, args map[stri
 		"retrieval": compiled.Retrieval,
 		"redacted":  compiled.Redacted,
 	})
+}
+
+func recordRuntimeTrace(ctx context.Context, deps Dependencies, tenantID, instanceID string, input appservices.TraceRecordInput) {
+	if deps.TraceRecorder == nil || tenantID == "" || instanceID == "" {
+		return
+	}
+	_, _ = deps.TraceRecorder.Record(ctx, tenantID, instanceID, input)
+}
+
+func recordRuntimeTraceError(ctx context.Context, deps Dependencies, tenantID, instanceID string, stage entities.RuntimeTraceStage, err error) {
+	if err == nil {
+		return
+	}
+	errorCode := "RUNTIME_STAGE_FAILED"
+	reasonCode := "STAGE_FAILED"
+	summary := err.Error()
+	var guardErr *engine.ErrGuardFailed
+	if errors.As(err, &guardErr) {
+		errorCode = "GUARD_FAILED"
+		reasonCode = "GUARD_FAILED"
+	}
+	recordRuntimeTrace(ctx, deps, tenantID, instanceID, appservices.TraceRecordInput{
+		Stage:      stage,
+		Status:     entities.RuntimeTraceStatusFailed,
+		ErrorCode:  &errorCode,
+		ReasonCode: &reasonCode,
+		Summary:    &summary,
+	})
+}
+
+func stateInstanceID(state *entities.StateInstance) string {
+	if state == nil {
+		return ""
+	}
+	return state.ID
+}
+
+func traceStringPtr(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 // ---- shared helpers ----

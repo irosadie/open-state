@@ -54,10 +54,13 @@ func RegisterWorkflowRoutes(e *echo.Echo, ctrl *controllers.WorkflowController, 
 
 	g.GET("", ctrl.List, middleware.RequirePermission(authz, "workflow:read", audit))
 	g.POST("", ctrl.Create, middleware.RequirePermission(authz, "workflow:create", audit))
+	g.POST("/simulate", ctrl.Simulate, middleware.RequirePermission(authz, "workflow:simulate", audit))
 	g.GET("/:id", ctrl.Get, middleware.RequirePermission(authz, "workflow:read", audit))
 	g.PATCH("/:id", ctrl.Update, middleware.RequirePermission(authz, "workflow:update", audit))
 	g.POST("/:id/publish", ctrl.Publish, middleware.RequirePermission(authz, "workflow:publish", audit))
 	g.GET("/:id/versions", ctrl.ListVersions, middleware.RequirePermission(authz, "workflow:read", audit))
+	g.GET("/:id/versions/compare", ctrl.CompareVersions, middleware.RequirePermission(authz, "workflow:read", audit))
+	g.GET("/:id/versions/:versionNo", ctrl.GetVersion, middleware.RequirePermission(authz, "workflow:read", audit))
 }
 
 // RegisterAuditRoutes registers the tenant-scoped audit trail query API
@@ -65,6 +68,37 @@ func RegisterWorkflowRoutes(e *echo.Echo, ctrl *controllers.WorkflowController, 
 func RegisterAuditRoutes(e *echo.Echo, ctrl *controllers.AuditController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {
 	g := e.Group("/api/audit", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
 	g.GET("", ctrl.List, middleware.RequirePermission(authz, "audit:read", audit))
+}
+
+// RegisterRuntimeInspectorRoutes registers the read-only, tenant-scoped Runtime
+// Inspector and separately protected Debug View routes.
+func RegisterRuntimeInspectorRoutes(e *echo.Echo, ctrl *controllers.RuntimeInspectorController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {
+	g := e.Group("/api/runtime/instances", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+	g.GET("", ctrl.List, middleware.RequirePermission(authz, "instance:read", audit))
+	g.GET("/:id", ctrl.Detail, middleware.RequirePermission(authz, "instance:read", audit))
+	g.GET("/:id/debug-trace", ctrl.DebugTrace, middleware.RequirePermission(authz, "debug:read", audit))
+}
+
+// RegisterAdminRoutes registers the permission-aware Admin Console backend.
+// Every route derives tenant scope from X-Tenant-ID and uses the exact existing
+// RBAC permission for the operation.
+func RegisterAdminRoutes(e *echo.Echo, identity *controllers.AdminIdentityController, runtime *controllers.AdminRuntimeController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {
+	auth := []echo.MiddlewareFunc{middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc)}
+
+	identityRoutes := e.Group("/api/admin", auth...)
+	identityRoutes.GET("/tenant", identity.GetTenant, middleware.RequirePermission(authz, "tenant:read", audit))
+	identityRoutes.PATCH("/tenant", identity.UpdateTenant, middleware.RequirePermission(authz, "tenant:update", audit))
+	identityRoutes.GET("/members", identity.ListMembers, middleware.RequirePermission(authz, "user:read", audit))
+	identityRoutes.PUT("/members/:userId/role", identity.UpdateMemberRole, middleware.RequirePermission(authz, "user:update", audit))
+	identityRoutes.DELETE("/members/:userId", identity.RemoveMember, middleware.RequirePermission(authz, "user:delete", audit))
+
+	runtimeRoutes := e.Group("/api/admin", auth...)
+	runtimeRoutes.GET("/instances", runtime.ListInstances, middleware.RequirePermission(authz, "instance:read", audit))
+	runtimeRoutes.POST("/instances/:id/suspend", runtime.Suspend, middleware.RequirePermission(authz, "instance:suspend", audit))
+	runtimeRoutes.POST("/instances/:id/resume", runtime.Resume, middleware.RequirePermission(authz, "instance:resume", audit))
+	runtimeRoutes.POST("/instances/:id/retry", runtime.Retry, middleware.RequirePermission(authz, "instance:retry", audit))
+	runtimeRoutes.GET("/events", runtime.ListEvents, middleware.RequirePermission(authz, "instance:read", audit))
+	runtimeRoutes.GET("/events/:eventId", runtime.GetEvent, middleware.RequirePermission(authz, "instance:read", audit))
 }
 
 // RegisterSSORoutes registers the external OIDC SSO login endpoints (PRD §79).

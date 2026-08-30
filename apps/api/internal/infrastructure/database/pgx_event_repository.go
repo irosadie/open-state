@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 	"github.com/irosadie/open-state/api/internal/domain/repositories"
 	"github.com/irosadie/open-state/api/internal/infrastructure/db"
+	sharedomain "github.com/irosadie/open-state/go-shared/domain"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/sqlc-dev/pqtype"
@@ -17,8 +19,8 @@ type PgxEventRepository struct {
 	queries *db.Queries
 }
 
-// NewPgxEventRepository returns a PostgreSQL-backed IEventRepository.
-func NewPgxEventRepository(pool *pgxpool.Pool) repositories.IEventRepository {
+// NewPgxEventRepository returns a PostgreSQL-backed event repository.
+func NewPgxEventRepository(pool *pgxpool.Pool) *PgxEventRepository {
 	sqlDB := stdlib.OpenDBFromPool(pool)
 	return newPgxEventRepository(db.New(sqlDB))
 }
@@ -26,7 +28,7 @@ func NewPgxEventRepository(pool *pgxpool.Pool) repositories.IEventRepository {
 // newPgxEventRepository builds an IEventRepository from a sqlc queries handle.
 // It enables the composed PostgresAdapter to bind this repository to a shared
 // transaction via WithTx.
-func newPgxEventRepository(q *db.Queries) repositories.IEventRepository {
+func newPgxEventRepository(q *db.Queries) *PgxEventRepository {
 	return &PgxEventRepository{queries: q}
 }
 
@@ -51,9 +53,17 @@ func (r *PgxEventRepository) Append(ctx context.Context, tenantID string, input 
 }
 
 func (r *PgxEventRepository) FindEventByID(ctx context.Context, tenantID, id string) (*entities.Event, error) {
+	eventUUID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, sharedomain.NewValidation("invalid event id")
+	}
+	tenantUUID, err := uuid.Parse(tenantID)
+	if err != nil {
+		return nil, sharedomain.NewValidation("invalid tenant id")
+	}
 	row, err := r.queries.FindEventByID(ctx, db.FindEventByIDParams{
-		ID:       mustUUID(id),
-		TenantID: mustUUID(tenantID),
+		ID:       eventUUID,
+		TenantID: tenantUUID,
 	})
 	if err != nil {
 		return nil, mapNotFound(err, "event")
@@ -86,6 +96,52 @@ func (r *PgxEventRepository) ListEventsByTenant(ctx context.Context, tenantID st
 		out = append(out, *mapEvent(row))
 	}
 	return out, nil
+}
+
+func (r *PgxEventRepository) ListEventsFiltered(ctx context.Context, tenantID string, filter repositories.EventFilter) ([]entities.Event, error) {
+	tenantUUID, err := uuid.Parse(tenantID)
+	if err != nil {
+		return nil, sharedomain.NewValidation("invalid tenant id")
+	}
+	workflowInstanceID, err := optionalUUID(filter.WorkflowInstanceID)
+	if err != nil {
+		return nil, sharedomain.NewValidation("invalid workflow instance id")
+	}
+	rows, err := r.queries.ListEventsFiltered(ctx, db.ListEventsFilteredParams{
+		TenantID:           tenantUUID,
+		WorkflowInstanceID: workflowInstanceID,
+		Type:               nullString(filter.Type),
+		Source:             nullString(filter.Source),
+		CorrelationID:      nullString(filter.CorrelationID),
+		PageSize:           int32(filter.Limit),
+		PageOffset:         int32(filter.Offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]entities.Event, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, *mapEvent(row))
+	}
+	return out, nil
+}
+
+func (r *PgxEventRepository) CountEventsFiltered(ctx context.Context, tenantID string, filter repositories.EventFilter) (int64, error) {
+	tenantUUID, err := uuid.Parse(tenantID)
+	if err != nil {
+		return 0, sharedomain.NewValidation("invalid tenant id")
+	}
+	workflowInstanceID, err := optionalUUID(filter.WorkflowInstanceID)
+	if err != nil {
+		return 0, sharedomain.NewValidation("invalid workflow instance id")
+	}
+	return r.queries.CountEventsFiltered(ctx, db.CountEventsFilteredParams{
+		TenantID:           tenantUUID,
+		WorkflowInstanceID: workflowInstanceID,
+		Type:               nullString(filter.Type),
+		Source:             nullString(filter.Source),
+		CorrelationID:      nullString(filter.CorrelationID),
+	})
 }
 
 func (r *PgxEventRepository) InsertInbox(ctx context.Context, tenantID string, input repositories.InsertInboxEventInput) (*entities.InboxEvent, error) {
@@ -256,6 +312,17 @@ func mapIdempotencyRecord(row db.IdempotencyRecord) *entities.IdempotencyRecord 
 		CreatedAt:      row.CreatedAt,
 		UpdatedAt:      row.UpdatedAt,
 	}
+}
+
+func optionalUUID(value *string) (uuid.NullUUID, error) {
+	if value == nil || *value == "" {
+		return uuid.NullUUID{}, nil
+	}
+	id, err := uuid.Parse(*value)
+	if err != nil {
+		return uuid.NullUUID{}, err
+	}
+	return uuid.NullUUID{UUID: id, Valid: true}, nil
 }
 
 // ---- helpers ----

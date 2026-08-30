@@ -1,0 +1,144 @@
+{
+  "/api/admin/tenant": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "Get the current tenant profile",
+      "description": "Returns only the tenant selected by the authenticated request context. Requires tenant:read.",
+      "parameters": [{ "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "responses": {
+        "200": { "description": "Tenant profile", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TenantResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    },
+    "patch": {
+      "tags": ["Admin Console"],
+      "summary": "Update the current tenant profile",
+      "description": "Updates the authenticated tenant profile and records an audit entry. Requires tenant:update.",
+      "parameters": [{ "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateTenantRequest" } } } },
+      "responses": {
+        "200": { "description": "Updated tenant profile", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TenantResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "409": { "$ref": "#/components/schemas/ConflictError" }
+      }
+    }
+  },
+  "/api/admin/members": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "List current-tenant memberships",
+      "description": "Returns a paginated, searchable membership list constrained to the authenticated tenant. Requires user:read.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "search", "in": "query", "schema": { "type": "string" } },
+        { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+        { "name": "pageSize", "in": "query", "schema": { "type": "integer", "default": 20, "maximum": 100 } }
+      ],
+      "responses": {
+        "200": { "description": "Membership page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TenantMembershipPageResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" }
+      }
+    }
+  },
+  "/api/admin/members/{userId}/role": {
+    "put": {
+      "tags": ["Admin Console"],
+      "summary": "Change a tenant membership role",
+      "description": "Validates the tenant role and rejects changes that would remove the last Owner. Requires user:update.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateMembershipRoleRequest" } } } },
+      "responses": {
+        "200": { "description": "Updated membership", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TenantMembershipResponse" } } } },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" },
+        "409": { "$ref": "#/components/schemas/ConflictError" }
+      }
+    }
+  },
+  "/api/admin/members/{userId}": {
+    "delete": {
+      "tags": ["Admin Console"],
+      "summary": "Remove a tenant membership",
+      "description": "Removes only the membership in the authenticated tenant and preserves at least one Owner. Requires user:delete.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": {
+        "200": { "description": "Membership removed" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" },
+        "409": { "$ref": "#/components/schemas/ConflictError" }
+      }
+    }
+  },
+  "/api/admin/instances": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "List current-tenant runtime instances",
+      "description": "Returns runtime instances for the authenticated tenant. Requires instance:read.",
+      "parameters": [{ "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "responses": { "200": { "description": "Instance list", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminInstanceListResponse" } } } }, "403": { "$ref": "#/components/schemas/ForbiddenError" } }
+    }
+  },
+  "/api/admin/instances/{id}/suspend": {
+    "post": {
+      "tags": ["Admin Console"],
+      "summary": "Suspend a runtime instance",
+      "description": "Validates the current lifecycle state and optimistic version before suspending. Requires instance:suspend.",
+      "parameters": [{ "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "responses": { "200": { "description": "Suspended instance", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminInstanceResponse" } } } }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" }, "409": { "$ref": "#/components/schemas/ConflictError" } }
+    }
+  },
+  "/api/admin/instances/{id}/resume": {
+    "post": {
+      "tags": ["Admin Console"],
+      "summary": "Resume a runtime instance",
+      "description": "Validates that the instance is suspended before resuming. Requires instance:resume.",
+      "parameters": [{ "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "responses": { "200": { "description": "Resumed instance", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminInstanceResponse" } } } }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" }, "409": { "$ref": "#/components/schemas/ConflictError" } }
+    }
+  },
+  "/api/admin/instances/{id}/retry": {
+    "post": {
+      "tags": ["Admin Console"],
+      "summary": "Retry a failed runtime instance",
+      "description": "Retries the current failed state using optimistic concurrency and leaves event history immutable. Requires instance:retry.",
+      "parameters": [{ "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "responses": { "200": { "description": "Retried instance", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminInstanceResponse" } } } }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" }, "409": { "$ref": "#/components/schemas/ConflictError" } }
+    }
+  },
+  "/api/admin/events": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "Browse current-tenant events",
+      "description": "Returns immutable, paginated event history with safe tenant-scoped filters. No event mutation or replay operation is exposed. Requires instance:read.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "workflowInstanceId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+        { "name": "type", "in": "query", "schema": { "type": "string" } },
+        { "name": "source", "in": "query", "schema": { "type": "string" } },
+        { "name": "correlationId", "in": "query", "schema": { "type": "string" } },
+        { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+        { "name": "pageSize", "in": "query", "schema": { "type": "integer", "default": 20, "maximum": 100 } }
+      ],
+      "responses": { "200": { "description": "Event page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminEventPageResponse" } } } }, "403": { "$ref": "#/components/schemas/ForbiddenError" } }
+    }
+  },
+  "/api/admin/events/{eventId}": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "Get a current-tenant event",
+      "description": "Returns a single immutable event scoped to the authenticated tenant. Requires instance:read.",
+      "parameters": [{ "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "eventId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "responses": { "200": { "description": "Event detail", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminEventResponse" } } } }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  }
+}

@@ -87,6 +87,7 @@ open-state/
 │   ├── skill-utils.mjs
 │   ├── sync-skill-registry.mjs
 │   ├── sync-claude-skills.mjs
+│   ├── sync-opencode-skills.mjs
 │   └── validate-skills.mjs
 └── skills/
     ├── manifest.json
@@ -103,8 +104,9 @@ open-state/
 - OpenAI/Codex entrypoint is root `AGENTS.md` (bridges to `.agents/AGENTS.md`).
 - Claude entrypoint is root `CLAUDE.md`.
 - Codex/OpenAI metadata lives in `agents/openai.yaml` with `interface` / `policy` / `dependencies` schema when needed.
-- Claude skill wrappers live in `.claude/skills/*` and must be synced from source of truth.
+- Claude skill wrappers live in `.claude/skills/*` and OpenCode skill wrappers live in `.opencode/skill/*`; both must be synced from the source of truth.
 - Registry table and skill reference lists are generated from `manifest.json` via `bun run skills:sync-registry`.
+- The OpenCode skill list in `opencode.md` is also generated from `manifest.json`.
 - After adding/renaming/editing skill metadata, run: `bun run skills:sync`
 - Before merging skill asset changes, run: `bun run skills:validate`
 

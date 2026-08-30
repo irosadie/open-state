@@ -21,6 +21,26 @@ FROM events
 WHERE tenant_id = $1
 ORDER BY sequence;
 
+-- name: ListEventsFiltered :many
+SELECT id, tenant_id, event_id, type, source, aggregate_id, workflow_instance_id, sequence, timestamp, payload, correlation_id, causation_id, idempotency_key, created_at
+FROM events
+WHERE tenant_id = @tenant_id
+  AND (sqlc.narg('workflow_instance_id')::uuid IS NULL OR workflow_instance_id = sqlc.narg('workflow_instance_id'))
+  AND (sqlc.narg('type')::text IS NULL OR type = sqlc.narg('type'))
+  AND (sqlc.narg('source')::text IS NULL OR source = sqlc.narg('source'))
+  AND (sqlc.narg('correlation_id')::text IS NULL OR correlation_id = sqlc.narg('correlation_id'))
+ORDER BY sequence DESC
+LIMIT @page_size OFFSET @page_offset;
+
+-- name: CountEventsFiltered :one
+SELECT COUNT(*)
+FROM events
+WHERE tenant_id = @tenant_id
+  AND (sqlc.narg('workflow_instance_id')::uuid IS NULL OR workflow_instance_id = sqlc.narg('workflow_instance_id'))
+  AND (sqlc.narg('type')::text IS NULL OR type = sqlc.narg('type'))
+  AND (sqlc.narg('source')::text IS NULL OR source = sqlc.narg('source'))
+  AND (sqlc.narg('correlation_id')::text IS NULL OR correlation_id = sqlc.narg('correlation_id'));
+
 -- name: InsertInboxEvent :one
 INSERT INTO event_inbox (tenant_id, idempotency_key, event_type, source, payload)
 VALUES ($1, $2, $3, $4, $5)

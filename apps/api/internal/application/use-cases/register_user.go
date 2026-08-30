@@ -3,10 +3,10 @@ package usecases
 import (
 	"context"
 
-	domain "github.com/irosadie/open-state/go-shared/domain"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 	"github.com/irosadie/open-state/api/internal/domain/repositories"
 	"github.com/irosadie/open-state/api/internal/domain/services"
+	domain "github.com/irosadie/open-state/go-shared/domain"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -18,11 +18,18 @@ type RegisterUserInput struct {
 
 type RegisterUserUseCase struct {
 	repo  repositories.IAuthRepository
+	roles roleAssigner
 	token services.TokenService
 }
 
-func NewRegisterUserUseCase(repo repositories.IAuthRepository, token services.TokenService) *RegisterUserUseCase {
-	return &RegisterUserUseCase{repo: repo, token: token}
+type roleAssigner interface {
+	Assign(ctx context.Context, userID, tenantID string, role entities.UserRole) (*entities.RoleAssignment, error)
+}
+
+const defaultTenantID = "00000000-0000-0000-0000-000000000001"
+
+func NewRegisterUserUseCase(repo repositories.IAuthRepository, roles roleAssigner, token services.TokenService) *RegisterUserUseCase {
+	return &RegisterUserUseCase{repo: repo, roles: roles, token: token}
 }
 
 func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserInput) (*entities.User, error) {
@@ -47,6 +54,9 @@ func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserIn
 	user, err := uc.repo.CreateUser(ctx, input.Email, string(hash), input.Name, entities.UserRoleLegacy, entities.UserStatusActive)
 	if err != nil {
 		return nil, domain.NewInternal("failed to create user")
+	}
+	if _, err := uc.roles.Assign(ctx, user.ID, defaultTenantID, entities.UserRoleViewer); err != nil {
+		return nil, domain.NewInternal("failed to assign default role")
 	}
 
 	return user, nil

@@ -28,9 +28,12 @@ const useCreateWorkflow = () => {
   >({
     mutationKey: [queryKeys.workflows.create],
     mutationFn: createWorkflow,
-    onSuccess: () => {
+    onSuccess: (data) => {
       void queryClient.invalidateQueries({
         queryKey: [queryKeys.workflows.list],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: [queryKeys.workflows.get, data.id],
       })
     },
   })

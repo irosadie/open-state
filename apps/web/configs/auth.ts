@@ -8,7 +8,3 @@ export const authConfig = {
   backendLogoutPath: process.env.AUTH_LOGOUT_PATH ?? "/auth/logout",
   sessionMaxAgeSeconds: 6 * 60 * 60,
 } as const
-
-export function getRoleRedirectPath(_role: string): string {
-  return authConfig.defaultRedirectPath
-}

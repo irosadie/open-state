@@ -46,6 +46,25 @@ type IEventRepository interface {
 	FindIdempotency(ctx context.Context, tenantID, idempotencyKey string) (*entities.IdempotencyRecord, error)
 }
 
+// IEventBrowserRepository is the read-only event surface used by the Admin
+// Console. It is intentionally separate from IEventRepository so existing
+// runtime adapters and test doubles do not gain mutation-shaped methods.
+type IEventBrowserRepository interface {
+	FindEventByID(ctx context.Context, tenantID, id string) (*entities.Event, error)
+	ListEventsFiltered(ctx context.Context, tenantID string, filter EventFilter) ([]entities.Event, error)
+	CountEventsFiltered(ctx context.Context, tenantID string, filter EventFilter) (int64, error)
+}
+
+// EventFilter contains only safe, tenant-scoped event browser filters.
+type EventFilter struct {
+	WorkflowInstanceID *string
+	Type               *string
+	Source             *string
+	CorrelationID      *string
+	Offset             int
+	Limit              int
+}
+
 // AppendEventInput carries the fields needed to append an event.
 type AppendEventInput struct {
 	EventID            string

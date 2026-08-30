@@ -14,18 +14,25 @@ import {
   useReactFlow,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
+import {
+  useCompareWorkflowVersions,
+  useWorkflowsSimulate,
+  useWorkflowsVersions,
+} from "$/hooks/transactions/use-workflow"
 import type React from "react"
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { edgeTypes } from "./edges/edges"
 import { nodeTypes } from "./nodes/nodes"
 import { Palette } from "./palette"
 import { PropertiesPanel } from "./properties-panel"
+import { SimulationPanel, type SimulationRunInput } from "./simulation-panel"
 import { EXAMPLE_WORKFLOWS, useStateBuilderStore } from "./state-builder.store"
 import { Toolbar } from "./toolbar"
 import { getLayoutedNodes } from "./utils/auto-layout"
 import { Toaster, toast } from "./utils/toast"
 import { parseWorkflowExport } from "./utils/workflow-export"
 import { downloadWorkflow } from "./utils/workflow-export"
+import { VersionHistoryPanel } from "./version-history-panel"
 
 const nodeColorByType: Record<string, string> = {
   start: "#25a45f",
@@ -35,7 +42,11 @@ const nodeColorByType: Record<string, string> = {
   end: "#d83838",
 }
 
-function BuilderInner() {
+interface StateBuilderProps {
+  workflowId?: string
+}
+
+function BuilderInner({ workflowId }: StateBuilderProps) {
   const nodes = useStateBuilderStore((s) => s.nodes)
   const edges = useStateBuilderStore((s) => s.edges)
   const setNodes = useStateBuilderStore((s) => s.setNodes)
@@ -53,6 +64,8 @@ function BuilderInner() {
   const future = useStateBuilderStore((s) => s.future)
   const isHydrated = useStateBuilderStore((s) => s.isHydrated)
   const isSaving = useStateBuilderStore((s) => s.isSaving)
+  const saveError = useStateBuilderStore((s) => s.saveError)
+  const saveConflict = useStateBuilderStore((s) => s.saveConflict)
   const lastSavedAt = useStateBuilderStore((s) => s.lastSavedAt)
   const searchQuery = useStateBuilderStore((s) => s.searchQuery)
   const setSearchQuery = useStateBuilderStore((s) => s.setSearchQuery)
@@ -63,16 +76,110 @@ function BuilderInner() {
   const newWorkflow = useStateBuilderStore((s) => s.newWorkflow)
   const resetToWorkflow = useStateBuilderStore((s) => s.resetToWorkflow)
   const persist = useStateBuilderStore((s) => s.persist)
+  const publish = useStateBuilderStore((s) => s.publish)
+  const apiWorkflowId = useStateBuilderStore((s) => s.apiWorkflowId)
   const removeNode = useStateBuilderStore((s) => s.removeNode)
   const removeTransition = useStateBuilderStore((s) => s.removeTransition)
+  const simulationOpen = useStateBuilderStore((s) => s.simulationOpen)
+  const simulationInitialContextText = useStateBuilderStore(
+    (s) => s.simulationInitialContextText,
+  )
+  const simulationEvents = useStateBuilderStore((s) => s.simulationEvents)
+  const simulationResult = useStateBuilderStore((s) => s.simulationResult)
+  const simulationError = useStateBuilderStore((s) => s.simulationError)
+  const simulationIsRunning = useStateBuilderStore((s) => s.simulationIsRunning)
+  const simulationSelectedSequence = useStateBuilderStore(
+    (s) => s.simulationSelectedSequence,
+  )
+  const simulationFocusTarget = useStateBuilderStore(
+    (s) => s.simulationFocusTarget,
+  )
+  const simulationStale = useStateBuilderStore((s) => s.simulationStale)
+  const simulationFingerprint = useStateBuilderStore(
+    (s) => s.simulationFingerprint,
+  )
+  const openSimulation = useStateBuilderStore((s) => s.openSimulation)
+  const closeSimulation = useStateBuilderStore((s) => s.closeSimulation)
+  const setSimulationInitialContextText = useStateBuilderStore(
+    (s) => s.setSimulationInitialContextText,
+  )
+  const addSimulationEvent = useStateBuilderStore((s) => s.addSimulationEvent)
+  const updateSimulationEvent = useStateBuilderStore(
+    (s) => s.updateSimulationEvent,
+  )
+  const removeSimulationEvent = useStateBuilderStore(
+    (s) => s.removeSimulationEvent,
+  )
+  const setSimulationIsRunning = useStateBuilderStore(
+    (s) => s.setSimulationIsRunning,
+  )
+  const setSimulationError = useStateBuilderStore((s) => s.setSimulationError)
+  const setSimulationResult = useStateBuilderStore((s) => s.setSimulationResult)
+  const selectSimulationStep = useStateBuilderStore(
+    (s) => s.selectSimulationStep,
+  )
+  const resetSimulation = useStateBuilderStore((s) => s.resetSimulation)
+  const markSimulationStale = useStateBuilderStore((s) => s.markSimulationStale)
+  const getSimulationSnapshot = useStateBuilderStore(
+    (s) => s.getSimulationSnapshot,
+  )
+  const simulationMutation = useWorkflowsSimulate()
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [showVersions, setShowVersions] = useState(false)
+  const [baseVersion, setBaseVersion] = useState<number | null>(null)
+  const [targetVersion, setTargetVersion] = useState<number | null>(null)
+  const versionsQuery = useWorkflowsVersions({
+    id: apiWorkflowId ?? "",
+    enabled: showVersions && Boolean(apiWorkflowId),
+  })
+  const diffQuery = useCompareWorkflowVersions(
+    apiWorkflowId ?? "",
+    baseVersion,
+    targetVersion,
+  )
 
   const { screenToFlowPosition } = useReactFlow()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load draft dari PGlite saat pertama mount
+  // Hydrate the draft from the Builder API on first mount.
   useEffect(() => {
-    void hydrate()
-  }, [hydrate])
+    void hydrate(workflowId)
+  }, [hydrate, workflowId])
+
+  useEffect(() => {
+    if (
+      workflowId ||
+      !apiWorkflowId ||
+      window.location.pathname !== "/state-builder"
+    ) {
+      return
+    }
+    window.history.replaceState(null, "", `/state-builder/${apiWorkflowId}`)
+  }, [apiWorkflowId, workflowId])
+
+  useEffect(() => {
+    const versions = versionsQuery.data ?? []
+    if (!showVersions || versions.length === 0) return
+    setTargetVersion((current) => current ?? versions[0]?.versionNo ?? null)
+    setBaseVersion((current) => current ?? versions[1]?.versionNo ?? null)
+  }, [showVersions, versionsQuery.data])
+
+  const simulationSnapshotFingerprint = JSON.stringify(getSimulationSnapshot())
+
+  useEffect(() => {
+    if (
+      simulationResult &&
+      simulationFingerprint &&
+      simulationFingerprint !== simulationSnapshotFingerprint
+    ) {
+      markSimulationStale()
+    }
+  }, [
+    markSimulationStale,
+    simulationFingerprint,
+    simulationResult,
+    simulationSnapshotFingerprint,
+  ])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -101,7 +208,12 @@ function BuilderInner() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         if (isTyping) return
         e.preventDefault()
-        void persist().then(() => toast.success("Draft tersimpan"))
+        useStateBuilderStore.getState().setSaving(true)
+        void persist()
+          .then(() => toast.success("Draft tersimpan"))
+          .catch((err) =>
+            toast.error(`Gagal menyimpan draft: ${getErrorMessage(err)}`),
+          )
         return
       }
       // Delete hapus node/edge terpilih
@@ -182,8 +294,74 @@ function BuilderInner() {
   }, [revalidate])
 
   const handleSave = useCallback(() => {
-    void persist().then(() => toast.success("Draft tersimpan"))
+    useStateBuilderStore.getState().setSaving(true)
+    void persist()
+      .then(() => toast.success("Draft tersimpan"))
+      .catch((err) =>
+        toast.error(`Gagal menyimpan draft: ${getErrorMessage(err)}`),
+      )
   }, [persist])
+
+  const handlePublish = useCallback(async () => {
+    if (!validation?.valid) {
+      revalidate()
+      toast.error("Workflow belum valid. Perbaiki error sebelum publish.")
+      return
+    }
+    setIsPublishing(true)
+    try {
+      const published = await publish()
+      toast.success(`Workflow berhasil dipublish v${published.versionNo}`)
+      setShowVersions(true)
+    } catch (err) {
+      const message = getErrorMessage(err)
+      toast.error(`Publish gagal: ${message}`)
+    } finally {
+      setIsPublishing(false)
+    }
+  }, [publish, revalidate, validation?.valid])
+
+  const handleSimulationRun = useCallback(
+    (input: SimulationRunInput) => {
+      const snapshot = getSimulationSnapshot()
+      const fingerprint = JSON.stringify(snapshot)
+      setSimulationError(null)
+      setSimulationIsRunning(true)
+      simulationMutation.mutate(
+        {
+          definition: snapshot as unknown as Record<string, unknown>,
+          initialContext: input.initialContext,
+          events: input.events,
+        },
+        {
+          onSuccess: (result) => setSimulationResult(result, fingerprint),
+          onError: (error) => {
+            const message =
+              error instanceof Error
+                ? error.message
+                : typeof error === "object" &&
+                    error !== null &&
+                    "message" in error
+                  ? String((error as { message: unknown }).message)
+                  : "Simulation gagal dijalankan"
+            setSimulationError(message)
+          },
+        },
+      )
+    },
+    [
+      getSimulationSnapshot,
+      setSimulationError,
+      setSimulationIsRunning,
+      setSimulationResult,
+      simulationMutation,
+    ],
+  )
+
+  const handleOpenSimulation = useCallback(() => {
+    setShowVersions(false)
+    openSimulation()
+  }, [openSimulation])
 
   const handleExport = useCallback(() => {
     downloadWorkflow(useStateBuilderStore.getState().workflow)
@@ -254,6 +432,29 @@ function BuilderInner() {
     })
   }, [nodes, searchQuery])
 
+  const focusedNodeIds = useMemo(
+    () => new Set(simulationFocusTarget?.nodeIds ?? []),
+    [simulationFocusTarget],
+  )
+  const simulationNodes = useMemo(
+    () =>
+      visibleNodes.map((node) => ({
+        ...node,
+        selected: Boolean(node.selected || focusedNodeIds.has(node.id)),
+      })),
+    [focusedNodeIds, visibleNodes],
+  )
+  const simulationEdges = useMemo(
+    () =>
+      edges.map((edge) => ({
+        ...edge,
+        selected: Boolean(
+          edge.selected || edge.id === simulationFocusTarget?.transitionId,
+        ),
+      })),
+    [edges, simulationFocusTarget?.transitionId],
+  )
+
   const stats = useMemo(
     () => ({
       states: workflow.nodes.filter((n) => n.kind === "STATE").length,
@@ -266,13 +467,16 @@ function BuilderInner() {
   )
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" data-testid="builder-root">
       <Toaster />
       <Toolbar
         validation={validation}
         onValidate={handleValidate}
         onAutoLayout={handleAutoLayout}
         onSave={handleSave}
+        onPublish={() => void handlePublish()}
+        onSimulate={handleOpenSimulation}
+        onVersions={() => setShowVersions(true)}
         onExport={handleExport}
         onNewStart={() => addNode("START")}
         onImport={() => fileInputRef.current?.click()}
@@ -287,6 +491,10 @@ function BuilderInner() {
         canUndo={history.length > 0}
         canRedo={future.length > 0}
         isSaving={isSaving}
+        saveError={saveError}
+        saveConflict={saveConflict}
+        isPublishing={isPublishing}
+        hasWorkflowId={Boolean(apiWorkflowId)}
         lastSavedAt={lastSavedAt}
         stats={stats}
         hasNode={hasNode}
@@ -315,8 +523,8 @@ function BuilderInner() {
           ) : null}
 
           <ReactFlow
-            nodes={visibleNodes}
-            edges={edges}
+            nodes={simulationNodes}
+            edges={simulationEdges}
             onNodesChange={onNodesChange}
             onConnect={onConnect}
             onDrop={onDrop}
@@ -362,7 +570,10 @@ function BuilderInner() {
 
           {/* Validation issues overlay */}
           {validation && validation.issues.length > 0 ? (
-            <div className="sb-scroll absolute bottom-3 left-3 z-10 max-h-40 w-80 overflow-y-auto rounded-lg border border-danger-200 bg-white p-2 shadow-lg">
+            <div
+              className="sb-scroll absolute bottom-3 left-3 z-10 max-h-40 w-80 overflow-y-auto rounded-lg border border-danger-200 bg-white p-2 shadow-lg"
+              data-testid="builder-validation"
+            >
               <p className="mb-1 text-xs font-semibold text-slate-600">
                 Validation ({validation.issues.length})
               </p>
@@ -380,6 +591,43 @@ function BuilderInner() {
               ))}
             </div>
           ) : null}
+
+          {showVersions ? (
+            <VersionHistoryPanel
+              versions={versionsQuery.data ?? []}
+              isLoading={versionsQuery.isLoading}
+              error={
+                versionsQuery.error ? "Gagal memuat version history" : null
+              }
+              baseVersion={baseVersion}
+              targetVersion={targetVersion}
+              onBaseVersionChange={setBaseVersion}
+              onTargetVersionChange={setTargetVersion}
+              diff={diffQuery.data}
+              isDiffLoading={diffQuery.isLoading}
+              onClose={() => setShowVersions(false)}
+            />
+          ) : null}
+
+          {simulationOpen ? (
+            <SimulationPanel
+              initialContextText={simulationInitialContextText}
+              events={simulationEvents}
+              result={simulationResult}
+              error={simulationError}
+              isRunning={simulationIsRunning}
+              stale={simulationStale}
+              selectedSequence={simulationSelectedSequence}
+              onInitialContextChange={setSimulationInitialContextText}
+              onAddEvent={addSimulationEvent}
+              onUpdateEvent={updateSimulationEvent}
+              onRemoveEvent={removeSimulationEvent}
+              onRun={handleSimulationRun}
+              onReset={resetSimulation}
+              onSelectStep={selectSimulationStep}
+              onClose={closeSimulation}
+            />
+          ) : null}
         </main>
 
         {/* Properties Panel */}
@@ -394,10 +642,41 @@ function BuilderInner() {
   )
 }
 
-export function StateBuilder() {
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "object" && error !== null) {
+    const value = error as {
+      message?: unknown
+      error?: unknown
+      details?: unknown
+    }
+    if (typeof value.message === "string") return value.message
+    if (typeof value.error === "string") {
+      if (Array.isArray(value.details)) {
+        const detailMessages = value.details
+          .map((detail) =>
+            typeof detail === "object" &&
+            detail !== null &&
+            "message" in detail &&
+            typeof (detail as { message?: unknown }).message === "string"
+              ? (detail as { message: string }).message
+              : null,
+          )
+          .filter((message): message is string => Boolean(message))
+        if (detailMessages.length > 0) {
+          return `${value.error}: ${detailMessages.join("; ")}`
+        }
+      }
+      return value.error
+    }
+  }
+  return "Permintaan gagal"
+}
+
+export function StateBuilder({ workflowId }: StateBuilderProps = {}) {
   return (
     <ReactFlowProvider>
-      <BuilderInner />
+      <BuilderInner workflowId={workflowId} />
     </ReactFlowProvider>
   )
 }

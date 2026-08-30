@@ -7,6 +7,7 @@ import { ContentTitle } from "$/components/content-title"
 import { PanelCard } from "$/components/panel-card"
 import { Select } from "$/components/select"
 import { useAuditList } from "$/hooks/transactions/use-audit"
+import { useAuthorization } from "$/providers/authorization-provider"
 import { auditActionLabels, auditActions } from "@openstate/schemas"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { AuditTable } from "./_components/audit-table"
@@ -19,6 +20,7 @@ const actionFilterOptions = auditActions.map((value) => ({
 }))
 
 export default function AuditPageContent() {
+  const authorization = useAuthorization()
   const [action, setAction] = useState<string | undefined>(undefined)
   const [resourceType, setResourceType] = useState<string | undefined>(
     undefined,
@@ -32,6 +34,9 @@ export default function AuditPageContent() {
     actor,
     page,
     pageSize,
+    enabled:
+      authorization.status === "ready" &&
+      authorization.hasPermission("audit:read"),
   })
 
   const entries = data?.data || []

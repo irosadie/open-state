@@ -15,6 +15,10 @@
     {
       "name": "System",
       "description": "Baseline system endpoints for starter health and app info."
+    },
+    {
+      "name": "Admin Console",
+      "description": "Tenant-scoped administration, runtime operations, and read-only event browsing."
     }
   ],
   "paths": {},

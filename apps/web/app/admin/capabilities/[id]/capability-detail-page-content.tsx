@@ -3,10 +3,12 @@
 import Link from "next/link"
 import { useState } from "react"
 
+import { PermissionGate } from "$/components/auth-guard/permission-gate"
 import { Button } from "$/components/button"
 import { ContentTitle } from "$/components/content-title"
 import { LoadingSpinner } from "$/components/loading-spinner"
 import { PanelCard } from "$/components/panel-card"
+import { useAuthorization } from "$/providers/authorization-provider"
 import { ArrowLeftIcon } from "lucide-react"
 
 import {
@@ -27,6 +29,7 @@ type CapabilityDetailPageContentProps = {
 export default function CapabilityDetailPageContent({
   id,
 }: CapabilityDetailPageContentProps) {
+  const authorization = useAuthorization()
   const [isEditing, setIsEditing] = useState(false)
   const [notice, setNotice] = useState<{
     type: "success" | "error"
@@ -38,7 +41,12 @@ export default function CapabilityDetailPageContent({
     isLoading,
     isError,
     refetch,
-  } = useCapabilitiesGet({ id })
+  } = useCapabilitiesGet({
+    id,
+    enabled:
+      authorization.status === "ready" &&
+      authorization.hasPermission("capability:read"),
+  })
   const { mutateAsync: updateMutateAsync, isPending: isUpdatePending } =
     useCapabilitiesUpdate()
 
@@ -109,9 +117,11 @@ export default function CapabilityDetailPageContent({
           title="Capability"
           action={
             !isEditing ? (
-              <Button intent="secondary" onClick={() => setIsEditing(true)}>
-                Edit
-              </Button>
+              <PermissionGate action="capability:update">
+                <Button intent="secondary" onClick={() => setIsEditing(true)}>
+                  Edit
+                </Button>
+              </PermissionGate>
             ) : undefined
           }
         >
@@ -127,7 +137,10 @@ export default function CapabilityDetailPageContent({
           )}
         </PanelCard>
 
-        <BindingsPanel capabilityId={capability.id} />
+        <BindingsPanel
+          capabilityId={capability.id}
+          enabled={authorization.hasPermission("binding:read")}
+        />
       </div>
 
       <TestInvocationPanel

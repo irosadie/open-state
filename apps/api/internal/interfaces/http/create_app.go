@@ -28,6 +28,9 @@ func CreateApp(
 	registerLimiter domainsvc.RateLimiter,
 	logger *slog.Logger,
 	metricsRec middleware.MetricsRecorder,
+	adminIdentityCtrl *controllers.AdminIdentityController,
+	adminRuntimeCtrl *controllers.AdminRuntimeController,
+	runtimeCtrls ...*controllers.RuntimeInspectorController,
 ) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
@@ -46,6 +49,12 @@ func CreateApp(
 	routes.RegisterCapabilityRoutes(e, capabilityCtrl, repo, tokenSvc, authz, audit)
 	routes.RegisterWorkflowRoutes(e, workflowCtrl, repo, tokenSvc, authz, audit)
 	routes.RegisterAuditRoutes(e, auditCtrl, repo, tokenSvc, authz, audit)
+	if adminIdentityCtrl != nil && adminRuntimeCtrl != nil {
+		routes.RegisterAdminRoutes(e, adminIdentityCtrl, adminRuntimeCtrl, repo, tokenSvc, authz, audit)
+	}
+	if len(runtimeCtrls) > 0 && runtimeCtrls[0] != nil {
+		routes.RegisterRuntimeInspectorRoutes(e, runtimeCtrls[0], repo, tokenSvc, authz, audit)
+	}
 
 	return e
 }

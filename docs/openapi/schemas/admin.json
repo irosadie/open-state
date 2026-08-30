@@ -1,0 +1,138 @@
+{
+  "Tenant": {
+    "type": "object",
+    "required": ["id", "name", "slug", "description", "createdAt", "updatedAt"],
+    "properties": {
+      "id": { "type": "string", "format": "uuid" },
+      "name": { "type": "string" },
+      "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+      "description": { "type": "string" },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "TenantResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/Tenant" } }
+  },
+  "UpdateTenantRequest": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string" },
+      "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+      "description": { "type": "string" }
+    }
+  },
+  "TenantMembership": {
+    "type": "object",
+    "required": ["roleAssignmentId", "userId", "tenantId", "role", "email", "name", "status", "createdAt", "updatedAt"],
+    "properties": {
+      "roleAssignmentId": { "type": "string", "format": "uuid" },
+      "userId": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string", "format": "uuid" },
+      "role": { "type": "string", "enum": ["OWNER", "ADMIN", "EDITOR", "OPERATOR", "VIEWER"] },
+      "email": { "type": "string", "format": "email" },
+      "name": { "type": "string" },
+      "status": { "type": "string" },
+      "photo": { "type": "string", "nullable": true },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "TenantMembershipPage": {
+    "type": "object",
+    "required": ["data", "page", "pageSize", "total", "hasNext"],
+    "properties": {
+      "data": { "type": "array", "items": { "$ref": "#/components/schemas/TenantMembership" } },
+      "page": { "type": "integer" },
+      "pageSize": { "type": "integer", "maximum": 100 },
+      "total": { "type": "integer", "format": "int64" },
+      "hasNext": { "type": "boolean" }
+    }
+  },
+  "TenantMembershipPageResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/TenantMembershipPage" } }
+  },
+  "TenantMembershipResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/TenantMembership" } }
+  },
+  "UpdateMembershipRoleRequest": {
+    "type": "object",
+    "required": ["role"],
+    "properties": { "role": { "type": "string", "enum": ["OWNER", "ADMIN", "EDITOR", "OPERATOR", "VIEWER"] } }
+  },
+  "AdminInstance": {
+    "type": "object",
+    "required": ["id", "tenantId", "workflowId", "workflowVersionId", "status", "version", "createdAt", "updatedAt"],
+    "properties": {
+      "id": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string", "format": "uuid" },
+      "workflowId": { "type": "string", "format": "uuid" },
+      "workflowVersionId": { "type": "string", "format": "uuid" },
+      "correlationKey": { "type": "string", "nullable": true },
+      "status": { "type": "string" },
+      "version": { "type": "integer" },
+      "currentStateInstanceId": { "type": "string", "nullable": true },
+      "startedAt": { "type": "string", "format": "date-time", "nullable": true },
+      "completedAt": { "type": "string", "format": "date-time", "nullable": true },
+      "expiresAt": { "type": "string", "format": "date-time", "nullable": true },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "AdminInstanceResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/AdminInstance" } }
+  },
+  "AdminInstanceListResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/AdminInstance" } } }
+  },
+  "AdminEvent": {
+    "type": "object",
+    "required": ["id", "tenantId", "eventId", "type", "source", "sequence", "timestamp", "payload", "createdAt"],
+    "properties": {
+      "id": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string", "format": "uuid" },
+      "eventId": { "type": "string" },
+      "type": { "type": "string" },
+      "source": { "type": "string" },
+      "aggregateId": { "type": "string", "nullable": true },
+      "workflowInstanceId": { "type": "string", "nullable": true },
+      "sequence": { "type": "integer", "format": "int64" },
+      "timestamp": { "type": "string", "format": "date-time" },
+      "payload": { "type": "object", "additionalProperties": true },
+      "correlationId": { "type": "string", "nullable": true },
+      "causationId": { "type": "string", "nullable": true },
+      "createdAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "AdminEventPage": {
+    "type": "object",
+    "required": ["data", "page", "pageSize", "total", "hasNext"],
+    "properties": {
+      "data": { "type": "array", "items": { "$ref": "#/components/schemas/AdminEvent" } },
+      "page": { "type": "integer" },
+      "pageSize": { "type": "integer", "maximum": 100 },
+      "total": { "type": "integer", "format": "int64" },
+      "hasNext": { "type": "boolean" }
+    }
+  },
+  "AdminEventPageResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/AdminEventPage" } }
+  },
+  "AdminEventResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/AdminEvent" } }
+  }
+}

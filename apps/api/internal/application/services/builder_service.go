@@ -42,13 +42,16 @@ func (s *BuilderService) CreateDraft(ctx context.Context, tenantID string, req d
 	if req.Name == "" {
 		return nil, domain.NewValidation("name is required")
 	}
+	if validationErr := ensureWorkflowDefinitionJSON(req.Definition); validationErr != nil {
+		return nil, validationErr
+	}
 
 	projectID, err := s.resolveProject(ctx, tenantID, req.ProjectID)
 	if err != nil {
 		return nil, err
 	}
 
-	wf, err := s.workflows.Create(ctx, tenantID, projectID, req.Slug, req.Name, optional(req.Description))
+	wf, err := s.workflows.Create(ctx, tenantID, projectID, req.Slug, req.Name, optional(req.Description), req.Definition)
 	if err != nil {
 		return nil, err
 	}
@@ -85,10 +88,8 @@ func (s *BuilderService) List(ctx context.Context, tenantID, projectID string) (
 	return &dtos.WorkflowListDTO{Data: data}, nil
 }
 
-// UpdateDraft confirms ownership of a DRAFT workflow at an expected optimistic
-// version, bumping the version counter (PRD §31). The draft definition body is
-// kept client-side in this slice (see design D2); the operation guards against
-// concurrent edits by another operator.
+// UpdateDraft confirms ownership of an editable workflow at an expected
+// optimistic version and atomically persists its metadata and graph body.
 func (s *BuilderService) UpdateDraft(ctx context.Context, tenantID, projectID, id string, req dtos.UpdateWorkflowRequest) (*dtos.WorkflowDTO, error) {
 	pid, err := s.resolveProject(ctx, tenantID, projectID)
 	if err != nil {
@@ -98,29 +99,27 @@ func (s *BuilderService) UpdateDraft(ctx context.Context, tenantID, projectID, i
 	if err != nil {
 		return nil, err
 	}
-	if existing.Status != entities.WorkflowDraft {
-		return nil, domain.NewConflict("only DRAFT workflows can be edited")
-	}
 	if req.Version != existing.Version {
 		return nil, domain.NewConflict("optimistic lock conflict: resource changed")
 	}
+	if validationErr := ensureWorkflowDefinitionJSON(req.Definition); validationErr != nil {
+		return nil, validationErr
+	}
 
-	// The repository's optimistic update bumps version and conflicts on staleness.
-	updated, err := s.workflows.UpdateStatus(ctx, tenantID, pid, id, entities.WorkflowDraft, existing.Version)
+	description := req.Description
+	if description == nil && existing.Description.Valid {
+		description = &existing.Description.String
+	}
+	updated, err := s.workflows.UpdateDraft(ctx, tenantID, pid, id, req.Name, description, req.Definition, existing.Version)
 	if err != nil {
 		return nil, err
 	}
 	return toWorkflowDTO(updated), nil
 }
 
-// Publish creates an immutable, current workflow version from the provided
-// definition (PRD §3.3, §9, §55, §65, §69, §68). It uses optimistic concurrency
-// on the workflow root version. On success it appends a workflow.published
-// audit entry (PRD 50) attributed to the actor.
+// Publish validates and creates an immutable, current workflow version from the
+// persisted draft definition (PRD §3.3, §9, §55, §65, §69, §68).
 func (s *BuilderService) Publish(ctx context.Context, tenantID, projectID, id, actor string, req dtos.PublishWorkflowRequest) (*dtos.WorkflowVersionDTO, error) {
-	if len(req.Definition) == 0 {
-		return nil, domain.NewValidation("definition is required")
-	}
 	pid, err := s.resolveProject(ctx, tenantID, projectID)
 	if err != nil {
 		return nil, err
@@ -132,9 +131,12 @@ func (s *BuilderService) Publish(ctx context.Context, tenantID, projectID, id, a
 	if req.Version != existing.Version {
 		return nil, domain.NewConflict("optimistic lock conflict: resource changed")
 	}
+	if validationErr := validateWorkflowDefinition(existing.DraftDefinition); validationErr != nil {
+		return nil, validationErr
+	}
 
 	versionNo := existing.CurrentVersion + 1
-	version, err := s.workflows.Publish(ctx, tenantID, pid, id, versionNo, req.Definition, entities.VersionStatusPublished, existing.Version)
+	version, err := s.workflows.Publish(ctx, tenantID, pid, id, versionNo, existing.DraftDefinition, entities.VersionStatusPublished, existing.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +145,39 @@ func (s *BuilderService) Publish(ctx context.Context, tenantID, projectID, id, a
 			nil, map[string]any{"version": versionNo}, nil)
 	}
 	return toWorkflowVersionDTO(version), nil
+}
+
+// GetVersion returns one immutable published snapshot within the workflow scope.
+func (s *BuilderService) GetVersion(ctx context.Context, tenantID, projectID, id string, versionNo int) (*dtos.WorkflowVersionDTO, error) {
+	pid, err := s.resolveProject(ctx, tenantID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	version, err := s.workflows.FindVersionByNumber(ctx, tenantID, pid, id, versionNo)
+	if err != nil {
+		return nil, err
+	}
+	return toWorkflowVersionDTO(version), nil
+}
+
+// CompareVersions compares two immutable snapshots of one workflow.
+func (s *BuilderService) CompareVersions(ctx context.Context, tenantID, projectID, id string, baseVersion, targetVersion int) (*dtos.WorkflowDiffDTO, error) {
+	if baseVersion < 1 || targetVersion < 1 || baseVersion == targetVersion {
+		return nil, domain.NewValidation("baseVersion and targetVersion must be distinct positive versions")
+	}
+	pid, err := s.resolveProject(ctx, tenantID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	base, err := s.workflows.FindVersionByNumber(ctx, tenantID, pid, id, baseVersion)
+	if err != nil {
+		return nil, err
+	}
+	target, err := s.workflows.FindVersionByNumber(ctx, tenantID, pid, id, targetVersion)
+	if err != nil {
+		return nil, err
+	}
+	return compareWorkflowDefinitions(id, baseVersion, targetVersion, base.Definition, target.Definition)
 }
 
 // ListVersions returns the immutable versions of a workflow, newest first.
@@ -166,7 +201,11 @@ func (s *BuilderService) ListVersions(ctx context.Context, tenantID, projectID, 
 // "default" project (creating it when missing) if none is supplied.
 func (s *BuilderService) resolveProject(ctx context.Context, tenantID, projectID string) (string, error) {
 	if projectID != "" {
-		return projectID, nil
+		project, err := s.projects.FindByID(ctx, tenantID, projectID)
+		if err != nil {
+			return "", err
+		}
+		return project.ID, nil
 	}
 	proj, err := s.projects.FindBySlug(ctx, tenantID, defaultProjectSlug)
 	if err == nil {
@@ -195,6 +234,7 @@ func toWorkflowDTO(w *entities.Workflow) *dtos.WorkflowDTO {
 		Status:         string(w.Status),
 		CurrentVersion: w.CurrentVersion,
 		Version:        w.Version,
+		Definition:     w.DraftDefinition,
 		CreatedAt:      w.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:      w.UpdatedAt.Format(time.RFC3339),
 	}
@@ -213,5 +253,6 @@ func toWorkflowVersionDTO(v *entities.WorkflowVersion) *dtos.WorkflowVersionDTO 
 		IsCurrent:  v.IsCurrent,
 		CreatedAt:  v.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:  v.UpdatedAt.Format(time.RFC3339),
+		Definition: v.Definition,
 	}
 }

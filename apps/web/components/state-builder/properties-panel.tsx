@@ -359,6 +359,7 @@ function NodePanel({ nodeId }: { nodeId: string }) {
       <Section title="General">
         <Field label="Name">
           <TextInput
+            data-testid="workflow-node-name"
             value={node.name}
             onChange={(e) => updateNode(node.id, { name: e.target.value })}
           />

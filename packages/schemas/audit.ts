@@ -16,6 +16,8 @@ export const auditActions = [
   "rbac.role_updated",
   "rbac.role_removed",
   "authorization.denied",
+  "tenant.updated",
+  "workflow.retried",
   "binding.created",
   "binding.deleted",
 ] as const
@@ -34,6 +36,8 @@ export const auditActionLabels = [
   { label: "Role updated", value: "rbac.role_updated" },
   { label: "Role removed", value: "rbac.role_removed" },
   { label: "Authorization denied", value: "authorization.denied" },
+  { label: "Tenant updated", value: "tenant.updated" },
+  { label: "Workflow retried", value: "workflow.retried" },
   { label: "Binding created", value: "binding.created" },
   { label: "Binding deleted", value: "binding.deleted" },
 ]

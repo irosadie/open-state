@@ -89,6 +89,10 @@ func seedOne(ctx context.Context, projects repositories.IProjectRepository, work
 	if err != nil {
 		return err
 	}
+	raw, err := json.Marshal(def)
+	if err != nil {
+		return fmt.Errorf("marshal workflow %s: %w", def.Slug, err)
+	}
 
 	wf, err := workflows.FindBySlug(ctx, demoTenantID, proj.ID, def.Slug)
 	if err != nil {
@@ -96,16 +100,12 @@ func seedOne(ctx context.Context, projects repositories.IProjectRepository, work
 			return fmt.Errorf("find workflow %s: %w", def.Slug, err)
 		}
 		desc := def.Description
-		wf, err = workflows.Create(ctx, demoTenantID, proj.ID, def.Slug, def.Name, &desc)
+		wf, err = workflows.Create(ctx, demoTenantID, proj.ID, def.Slug, def.Name, &desc, raw)
 		if err != nil {
 			return fmt.Errorf("create workflow %s: %w", def.Slug, err)
 		}
 	}
 
-	raw, err := json.Marshal(def)
-	if err != nil {
-		return fmt.Errorf("marshal workflow %s: %w", def.Slug, err)
-	}
 	versionNo := wf.CurrentVersion + 1
 	if _, err := workflows.Publish(ctx, demoTenantID, proj.ID, wf.ID, versionNo, raw, entities.VersionStatusPublished, wf.Version); err != nil {
 		return fmt.Errorf("publish workflow %s: %w", def.Slug, err)

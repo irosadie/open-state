@@ -1,6 +1,7 @@
 import { authConfig } from "$/configs/auth"
 import { env } from "$/configs/env"
 import type { ErrorResponse } from "$/types/generals"
+import { getAuthRecoveryAction } from "$/utils/auth-error"
 import axiosClient, { type AxiosRequestConfig } from "axios"
 
 /**
@@ -57,14 +58,40 @@ instance.interceptors.response.use(
     return res.data
   },
   (error) => {
-    // Session expired — redirect to login
-    if (error.response?.status === 401 && typeof window !== "undefined") {
-      window.location.href = authConfig.loginPath
+    const recoveryAction = getAuthRecoveryAction(error.response?.status)
+
+    // Session expired — redirect to login, but skip if already there
+    if (
+      recoveryAction === "login" &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== authConfig.loginPath
+    ) {
+      const loginUrl = new URL(authConfig.loginPath, window.location.origin)
+
+      loginUrl.searchParams.set(
+        "callbackUrl",
+        window.location.pathname + window.location.search,
+      )
+
+      window.location.href = loginUrl.toString()
 
       return new Promise(() => {})
     }
 
-    throw (error.response?.data ?? error) as ErrorResponse
+    if (recoveryAction === "forbidden" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("openstate:forbidden"))
+    }
+
+    const responseData: unknown = error.response?.data ?? error
+
+    if (responseData && typeof responseData === "object") {
+      throw {
+        ...responseData,
+        status: error.response?.status,
+      } as ErrorResponse
+    }
+
+    throw responseData as ErrorResponse
   },
 )
 /**

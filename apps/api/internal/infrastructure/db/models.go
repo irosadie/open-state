@@ -113,6 +113,14 @@ type AuditLog struct {
 	CreatedAt     time.Time             `json:"created_at"`
 }
 
+type AuthRoleBackfillRecord struct {
+	ID               uuid.UUID `json:"id"`
+	RoleAssignmentID uuid.UUID `json:"role_assignment_id"`
+	InitialRole      string    `json:"initial_role"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
 type AuthSession struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"user_id"`
@@ -258,6 +266,26 @@ type RoleAssignment struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type RuntimeTraceEntry struct {
+	ID                 uuid.UUID       `json:"id"`
+	TenantID           uuid.UUID       `json:"tenant_id"`
+	WorkflowInstanceID uuid.UUID       `json:"workflow_instance_id"`
+	TurnID             sql.NullString  `json:"turn_id"`
+	Sequence           int64           `json:"sequence"`
+	Stage              string          `json:"stage"`
+	Source             string          `json:"source"`
+	Status             string          `json:"status"`
+	OccurredAt         time.Time       `json:"occurred_at"`
+	CorrelationID      sql.NullString  `json:"correlation_id"`
+	DurationMs         sql.NullInt64   `json:"duration_ms"`
+	ReasonCode         sql.NullString  `json:"reason_code"`
+	ErrorCode          sql.NullString  `json:"error_code"`
+	ProviderAlias      sql.NullString  `json:"provider_alias"`
+	ProviderReference  sql.NullString  `json:"provider_reference"`
+	Summary            sql.NullString  `json:"summary"`
+	Attributes         json.RawMessage `json:"attributes"`
+}
+
 type State struct {
 	ID                uuid.UUID       `json:"id"`
 	WorkflowVersionID uuid.UUID       `json:"workflow_version_id"`
@@ -290,6 +318,15 @@ type StateInstance struct {
 	ExitedAt           sql.NullTime  `json:"exited_at"`
 	CreatedAt          time.Time     `json:"created_at"`
 	UpdatedAt          time.Time     `json:"updated_at"`
+}
+
+type Tenant struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Slug        string    `json:"slug"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type Transition struct {
@@ -338,17 +375,18 @@ type UserIdentity struct {
 }
 
 type Workflow struct {
-	ID             uuid.UUID      `json:"id"`
-	TenantID       uuid.UUID      `json:"tenant_id"`
-	ProjectID      uuid.UUID      `json:"project_id"`
-	Slug           string         `json:"slug"`
-	Name           string         `json:"name"`
-	Description    sql.NullString `json:"description"`
-	Status         string         `json:"status"`
-	CurrentVersion int32          `json:"current_version"`
-	Version        int32          `json:"version"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID              uuid.UUID       `json:"id"`
+	TenantID        uuid.UUID       `json:"tenant_id"`
+	ProjectID       uuid.UUID       `json:"project_id"`
+	Slug            string          `json:"slug"`
+	Name            string          `json:"name"`
+	Description     sql.NullString  `json:"description"`
+	Status          string          `json:"status"`
+	CurrentVersion  int32           `json:"current_version"`
+	Version         int32           `json:"version"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+	DraftDefinition json.RawMessage `json:"draft_definition"`
 }
 
 type WorkflowInstance struct {

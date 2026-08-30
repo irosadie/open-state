@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 
+import { PermissionGate } from "$/components/auth-guard/permission-gate"
 import { Button } from "$/components/button"
 import { EmptyState } from "$/components/empty-state"
 import { Input } from "$/components/input"
@@ -39,11 +40,15 @@ const permissionVariant: Record<BindingPermission, "success" | "danger"> = {
 
 type BindingsPanelProps = {
   capabilityId: string
+  enabled?: boolean
 }
 
 type FieldErrors = Partial<Record<keyof BindingSchemaProps, string>>
 
-export function BindingsPanel({ capabilityId }: BindingsPanelProps) {
+export function BindingsPanel({
+  capabilityId,
+  enabled = true,
+}: BindingsPanelProps) {
   const [scopeType, setScopeType] = useState<BindingScopeType | undefined>(
     undefined,
   )
@@ -58,6 +63,7 @@ export function BindingsPanel({ capabilityId }: BindingsPanelProps) {
     refetch,
   } = useCapabilitiesListBindings({
     capabilityId,
+    enabled,
   })
   const { mutateAsync: createMutateAsync, isPending: isCreatePending } =
     useCapabilitiesCreateBinding()
@@ -174,13 +180,15 @@ export function BindingsPanel({ capabilityId }: BindingsPanelProps) {
             onChange={(e) => setScopeId(e.target.value)}
           />
           <div className="flex items-end pb-0.5">
-            <Button
-              intent="primary"
-              loading={isCreatePending}
-              onClick={() => void handleCreate()}
-            >
-              Bind
-            </Button>
+            <PermissionGate action="binding:create">
+              <Button
+                intent="primary"
+                loading={isCreatePending}
+                onClick={() => void handleCreate()}
+              >
+                Bind
+              </Button>
+            </PermissionGate>
           </div>
         </div>
 
@@ -214,12 +222,14 @@ export function BindingsPanel({ capabilityId }: BindingsPanelProps) {
                     {binding.scopeId}
                   </span>
                 </div>
-                <Button
-                  intent="clean"
-                  leftIcon={<Trash2Icon size={15} className="text-red-500" />}
-                  onClick={() => handleDelete(binding)}
-                  aria-label={`Remove binding ${binding.id}`}
-                />
+                <PermissionGate action="binding:delete">
+                  <Button
+                    intent="clean"
+                    leftIcon={<Trash2Icon size={15} className="text-red-500" />}
+                    onClick={() => handleDelete(binding)}
+                    aria-label={`Remove binding ${binding.id}`}
+                  />
+                </PermissionGate>
               </li>
             ))}
           </ul>

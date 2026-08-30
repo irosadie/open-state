@@ -175,6 +175,45 @@ Operational rules:
 2. Run `bun run openapi:generate` after changes.
 3. Commit both split files and merged `docs/openapi.json` so tooling that reads merged file stays in sync.
 
+## Runtime Inspector and Debug View
+
+Runtime Inspector reads only tenant-scoped data already persisted by OpenState:
+workflow instances, pinned versions, state/context projections, events, audit
+correlations, and the append-only runtime trace. The browser calls the internal
+BFF/API routes under `/api/runtime/instances`; it never connects to an LLM, RAG,
+MCP provider, OTLP collector, or provider dashboard.
+
+Debug Trace is separately protected by `debug:read`. Provider stages show only
+the alias, opaque operation reference, status, duration, correlation id, and a
+sanitized summary. Secrets, credentials, sensitive PII, raw prompts/responses,
+and raw retrieval documents are redacted before trace persistence. Missing trace
+data is displayed as “not recorded” and must not be interpreted as a provider
+success or failure.
+
+The Runtime Inspector API follows the same boundary: `GET /api/runtime/instances`
+and `GET /api/runtime/instances/{id}` require `instance:read`, while
+`GET /api/runtime/instances/{id}/debug-trace` additionally requires `debug:read`.
+A forbidden trace request returns no trace metadata. An observed external-provider
+entry with a failed status means OpenState received that status from the
+integration boundary; an unavailable or unrecorded stage means there is no
+evidence and must remain distinct from failure. Redaction is applied before
+trace storage and again at the response boundary as defense in depth.
+
+## Admin Console
+
+The Admin Console is available under `/admin` after login. Its navigation is
+derived from the authenticated tenant permissions and links to the existing
+Builder, Runtime Inspector, Audit, and Capabilities surfaces.
+
+Tenant settings and membership changes require explicit confirmation in the
+web UI. Runtime suspend, resume, and retry commands are tenant-scoped,
+optimistically validated, and audited. The event browser is read-only: it
+supports pagination and safe filters, but never edits, deletes, replays, or
+injects events.
+
+The backend Admin Console routes are documented in `docs/openapi/paths/admin.json`
+and are merged into `docs/openapi.json` with `bun run openapi:generate`.
+
 ## Prisma Workflow
 
 Local Prisma infra is now available, though default schema is still generic scaffold.

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 
+import { PermissionGate } from "$/components/auth-guard/permission-gate"
 import { Button } from "$/components/button"
 import { PanelCard } from "$/components/panel-card"
 import { Textarea } from "$/components/textarea"
@@ -89,13 +90,15 @@ export function TestInvocationPanel({
         />
 
         <div className="flex items-center gap-2">
-          <Button
-            intent="primary"
-            loading={isPending}
-            onClick={() => void handleTest()}
-          >
-            Run test
-          </Button>
+          <PermissionGate action="capability:invoke">
+            <Button
+              intent="primary"
+              loading={isPending}
+              onClick={() => void handleTest()}
+            >
+              Run test
+            </Button>
+          </PermissionGate>
           <span className="text-xs text-gray-400">
             Executes via the mock provider only — no live side effects.
           </span>

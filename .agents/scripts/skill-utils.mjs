@@ -5,6 +5,7 @@ export const repoRoot = process.cwd();
 export const agentsRoot = path.join(repoRoot, '.agents');
 export const skillsRoot = path.join(agentsRoot, 'skills');
 export const claudeSkillsRoot = path.join(repoRoot, '.claude', 'skills');
+export const opencodeSkillsRoot = path.join(repoRoot, '.opencode', 'skill');
 export const manifestPath = path.join(skillsRoot, 'manifest.json');
 export const packageJsonPath = path.join(repoRoot, 'package.json');
 
@@ -118,7 +119,7 @@ export function createOpenAiYamlContent({ displayName, shortDescription, default
   ].join('\n');
 }
 
-export function createClaudeWrapperContent({ name, description }) {
+export function createSkillWrapperContent({ name, description }) {
   return [
     '---',
     `name: "${name}"`,
@@ -134,6 +135,8 @@ export function createClaudeWrapperContent({ name, description }) {
     '',
   ].join('\n');
 }
+
+export const createClaudeWrapperContent = createSkillWrapperContent;
 
 export function createSkillSectionReference(name) {
   return `- For skill \`${name}\`: \`.agents/skills/${name}/SKILL.md\``;
@@ -194,6 +197,12 @@ export function renderSkillRegistryTable(entries) {
 export function renderSkillReferenceList(entries) {
   return entries
     .map((entry) => createSkillSectionReference(entry.name))
+    .join('\n');
+}
+
+export function renderOpenCodeSkillList(entries) {
+  return entries
+    .map((entry) => `- \`${entry.name}\` — ${entry.whenToUse ?? entry.description}`)
     .join('\n');
 }
 

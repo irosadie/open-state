@@ -1,3 +1,5 @@
+import { AuthorizationBoundary } from "$/components/auth-guard/authorization-boundary"
+import { AuthorizationProvider } from "$/providers/authorization-provider"
 import QueryProvider from "$/providers/query-provider"
 import SessionProviderWrapper from "$/providers/session-provider"
 import type { Metadata } from "next"
@@ -18,7 +20,11 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <SessionProviderWrapper>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            <AuthorizationProvider>
+              <AuthorizationBoundary>{children}</AuthorizationBoundary>
+            </AuthorizationProvider>
+          </QueryProvider>
         </SessionProviderWrapper>
       </body>
     </html>

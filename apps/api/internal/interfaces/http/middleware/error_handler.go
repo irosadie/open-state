@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"net/http"
 
 	domaincap "github.com/irosadie/open-state/api/internal/domain/capability"
@@ -39,6 +40,11 @@ type classifiedCapabilityError struct {
 	Message string              `json:"message"`
 }
 
+type domainErrorResponse struct {
+	Error   string          `json:"error"`
+	Details json.RawMessage `json:"details,omitempty"`
+}
+
 // ErrorHandler is the centralized Echo error handler.
 func ErrorHandler(err error, c echo.Context) {
 	if c.Response().Committed {
@@ -68,7 +74,7 @@ func ErrorHandler(err error, c echo.Context) {
 		if status == 0 {
 			status = http.StatusInternalServerError
 		}
-		body = map[string]string{"error": de.Message}
+		body = domainErrorResponse{Error: de.Message, Details: de.Details}
 	} else if he, ok := err.(*echo.HTTPError); ok {
 		status = he.Code
 		body = map[string]string{"error": http.StatusText(he.Code)}

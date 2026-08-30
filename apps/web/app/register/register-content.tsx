@@ -3,16 +3,19 @@
 import { Button } from "$/components/button"
 import { Input } from "$/components/input"
 import { PanelCard } from "$/components/panel-card"
-import { authConfig, getRoleRedirectPath } from "$/configs/auth"
+import { authConfig } from "$/configs/auth"
 import { useAuthLogin, useAuthRegister } from "$/hooks/transactions/use-auth"
+import { useAuthorization } from "$/providers/authorization-provider"
+import { resolveAuthorizedPath } from "$/utils/rbac"
 import {
   type RegisterProps,
   registerPayloadSchema,
   registerSchema,
 } from "@openstate/schemas"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { type FormEvent, useState } from "react"
+import { type FormEvent, useEffect, useMemo, useState } from "react"
 
 type RegisterErrors = Partial<Record<keyof RegisterProps, string>>
 
@@ -35,6 +38,8 @@ const getErrorMessage = (error: unknown) => {
 
 export default function RegisterContent() {
   const router = useRouter()
+  const { status: sessionStatus } = useSession()
+  const authorization = useAuthorization()
   const registerMutation = useAuthRegister()
   const loginMutation = useAuthLogin()
   const [formError, setFormError] = useState("")
@@ -47,6 +52,20 @@ export default function RegisterContent() {
   })
 
   const isPending = registerMutation.isPending || loginMutation.isPending
+  const authorizedPath = useMemo(
+    () => resolveAuthorizedPath(null, authorization.permissions),
+    [authorization.permissions],
+  )
+
+  useEffect(() => {
+    if (
+      sessionStatus === "authenticated" &&
+      authorization.status === "ready" &&
+      authorizedPath
+    ) {
+      router.replace(authorizedPath)
+    }
+  }, [authorizedPath, authorization.status, router, sessionStatus])
 
   const handleChange = (field: keyof RegisterProps, value: string) => {
     setForm((current) => ({
@@ -91,13 +110,12 @@ export default function RegisterContent() {
 
         await registerMutation.mutateAsync(payload)
 
-        const loginResult = await loginMutation.mutateAsync({
+        await loginMutation.mutateAsync({
           email: parsedForm.data.email,
           password: parsedForm.data.password,
-          callbackUrl: getRoleRedirectPath("USER"),
+          callbackUrl: authConfig.defaultRedirectPath,
         })
 
-        router.replace(loginResult.redirectTo)
         router.refresh()
       } catch (error) {
         setFormError(getErrorMessage(error))
@@ -162,6 +180,14 @@ export default function RegisterContent() {
 
           {formError ? (
             <p className="text-sm text-danger-500">{formError}</p>
+          ) : null}
+
+          {sessionStatus === "authenticated" &&
+          authorization.status === "ready" &&
+          !authorizedPath ? (
+            <p className="text-sm text-danger-500">
+              Your account has no accessible application area.
+            </p>
           ) : null}
 
           <Button

@@ -104,6 +104,36 @@ func (s *OrchestratorService) ResumeWorkflow(ctx context.Context, tenantID, inst
 	return s.instances.UpdateStatus(ctx, tenantID, instanceID, entities.WorkflowInstanceRunning, inst.Version)
 }
 
+// RetryWorkflow retries the current failed state using its optimistic version.
+// It never overwrites a newer state projection and only accepts failed runtime
+// state, leaving event history immutable.
+func (s *OrchestratorService) RetryWorkflow(ctx context.Context, tenantID, instanceID string) (*entities.WorkflowInstance, error) {
+	inst, state, err := s.GetCurrentState(ctx, tenantID, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if state == nil || (state.Status != entities.StateInstanceFailed && inst.Status != entities.WorkflowInstanceFailed) {
+		return nil, domain.NewConflict("only failed instances can be retried")
+	}
+
+	retriedState, err := s.instances.IncrementRetry(ctx, tenantID, state.ID, state.Version)
+	if err != nil {
+		return nil, err
+	}
+	if retriedState == nil {
+		return nil, domain.NewInternal("retry did not return the updated state")
+	}
+	if state.Status == entities.StateInstanceFailed {
+		if _, err := s.instances.UpdateStateInstanceStatus(ctx, tenantID, state.ID, entities.StateInstanceActive, retriedState.Version); err != nil {
+			return nil, err
+		}
+	}
+	if inst.Status == entities.WorkflowInstanceFailed {
+		return s.instances.UpdateStatus(ctx, tenantID, instanceID, entities.WorkflowInstanceRunning, inst.Version)
+	}
+	return inst, nil
+}
+
 // CancelWorkflow cancels a non-terminal instance (PRD 42-43).
 func (s *OrchestratorService) CancelWorkflow(ctx context.Context, tenantID, instanceID string) (*entities.WorkflowInstance, error) {
 	inst, err := s.instances.FindByID(ctx, tenantID, instanceID)
@@ -182,13 +212,13 @@ func (s *OrchestratorService) ReplayState(ctx context.Context, tenantID, instanc
 			_ = json.Unmarshal(e.Payload, &payload)
 		}
 		engineEvents = append(engineEvents, engine.Event{
-			ID:          e.EventID,
-			TenantID:    tenantID,
-			Type:        e.Type,
-			Source:      engine.EventSource(e.Source),
+			ID:                 e.EventID,
+			TenantID:           tenantID,
+			Type:               e.Type,
+			Source:             engine.EventSource(e.Source),
 			WorkflowInstanceID: instanceID,
-			Payload:     payload,
-			Timestamp:   e.Timestamp,
+			Payload:            payload,
+			Timestamp:          e.Timestamp,
 		})
 	}
 	replayed, err := s.engine.Replay(ctx, tenantID, instanceID, engineEvents)
@@ -216,13 +246,13 @@ func (s *OrchestratorService) ProposeEvent(ctx context.Context, tenantID, instan
 
 	if s.engine != nil {
 		evt := &engine.Event{
-			ID:          uuid.NewString(),
-			TenantID:    tenantID,
-			Type:        eventType,
-			Source:      engine.SourceMCP,
+			ID:                 uuid.NewString(),
+			TenantID:           tenantID,
+			Type:               eventType,
+			Source:             engine.SourceMCP,
 			WorkflowInstanceID: instanceID,
-			Payload:     payload,
-			Timestamp:   time.Now().UTC(),
+			Payload:            payload,
+			Timestamp:          time.Now().UTC(),
 		}
 		// The engine loads the instance, evaluates guards, transitions, and persists.
 		next, _, err := s.engine.ProcessEvent(ctx, tenantID, instanceID, evt)

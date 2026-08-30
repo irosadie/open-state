@@ -22,10 +22,12 @@ const (
 	AuditActionHumanHandoffCreated AuditAction = "human_handoff.created"
 
 	// RBAC actions (PRD 80, 81): role-assignment mutations and authorization denials.
-	AuditActionRoleAssigned AuditAction = "rbac.role_assigned"
-	AuditActionRoleUpdated  AuditAction = "rbac.role_updated"
-	AuditActionRoleRemoved  AuditAction = "rbac.role_removed"
-	AuditActionAuthDenied   AuditAction = "authorization.denied"
+	AuditActionRoleAssigned    AuditAction = "rbac.role_assigned"
+	AuditActionRoleUpdated     AuditAction = "rbac.role_updated"
+	AuditActionRoleRemoved     AuditAction = "rbac.role_removed"
+	AuditActionAuthDenied      AuditAction = "authorization.denied"
+	AuditActionTenantUpdated   AuditAction = "tenant.updated"
+	AuditActionWorkflowRetried AuditAction = "workflow.retried"
 
 	// Binding actions (PRD 60): capability-binding mutations.
 	AuditActionBindingCreated AuditAction = "binding.created"

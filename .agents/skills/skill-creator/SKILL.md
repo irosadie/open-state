@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Create a new skill from scratch with full structure — SKILL.md, references, templates, openai.yaml, Claude wrapper, and registration in manifest + AGENTS.md + CLAUDE.md.
+description: Create a new skill from scratch with full structure — SKILL.md, references, templates, openai.yaml, Claude/OpenCode wrappers, and registration in manifest + AGENTS.md + CLAUDE.md.
 ---
 
 # Skill: Skill Creator
@@ -31,7 +31,7 @@ bun run skills:create -- \
   --when "{When used in Skill Registry}"
 ```
 
-The generator creates the skill folder, `openai.yaml` metadata, Claude wrapper, updates `manifest.json`, and adds registry entries.
+The generator creates the skill folder, `openai.yaml` metadata, Claude/OpenCode wrappers, updates `manifest.json`, and adds registry entries.
 
 ### 2. Create Skill Folder & Files
 
@@ -117,7 +117,7 @@ policy:
   allow_implicit_invocation: true
 ```
 
-### 3. Create Claude Wrapper
+### 3. Create Claude and OpenCode Wrappers
 
 Create the file at `.claude/skills/{skill-name}/SKILL.md`:
 
@@ -134,6 +134,8 @@ When this skill is used:
 2. Follow the workflow and rules in that file.
 3. Read referenced child files (`references/context.md`, `templates/checklist.md`) from the source-of-truth folder.
 ```
+
+Create the equivalent wrapper at `.opencode/skill/{skill-name}/SKILL.md`.
 
 ### 4. Register in `manifest.json`
 
@@ -178,7 +180,7 @@ bun run skills:validate
 
 ## Prohibitions
 
-- **NEVER** skip the Claude wrapper — always create `.claude/skills/{name}/SKILL.md`.
+- **NEVER** skip the compatibility wrappers — always create `.claude/skills/{name}/SKILL.md` and `.opencode/skill/{name}/SKILL.md`.
 - **NEVER** create a skill without registering it in `manifest.json`.
 - **NEVER** use an ambiguous skill name — must be `{scope}-{capability}`.
 - **NEVER** duplicate an existing skill — check the manifest first.
@@ -192,6 +194,7 @@ bun run skills:validate
 - [ ] `templates/checklist.md` created with full steps
 - [ ] `agents/openai.yaml` created
 - [ ] `.claude/skills/{name}/SKILL.md` created (Claude wrapper)
+- [ ] `.opencode/skill/{name}/SKILL.md` created (OpenCode wrapper)
 - [ ] Entry added in `manifest.json`
 - [ ] `manifest.json` contains `whenToUse` for the registry
 - [ ] Skill Registry in `.agents/AGENTS.md` and `CLAUDE.md` synced from script

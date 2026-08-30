@@ -3,7 +3,7 @@
   "info": {
     "title": "Vibecoding Starter API",
     "version": "0.1.0",
-    "description": "OpenState \u2014 Enterprise Conversation State Orchestration Platform API."
+    "description": "OpenState — Enterprise Conversation State Orchestration Platform API."
   },
   "servers": [
     {
@@ -17,11 +17,693 @@
       "description": "Baseline system endpoints for starter health and app info."
     },
     {
-      "name": "Audit",
-      "description": "Tenant-scoped audit trail query (PRD 50)."
+      "name": "Admin Console",
+      "description": "Tenant-scoped administration, runtime operations, and read-only event browsing."
     }
   ],
   "paths": {
+    "/api/admin/tenant": {
+      "get": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "Get the current tenant profile",
+        "description": "Returns only the tenant selected by the authenticated request context. Requires tenant:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "Update the current tenant profile",
+        "description": "Updates the authenticated tenant profile and records an audit entry. Requires tenant:update.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTenantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated tenant profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "409": {
+            "$ref": "#/components/schemas/ConflictError"
+          }
+        }
+      }
+    },
+    "/api/admin/members": {
+      "get": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "List current-tenant memberships",
+        "description": "Returns a paginated, searchable membership list constrained to the authenticated tenant. Requires user:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Membership page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantMembershipPageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/api/admin/members/{userId}/role": {
+      "put": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "Change a tenant membership role",
+        "description": "Validates the tenant role and rejects changes that would remove the last Owner. Requires user:update.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMembershipRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated membership",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantMembershipResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/schemas/ConflictError"
+          }
+        }
+      }
+    },
+    "/api/admin/members/{userId}": {
+      "delete": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "Remove a tenant membership",
+        "description": "Removes only the membership in the authenticated tenant and preserves at least one Owner. Requires user:delete.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Membership removed"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/schemas/ConflictError"
+          }
+        }
+      }
+    },
+    "/api/admin/instances": {
+      "get": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "List current-tenant runtime instances",
+        "description": "Returns runtime instances for the authenticated tenant. Requires instance:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Instance list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInstanceListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/api/admin/instances/{id}/suspend": {
+      "post": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "Suspend a runtime instance",
+        "description": "Validates the current lifecycle state and optimistic version before suspending. Requires instance:suspend.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suspended instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInstanceResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/schemas/ConflictError"
+          }
+        }
+      }
+    },
+    "/api/admin/instances/{id}/resume": {
+      "post": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "Resume a runtime instance",
+        "description": "Validates that the instance is suspended before resuming. Requires instance:resume.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumed instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInstanceResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/schemas/ConflictError"
+          }
+        }
+      }
+    },
+    "/api/admin/instances/{id}/retry": {
+      "post": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "Retry a failed runtime instance",
+        "description": "Retries the current failed state using optimistic concurrency and leaves event history immutable. Requires instance:retry.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Retried instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInstanceResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/schemas/ConflictError"
+          }
+        }
+      }
+    },
+    "/api/admin/events": {
+      "get": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "Browse current-tenant events",
+        "description": "Returns immutable, paginated event history with safe tenant-scoped filters. No event mutation or replay operation is exposed. Requires instance:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workflowInstanceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "correlationId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEventPageResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/api/admin/events/{eventId}": {
+      "get": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "Get a current-tenant event",
+        "description": "Returns a single immutable event scoped to the authenticated tenant. Requires instance:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEventResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "List audit entries",
+        "description": "Returns a filtered, paginated view of the tenant-scoped audit trail (PRD 50), ordered newest first. Requires the audit:read permission.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "correlationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit trail page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          }
+        }
+      }
+    },
     "/capabilities": {
       "get": {
         "tags": [
@@ -482,16 +1164,6 @@
           },
           "422": {
             "$ref": "#/components/schemas/ValidationError"
-          },
-          "429": {
-            "description": "Rate limit exceeded (capability.rate_limited)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CapabilityError"
-                }
-              }
-            }
           }
         }
       }
@@ -539,6 +1211,190 @@
           },
           "401": {
             "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/runtime/instances": {
+      "get": {
+        "tags": [
+          "Runtime Inspector"
+        ],
+        "summary": "List runtime instances",
+        "description": "Returns tenant-scoped persisted workflow instances. Requires instance:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workflowId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "correlationKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runtime instance page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeInstanceListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/api/runtime/instances/{id}": {
+      "get": {
+        "tags": [
+          "Runtime Inspector"
+        ],
+        "summary": "Get a runtime instance",
+        "description": "Returns the tenant-scoped workflow/version, state, sanitized context, timeline, and audit correlations. Requires instance:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runtime instance detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeInstanceDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/runtime/instances/{id}/debug-trace": {
+      "get": {
+        "tags": [
+          "Runtime Inspector"
+        ],
+        "summary": "Get a runtime debug trace",
+        "description": "Returns only OpenState-owned sanitized trace metadata. It never calls an LLM, RAG, MCP provider, or OTLP collector. Requires debug:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "turnId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sanitized runtime trace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeTraceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
           },
           "404": {
             "$ref": "#/components/schemas/NotFoundError"
@@ -642,7 +1498,7 @@
           "Workflow"
         ],
         "summary": "Create a workflow draft",
-        "description": "Creates a workflow definition draft (status=DRAFT) scoped to the tenant.",
+        "description": "Creates a workflow definition draft (status=DRAFT) with its complete editable graph scoped to the tenant.",
         "parameters": [
           {
             "name": "X-Tenant-ID",
@@ -684,6 +1540,61 @@
           },
           "409": {
             "$ref": "#/components/schemas/ConflictError"
+          },
+          "422": {
+            "$ref": "#/components/schemas/ValidationError"
+          }
+        }
+      }
+    },
+    "/workflows/simulate": {
+      "post": {
+        "tags": [
+          "Workflow"
+        ],
+        "summary": "Simulate a workflow draft",
+        "description": "Runs an unsaved workflow snapshot in an isolated deterministic sandbox. Capability requests are mock plans only; no runtime instance, event, audit record, LLM, MCP, or live provider is created or invoked (PRD §53).",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateWorkflowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deterministic sandbox trace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SimulationResult"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
           },
           "422": {
             "$ref": "#/components/schemas/ValidationError"
@@ -753,7 +1664,7 @@
           "Workflow"
         ],
         "summary": "Update a workflow draft",
-        "description": "Confirms ownership of a DRAFT workflow at an expected optimistic version, bumping the version counter (PRD \u00a731). Only DRAFT workflows are editable.",
+        "description": "Atomically replaces an editable workflow's metadata and complete graph at an expected optimistic version (PRD §31).",
         "parameters": [
           {
             "name": "X-Tenant-ID",
@@ -827,7 +1738,7 @@
           "Workflow"
         ],
         "summary": "Publish a workflow version",
-        "description": "Publishes a workflow definition as an immutable, current version (PRD \u00a73.3, \u00a79, \u00a755, \u00a765, \u00a769).",
+        "description": "Validates the persisted workflow draft and publishes it as an immutable, current version (PRD §3.3, §9, §55, §65, §69).",
         "parameters": [
           {
             "name": "X-Tenant-ID",
@@ -956,13 +1867,12 @@
         }
       }
     },
-    "/api/audit": {
+    "/workflows/{id}/versions/{versionNo}": {
       "get": {
         "tags": [
-          "Audit"
+          "Workflow"
         ],
-        "summary": "List audit entries",
-        "description": "Returns a filtered, paginated view of the tenant-scoped audit trail (PRD 50), ordered newest first. Requires the audit:read permission.",
+        "summary": "Get an immutable workflow version",
         "parameters": [
           {
             "name": "X-Tenant-ID",
@@ -973,90 +1883,43 @@
             }
           },
           {
-            "name": "action",
-            "in": "query",
+            "name": "X-Project-ID",
+            "in": "header",
             "required": false,
             "schema": {
               "type": "string"
             }
           },
           {
-            "name": "resourceType",
-            "in": "query",
-            "required": false,
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "string"
             }
           },
           {
-            "name": "resourceId",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "actor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "correlationId",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "from",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
+            "name": "versionNo",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "integer",
-              "default": 1
-            }
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 20,
-              "maximum": 100
+              "minimum": 1
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Audit trail page",
+            "description": "Immutable workflow version",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuditListResponse"
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/WorkflowVersion"
+                    }
+                  }
                 }
               }
             }
@@ -1064,8 +1927,86 @@
           "401": {
             "$ref": "#/components/schemas/UnauthorizedError"
           },
-          "403": {
-            "$ref": "#/components/schemas/ForbiddenError"
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          }
+        }
+      }
+    },
+    "/workflows/{id}/versions/compare": {
+      "get": {
+        "tags": [
+          "Workflow"
+        ],
+        "summary": "Compare immutable workflow versions",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Project-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "baseVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "targetVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Semantic graph diff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/WorkflowDiff"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          },
+          "422": {
+            "$ref": "#/components/schemas/ValidationError"
           }
         }
       }
@@ -1073,6 +2014,499 @@
   },
   "components": {
     "schemas": {
+      "Tenant": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "description",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TenantResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Tenant"
+          }
+        }
+      },
+      "UpdateTenantRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "TenantMembership": {
+        "type": "object",
+        "required": [
+          "roleAssignmentId",
+          "userId",
+          "tenantId",
+          "role",
+          "email",
+          "name",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "roleAssignmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "ADMIN",
+              "EDITOR",
+              "OPERATOR",
+              "VIEWER"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "photo": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TenantMembershipPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "pageSize",
+          "total",
+          "hasNext"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantMembership"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer",
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TenantMembershipPageResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TenantMembershipPage"
+          }
+        }
+      },
+      "TenantMembershipResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TenantMembership"
+          }
+        }
+      },
+      "UpdateMembershipRoleRequest": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "ADMIN",
+              "EDITOR",
+              "OPERATOR",
+              "VIEWER"
+            ]
+          }
+        }
+      },
+      "AdminInstance": {
+        "type": "object",
+        "required": [
+          "id",
+          "tenantId",
+          "workflowId",
+          "workflowVersionId",
+          "status",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workflowId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workflowVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "correlationKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "currentStateInstanceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminInstanceResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminInstance"
+          }
+        }
+      },
+      "AdminInstanceListResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminInstance"
+            }
+          }
+        }
+      },
+      "AdminEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "tenantId",
+          "eventId",
+          "type",
+          "source",
+          "sequence",
+          "timestamp",
+          "payload",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "aggregateId": {
+            "type": "string",
+            "nullable": true
+          },
+          "workflowInstanceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminEventPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "pageSize",
+          "total",
+          "hasNext"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminEvent"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer",
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AdminEventPageResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminEventPage"
+          }
+        }
+      },
+      "AdminEventResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminEvent"
+          }
+        }
+      },
+      "AuditEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "tenantId",
+          "actor",
+          "action",
+          "resourceType",
+          "resourceId",
+          "occurredAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AuditPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "pageSize",
+          "total",
+          "hasNext"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuditListResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuditPage"
+          }
+        }
+      },
       "Capability": {
         "type": "object",
         "required": [
@@ -1372,6 +2806,12 @@
         "properties": {
           "error": {
             "type": "string"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowValidationIssue"
+            }
           }
         }
       },
@@ -1465,6 +2905,360 @@
           }
         }
       },
+      "RuntimeWorkflow": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "versionId",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "versionId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        }
+      },
+      "RuntimeState": {
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "status",
+          "enteredAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "enteredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "exitedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "RuntimeInstanceSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "workflow",
+          "status",
+          "lastActivityAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workflow": {
+            "$ref": "#/components/schemas/RuntimeWorkflow"
+          },
+          "status": {
+            "type": "string"
+          },
+          "currentState": {
+            "$ref": "#/components/schemas/RuntimeState",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastActivityAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RuntimeInstanceList": {
+        "type": "object",
+        "required": [
+          "data",
+          "page",
+          "pageSize",
+          "total",
+          "hasNext"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeInstanceSummary"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RuntimeContext": {
+        "type": "object",
+        "required": [
+          "available",
+          "missing",
+          "redacted"
+        ],
+        "properties": {
+          "available": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "redacted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RuntimeTimelineEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "type",
+          "label",
+          "status",
+          "sequence",
+          "occurredAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "STATE",
+              "EVENT",
+              "DECISION"
+            ]
+          },
+          "type": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "RuntimeInstanceDetail": {
+        "type": "object",
+        "required": [
+          "summary",
+          "context",
+          "timeline",
+          "auditCorrelationIds"
+        ],
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/RuntimeInstanceSummary"
+          },
+          "currentState": {
+            "$ref": "#/components/schemas/RuntimeState",
+            "nullable": true
+          },
+          "context": {
+            "$ref": "#/components/schemas/RuntimeContext"
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeTimelineEntry"
+            }
+          },
+          "auditCorrelationIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RuntimeTraceEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "sequence",
+          "stage",
+          "source",
+          "status",
+          "occurredAt",
+          "attributes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "turnId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "OPENSTATE",
+              "EXTERNAL_PROVIDER"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "providerAlias": {
+            "type": "string",
+            "nullable": true
+          },
+          "providerReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "RuntimeTrace": {
+        "type": "object",
+        "required": [
+          "available",
+          "data"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeTraceEntry"
+            }
+          }
+        }
+      },
+      "RuntimeInstanceListResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RuntimeInstanceList"
+          }
+        }
+      },
+      "RuntimeInstanceDetailResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RuntimeInstanceDetail"
+          }
+        }
+      },
+      "RuntimeTraceResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RuntimeTrace"
+          }
+        }
+      },
       "AppInfo": {
         "type": "object",
         "required": [
@@ -1555,6 +3349,7 @@
           "status",
           "currentVersion",
           "version",
+          "definition",
           "createdAt",
           "updatedAt"
         ],
@@ -1595,7 +3390,11 @@
           },
           "version": {
             "type": "integer",
-            "description": "Optimistic-lock version (PRD \u00a731)"
+            "description": "Optimistic-lock version (PRD §31)"
+          },
+          "definition": {
+            "type": "object",
+            "description": "Complete editable WorkflowDefinition graph"
           },
           "createdAt": {
             "type": "string",
@@ -1611,7 +3410,8 @@
         "type": "object",
         "required": [
           "slug",
-          "name"
+          "name",
+          "definition"
         ],
         "properties": {
           "projectId": {
@@ -1626,13 +3426,18 @@
           },
           "description": {
             "type": "string"
+          },
+          "definition": {
+            "type": "object",
+            "description": "Complete initial WorkflowDefinition graph"
           }
         }
       },
       "UpdateWorkflowRequest": {
         "type": "object",
         "required": [
-          "version"
+          "version",
+          "definition"
         ],
         "properties": {
           "name": {
@@ -1644,21 +3449,234 @@
           "version": {
             "type": "integer",
             "description": "Expected optimistic version; conflicts return 409"
+          },
+          "definition": {
+            "type": "object",
+            "description": "Complete replacement WorkflowDefinition graph"
           }
         }
       },
       "PublishWorkflowRequest": {
         "type": "object",
         "required": [
-          "version",
-          "definition"
+          "version"
         ],
         "properties": {
           "version": {
+            "type": "integer",
+            "description": "Expected optimistic version"
+          }
+        }
+      },
+      "SimulateWorkflowRequest": {
+        "type": "object",
+        "required": [
+          "definition"
+        ],
+        "properties": {
+          "definition": {
+            "type": "object",
+            "description": "Complete unsaved WorkflowDefinition snapshot"
+          },
+          "initialContext": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Optional context available before the first event"
+          },
+          "events": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "required": [
+                "type"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "SimulationState": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "START",
+              "STATE",
+              "DECISION",
+              "EVENT",
+              "END"
+            ]
+          }
+        }
+      },
+      "SimulationCandidate": {
+        "type": "object",
+        "required": [
+          "transitionId",
+          "event",
+          "priority",
+          "guardPassed"
+        ],
+        "properties": {
+          "transitionId": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "priority": {
             "type": "integer"
           },
-          "definition": {
-            "description": "Full WorkflowDefinition envelope stored as JSONB (PRD \u00a768)"
+          "guardPassed": {
+            "type": "boolean"
+          },
+          "guardError": {
+            "type": "string"
+          }
+        }
+      },
+      "SimulationCapabilityRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "mock",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "mock": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PLANNED"
+            ]
+          }
+        }
+      },
+      "SimulationStep": {
+        "type": "object",
+        "required": [
+          "sequence",
+          "outcome",
+          "stateBefore",
+          "candidates",
+          "context",
+          "capabilityRequests"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ENTERED",
+              "TRANSITIONED",
+              "REJECTED"
+            ]
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "eventPayload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "stateBefore": {
+            "$ref": "#/components/schemas/SimulationState"
+          },
+          "stateAfter": {
+            "$ref": "#/components/schemas/SimulationState"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulationCandidate"
+            }
+          },
+          "selectedTransitionId": {
+            "type": "string"
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "capabilityRequests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulationCapabilityRequest"
+            }
+          },
+          "errorCode": {
+            "type": "string",
+            "enum": [
+              "EVENT_NOT_ALLOWED",
+              "GUARD_FAILED",
+              "GUARD_EVALUATION_ERROR"
+            ]
+          },
+          "errorMessage": {
+            "type": "string"
+          }
+        }
+      },
+      "SimulationResult": {
+        "type": "object",
+        "required": [
+          "finalState",
+          "finalContext",
+          "finalStatus",
+          "steps"
+        ],
+        "properties": {
+          "finalState": {
+            "$ref": "#/components/schemas/SimulationState"
+          },
+          "finalContext": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "finalStatus": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "COMPLETED"
+            ]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulationStep"
+            }
           }
         }
       },
@@ -1670,6 +3688,7 @@
           "versionNo",
           "status",
           "isCurrent",
+          "definition",
           "createdAt",
           "updatedAt"
         ],
@@ -1696,6 +3715,10 @@
           "isCurrent": {
             "type": "boolean"
           },
+          "definition": {
+            "type": "object",
+            "description": "Immutable WorkflowDefinition snapshot"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -1706,91 +3729,99 @@
           }
         }
       },
-      "AuditEntry": {
+      "WorkflowDiffItem": {
         "type": "object",
         "required": [
-          "id",
-          "tenantId",
-          "actor",
-          "action",
-          "resourceType",
-          "resourceId",
-          "occurredAt"
+          "id"
         ],
         "properties": {
           "id": {
             "type": "string"
           },
-          "tenantId": {
-            "type": "string"
+          "definition": {
+            "type": "object"
           },
-          "actor": {
-            "type": "string"
-          },
-          "action": {
-            "type": "string"
-          },
-          "resourceType": {
-            "type": "string"
-          },
-          "resourceId": {
-            "type": "string"
-          },
-          "before": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "after": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "correlationId": {
-            "type": "string"
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "AuditPage": {
-        "type": "object",
-        "required": [
-          "data",
-          "page",
-          "pageSize",
-          "total",
-          "hasNext"
-        ],
-        "properties": {
-          "data": {
+          "changedFields": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AuditEntry"
+              "type": "string"
             }
-          },
-          "page": {
-            "type": "integer"
-          },
-          "pageSize": {
-            "type": "integer"
-          },
-          "total": {
-            "type": "integer"
-          },
-          "hasNext": {
-            "type": "boolean"
           }
         }
       },
-      "AuditListResponse": {
+      "WorkflowValidationIssue": {
         "type": "object",
         "required": [
-          "data"
+          "code",
+          "message"
         ],
         "properties": {
-          "data": {
-            "$ref": "#/components/schemas/AuditPage"
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "transitionId": {
+            "type": "string"
+          }
+        }
+      },
+      "WorkflowDiffGroup": {
+        "type": "object",
+        "required": [
+          "added",
+          "removed",
+          "changed"
+        ],
+        "properties": {
+          "added": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowDiffItem"
+            }
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowDiffItem"
+            }
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowDiffItem"
+            }
+          }
+        }
+      },
+      "WorkflowDiff": {
+        "type": "object",
+        "required": [
+          "workflowId",
+          "baseVersion",
+          "targetVersion",
+          "nodes",
+          "transitions"
+        ],
+        "properties": {
+          "workflowId": {
+            "type": "string"
+          },
+          "baseVersion": {
+            "type": "integer"
+          },
+          "targetVersion": {
+            "type": "integer"
+          },
+          "nodes": {
+            "$ref": "#/components/schemas/WorkflowDiffGroup"
+          },
+          "transitions": {
+            "$ref": "#/components/schemas/WorkflowDiffGroup"
           }
         }
       }

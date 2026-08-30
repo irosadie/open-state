@@ -1,5 +1,7 @@
 "use client"
 
+import type { SimulationResultResponse } from "@openstate/types"
+import type { WorkflowVersionResponse } from "@openstate/types"
 import type { Edge, Node } from "@xyflow/react"
 import { create } from "zustand"
 import type {
@@ -18,16 +20,17 @@ import {
 } from "./types/workflow.utils"
 import { getLayoutedNodes } from "./utils/auto-layout"
 import {
+  clearDraftLocal,
   loadApiId,
   loadApiVersion,
   loadDraftLocal,
   saveApiId,
   saveApiVersion,
-  saveDraftLocal,
 } from "./utils/draft-bridge"
 import { toast } from "./utils/toast"
 import {
   createWorkflowApi,
+  getWorkflowApi,
   publishWorkflowApi,
   updateWorkflowApi,
 } from "./utils/workflow-api"
@@ -39,6 +42,17 @@ const MAX_HISTORY = 50
 
 /** Daftar workflow contoh yang bisa di-load (single source: intent-resolver) */
 export const EXAMPLE_WORKFLOWS: WorkflowDefinition[] = ALL_WORKFLOWS
+
+export interface SimulationDraftEvent {
+  id: string
+  type: string
+  payloadText: string
+}
+
+export interface SimulationFocusTarget {
+  nodeIds: string[]
+  transitionId: string | null
+}
 
 interface StateBuilderState {
   workflow: WorkflowDefinition
@@ -56,6 +70,8 @@ interface StateBuilderState {
   isHydrated: boolean
   isSaving: boolean
   lastSavedAt: string | null
+  saveError: string | null
+  saveConflict: boolean
   searchQuery: string
 
   /** Authoritative API workflow id (null until first successful API save) */
@@ -63,10 +79,23 @@ interface StateBuilderState {
   /** Optimistic version tracked from the API response */
   apiVersion: number
 
+  // transient simulation state (never persisted with the workflow draft)
+  simulationOpen: boolean
+  simulationInitialContextText: string
+  simulationEvents: SimulationDraftEvent[]
+  simulationResult: SimulationResultResponse | null
+  simulationError: string | null
+  simulationIsRunning: boolean
+  simulationSelectedSequence: number | null
+  simulationFocusTarget: SimulationFocusTarget | null
+  simulationStale: boolean
+  simulationFingerprint: string | null
+
   setSaving: (v: boolean) => void
+  setSaveError: (message: string | null, conflict?: boolean) => void
 
   // actions
-  hydrate: () => Promise<void>
+  hydrate: (workflowId?: string) => Promise<void>
   setNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
   selectNode: (id: string | null) => void
@@ -90,7 +119,27 @@ interface StateBuilderState {
   clearAll: () => void
   setSearchQuery: (q: string) => void
   persist: () => Promise<void>
-  publish: () => Promise<void>
+  publish: () => Promise<WorkflowVersionResponse>
+
+  getSimulationSnapshot: () => WorkflowDefinition
+  openSimulation: () => void
+  closeSimulation: () => void
+  setSimulationInitialContextText: (value: string) => void
+  addSimulationEvent: () => void
+  updateSimulationEvent: (
+    id: string,
+    patch: Partial<Pick<SimulationDraftEvent, "type" | "payloadText">>,
+  ) => void
+  removeSimulationEvent: (id: string) => void
+  setSimulationIsRunning: (value: boolean) => void
+  setSimulationError: (value: string | null) => void
+  setSimulationResult: (
+    result: SimulationResultResponse,
+    fingerprint: string,
+  ) => void
+  selectSimulationStep: (sequence: number | null) => void
+  resetSimulation: () => void
+  markSimulationStale: () => void
 
   resetValidation: () => void
   revalidate: () => void
@@ -136,6 +185,82 @@ function materialize(
   }
 }
 
+function parseServerDraft(
+  value: Record<string, unknown>,
+): WorkflowDefinition | null {
+  if (!Array.isArray(value.nodes) || !Array.isArray(value.transitions)) {
+    return null
+  }
+  return value as unknown as WorkflowDefinition
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "object" && error !== null) {
+    const value = error as {
+      message?: unknown
+      error?: unknown
+      details?: unknown
+    }
+    if (typeof value.message === "string") return value.message
+    if (typeof value.error === "string") {
+      if (Array.isArray(value.details)) {
+        const detailMessages = value.details
+          .map((detail) =>
+            typeof detail === "object" &&
+            detail !== null &&
+            "message" in detail &&
+            typeof (detail as { message?: unknown }).message === "string"
+              ? (detail as { message: string }).message
+              : null,
+          )
+          .filter((message): message is string => Boolean(message))
+        if (detailMessages.length > 0) {
+          return `${value.error}: ${detailMessages.join("; ")}`
+        }
+      }
+      return value.error
+    }
+  }
+  return "Permintaan gagal"
+}
+
+function focusTargetFor(
+  result: SimulationResultResponse | null,
+  sequence: number | null,
+): SimulationFocusTarget | null {
+  if (!result || sequence === null) return null
+  const step = result.steps.find((item) => item.sequence === sequence)
+  if (!step) return null
+  return {
+    nodeIds: [step.stateBefore.id, step.stateAfter?.id].filter(
+      (id): id is string => Boolean(id),
+    ),
+    transitionId: step.selectedTransitionId || null,
+  }
+}
+
+function invalidateSimulation(
+  state: StateBuilderState,
+): Partial<StateBuilderState> {
+  return state.simulationResult
+    ? {
+        simulationStale: true,
+        simulationSelectedSequence: null,
+        simulationFocusTarget: null,
+      }
+    : {}
+}
+
+function invalidateSimulationFor(
+  state: StateBuilderState,
+  nextWorkflow: WorkflowDefinition,
+): Partial<StateBuilderState> {
+  return JSON.stringify(state.workflow) === JSON.stringify(nextWorkflow)
+    ? {}
+    : invalidateSimulation(state)
+}
+
 /** Wrapper action yang otomatis: push history + revalidate */
 function tracked(
   get: () => StateBuilderState,
@@ -155,13 +280,16 @@ function tracked(
     selectedNodeId: prev.selectedNodeId,
     selectedEdgeId: prev.selectedEdgeId,
     validation: validateWorkflow(nextWf),
+    ...invalidateSimulationFor(prev, nextWf),
   })
   void schedulePersist()
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null
+let persistQueue: Promise<void> = Promise.resolve()
+let legacyImportPending = false
 
-/** Auto-save (debounce 800ms): local bridge first, then API */
+/** Auto-save (debounce 800ms): persist the complete graph to the API. */
 function schedulePersist() {
   if (persistTimer) clearTimeout(persistTimer)
   persistTimer = setTimeout(() => {
@@ -173,7 +301,7 @@ function schedulePersist() {
         useStateBuilderStore.getState().setSaving(false)
       })
       .catch((err) => {
-        toast.error(`Gagal menyimpan draft: ${(err as Error).message}`)
+        toast.error(`Gagal menyimpan draft: ${getErrorMessage(err)}`)
         useStateBuilderStore.getState().setSaving(false)
       })
   }, 800)
@@ -197,52 +325,119 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
     isHydrated: false,
     isSaving: false,
     lastSavedAt: null,
+    saveError: null,
+    saveConflict: false,
     searchQuery: "",
     apiWorkflowId: null,
     apiVersion: 0,
 
-    hydrate: async () => {
+    simulationOpen: false,
+    simulationInitialContextText: "{}",
+    simulationEvents: [],
+    simulationResult: null,
+    simulationError: null,
+    simulationIsRunning: false,
+    simulationSelectedSequence: null,
+    simulationFocusTarget: null,
+    simulationStale: false,
+    simulationFingerprint: null,
+
+    hydrate: async (workflowId) => {
       try {
-        // Load draft body from local bridge (localStorage)
-        const draft = loadDraftLocal()
-        const apiId = loadApiId()
-        const apiVer = loadApiVersion()
-        if (draft) {
+        if (workflowId) {
+          const serverWorkflow = await getWorkflowApi({ id: workflowId })
+          const draft = parseServerDraft(serverWorkflow.definition)
+          if (!draft) {
+            throw new Error("Draft server tidak memiliki graph yang valid")
+          }
           const { nodes: n, edges: e } = materialize(draft, true)
           set({
             workflow: draft,
             nodes: n,
             edges: e,
             validation: validateWorkflow(draft),
-            apiWorkflowId: apiId,
-            apiVersion: apiVer ?? 0,
+            apiWorkflowId: serverWorkflow.id,
+            apiVersion: serverWorkflow.version,
           })
+          saveApiId(serverWorkflow.id)
+          saveApiVersion(serverWorkflow.version)
         } else {
-          set({ apiWorkflowId: apiId, apiVersion: apiVer ?? 0 })
+          // A legacy local draft is only considered when no server workflow id
+          // was requested; it can never overwrite a server draft.
+          const apiId = loadApiId()
+          const apiVer = loadApiVersion()
+          if (apiId) {
+            const serverWorkflow = await getWorkflowApi({ id: apiId })
+            const draft = parseServerDraft(serverWorkflow.definition)
+            if (!draft)
+              throw new Error("Draft server tidak memiliki graph yang valid")
+            const { nodes: n, edges: e } = materialize(draft, true)
+            set({
+              workflow: draft,
+              nodes: n,
+              edges: e,
+              validation: validateWorkflow(draft),
+              apiWorkflowId: serverWorkflow.id,
+              apiVersion: serverWorkflow.version,
+            })
+          } else {
+            const localDraft = loadDraftLocal()
+            const draft =
+              localDraft &&
+              typeof window !== "undefined" &&
+              window.confirm(
+                "Ditemukan draft lama di browser. Import ke server sekarang?",
+              )
+                ? localDraft
+                : null
+            if (!draft) {
+              set({ apiWorkflowId: null, apiVersion: 0 })
+            } else {
+              legacyImportPending = true
+              const { nodes: n, edges: e } = materialize(draft, true)
+              set({
+                workflow: draft,
+                nodes: n,
+                edges: e,
+                validation: validateWorkflow(draft),
+                apiWorkflowId: null,
+                apiVersion: apiVer ?? 0,
+              })
+            }
+          }
         }
       } catch (err) {
-        toast.error(`Gagal memuat draft: ${(err as Error).message}`)
+        toast.error(`Gagal memuat draft: ${getErrorMessage(err)}`)
       } finally {
-        set({ isHydrated: true })
+        set((state) => ({ isHydrated: true, ...invalidateSimulation(state) }))
       }
     },
 
     setNodes: (nodes) => {
-      const wf = buildSnapshot(get().workflow, nodes, get().edges)
-      const history = [...get().history, get().workflow].slice(-MAX_HISTORY)
-      set({ nodes, workflow: wf, history, future: [] })
+      const state = get()
+      const wf = buildSnapshot(state.workflow, nodes, state.edges)
+      const history = [...state.history, state.workflow].slice(-MAX_HISTORY)
+      set({
+        nodes,
+        workflow: wf,
+        history,
+        future: [],
+        ...invalidateSimulationFor(state, wf),
+      })
       get().revalidate()
       void schedulePersist()
     },
 
     setEdges: (edges) => {
-      const wf = buildSnapshot(get().workflow, get().nodes, edges)
-      const history = [...get().history, get().workflow].slice(-MAX_HISTORY)
+      const state = get()
+      const wf = buildSnapshot(state.workflow, state.nodes, edges)
+      const history = [...state.history, state.workflow].slice(-MAX_HISTORY)
       set({
         edges: toFlowEdges(wf),
         workflow: wf,
         history,
         future: [],
+        ...invalidateSimulationFor(state, wf),
       })
       get().revalidate()
       void schedulePersist()
@@ -372,7 +567,14 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
     },
 
     setWorkflowMeta: (patch) => {
-      set({ workflow: { ...get().workflow, ...patch } })
+      const state = get()
+      set({
+        workflow: { ...state.workflow, ...patch },
+        ...invalidateSimulationFor(state, {
+          ...state.workflow,
+          ...patch,
+        }),
+      })
       void schedulePersist()
     },
 
@@ -390,6 +592,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
         selectedNodeId: null,
         selectedEdgeId: null,
         validation: validateWorkflow(prev),
+        ...invalidateSimulation(get()),
       })
       void schedulePersist()
     },
@@ -408,6 +611,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
         selectedNodeId: null,
         selectedEdgeId: null,
         validation: validateWorkflow(next),
+        ...invalidateSimulation(get()),
       })
       void schedulePersist()
     },
@@ -426,6 +630,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
         // Clear API id when loading a new workflow — needs a fresh create
         apiWorkflowId: null,
         apiVersion: 0,
+        ...invalidateSimulation(get()),
       })
       saveApiId(null)
       void schedulePersist()
@@ -458,6 +663,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
         validation: validateWorkflow(fresh),
         apiWorkflowId: null,
         apiVersion: 0,
+        ...invalidateSimulation(get()),
       })
       saveApiId(null)
       void schedulePersist()
@@ -475,42 +681,81 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
     setSearchQuery: (q) => set({ searchQuery: q }),
 
     setSaving: (v) => set({ isSaving: v }),
+    setSaveError: (message, conflict = false) =>
+      set({ saveError: message, saveConflict: conflict }),
 
-    persist: async () => {
-      const { workflow, nodes, edges, apiWorkflowId, apiVersion } = get()
-      const snapshot = buildSnapshot(workflow, nodes, edges)
+    persist: () => {
+      // Serialize all saves so autosave, manual save, and publish cannot race
+      // with the same optimistic-lock version.
+      const operation = async () => {
+        const { workflow, nodes, edges, apiWorkflowId, apiVersion } = get()
+        const snapshot = buildSnapshot(workflow, nodes, edges)
 
-      // 1. Always save the draft body to the local bridge first (non-blocking
-      //    for the API call; ensures the graph survives refresh even if offline).
-      saveDraftLocal(snapshot)
+        // Sync the workflow root and its complete draft graph to the API.
+        set({ isSaving: true, saveError: null, saveConflict: false })
+        try {
+          if (!apiWorkflowId) {
+            // First save — create the workflow root via the Builder API.
+            const created = await createWorkflowApi({
+              slug: snapshot.slug,
+              name: snapshot.name,
+              description: snapshot.description,
+              definition: snapshot,
+            })
+            set({ apiWorkflowId: created.id, apiVersion: created.version })
+            saveApiId(created.id)
+            saveApiVersion(created.version)
+            if (legacyImportPending) {
+              clearDraftLocal()
+              legacyImportPending = false
+            }
+          } else {
+            // Subsequent save — bump the optimistic version.
+            const updated = await updateWorkflowApi({
+              id: apiWorkflowId,
+              version: apiVersion,
+              name: snapshot.name,
+              description: snapshot.description,
+              definition: snapshot,
+            })
+            set({ apiVersion: updated.version })
+            saveApiVersion(updated.version)
+          }
 
-      // 2. Sync the workflow root to the API.
-      if (!apiWorkflowId) {
-        // First save — create the workflow root via the Builder API.
-        const created = await createWorkflowApi({
-          slug: snapshot.slug,
-          name: snapshot.name,
-          description: snapshot.description,
-        })
-        set({ apiWorkflowId: created.id, apiVersion: created.version })
-        saveApiId(created.id)
-        saveApiVersion(created.version)
-      } else {
-        // Subsequent save — bump the optimistic version.
-        const updated = await updateWorkflowApi({
-          id: apiWorkflowId,
-          version: apiVersion,
-        })
-        set({ apiVersion: updated.version })
-        saveApiVersion(updated.version)
+          set({ isSaving: false, lastSavedAt: new Date().toISOString() })
+        } catch (err) {
+          const apiError = err as {
+            status?: number
+            response?: { status?: number }
+          }
+          const conflict =
+            apiError.response?.status === 409 || apiError.status === 409
+          const message = getErrorMessage(err)
+          set({ isSaving: false, saveError: message, saveConflict: conflict })
+          throw err
+        }
       }
 
-      set({ isSaving: false, lastSavedAt: new Date().toISOString() })
+      const next = persistQueue.then(operation, operation)
+      persistQueue = next.catch(() => undefined)
+      return next
     },
 
     publish: async () => {
+      // Flush a pending debounce and ensure the server draft is current before
+      // creating an immutable version.
+      if (persistTimer) {
+        clearTimeout(persistTimer)
+        persistTimer = null
+      }
+      await get().persist()
       const { workflow, nodes, edges, apiWorkflowId, apiVersion } = get()
       const snapshot = buildSnapshot(workflow, nodes, edges)
+      const validation = validateWorkflow(snapshot)
+      set({ validation })
+      if (!validation.valid) {
+        throw new Error("Workflow tidak valid. Perbaiki error sebelum publish.")
+      }
 
       // Ensure there's an API workflow root before publishing.
       let id = apiWorkflowId
@@ -520,6 +765,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
           slug: snapshot.slug,
           name: snapshot.name,
           description: snapshot.description,
+          definition: snapshot,
         })
         id = created.id
         ver = created.version
@@ -528,15 +774,107 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
         saveApiVersion(ver)
       }
 
-      await publishWorkflowApi({
+      const published = await publishWorkflowApi({
         id,
         version: ver,
-        definition: snapshot,
       })
       // After publish, update the local version tracking.
       set({ apiVersion: ver + 1, lastSavedAt: new Date().toISOString() })
       saveApiVersion(ver + 1)
+      return published
     },
+
+    getSimulationSnapshot: () => {
+      const state = get()
+      return buildSnapshot(state.workflow, state.nodes, state.edges)
+    },
+
+    openSimulation: () =>
+      set({
+        simulationOpen: true,
+        simulationError: null,
+        simulationSelectedSequence: null,
+        simulationFocusTarget: null,
+      }),
+
+    closeSimulation: () => set({ simulationOpen: false }),
+
+    setSimulationInitialContextText: (value) =>
+      set({ simulationInitialContextText: value, simulationError: null }),
+
+    addSimulationEvent: () =>
+      set((state) => ({
+        simulationEvents: [
+          ...state.simulationEvents,
+          { id: uid("sim-event"), type: "", payloadText: "{}" },
+        ],
+        simulationError: null,
+      })),
+
+    updateSimulationEvent: (id, patch) =>
+      set((state) => ({
+        simulationEvents: state.simulationEvents.map((event) =>
+          event.id === id ? { ...event, ...patch } : event,
+        ),
+        simulationError: null,
+      })),
+
+    removeSimulationEvent: (id) =>
+      set((state) => ({
+        simulationEvents: state.simulationEvents.filter(
+          (event) => event.id !== id,
+        ),
+        simulationError: null,
+      })),
+
+    setSimulationIsRunning: (value) => set({ simulationIsRunning: value }),
+
+    setSimulationError: (value) =>
+      set({ simulationError: value, simulationIsRunning: false }),
+
+    setSimulationResult: (result, fingerprint) =>
+      set({
+        simulationResult: result,
+        simulationFingerprint: fingerprint,
+        simulationError: null,
+        simulationIsRunning: false,
+        simulationStale: false,
+        simulationSelectedSequence: result.steps[0]?.sequence ?? null,
+        simulationFocusTarget: focusTargetFor(
+          result,
+          result.steps[0]?.sequence ?? null,
+        ),
+      }),
+
+    selectSimulationStep: (sequence) =>
+      set((state) => ({
+        simulationSelectedSequence: sequence,
+        simulationFocusTarget: focusTargetFor(state.simulationResult, sequence),
+      })),
+
+    resetSimulation: () =>
+      set({
+        simulationInitialContextText: "{}",
+        simulationEvents: [],
+        simulationResult: null,
+        simulationError: null,
+        simulationIsRunning: false,
+        simulationSelectedSequence: null,
+        simulationFocusTarget: null,
+        simulationStale: false,
+        simulationFingerprint: null,
+      }),
+
+    markSimulationStale: () =>
+      set((state) =>
+        state.simulationResult
+          ? {
+              simulationStale: true,
+              simulationSelectedSequence: null,
+              simulationFocusTarget: null,
+            }
+          : {},
+      ),
 
     resetValidation: () => set({ validation: null }),
 

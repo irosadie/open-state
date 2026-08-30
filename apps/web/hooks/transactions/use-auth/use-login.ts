@@ -1,5 +1,6 @@
 import { authConfig } from "$/configs/auth"
 import { queryKeys } from "$/constants"
+import { sanitizeCallbackPath } from "$/utils/rbac"
 import { type LoginProps, loginSchema } from "@openstate/schemas"
 import { useMutation } from "@tanstack/react-query"
 import { signIn } from "next-auth/react"
@@ -14,9 +15,8 @@ type LoginResult = {
 
 const login = async ({ callbackUrl, ...credentials }: LoginPayload) => {
   const validatedCredentials = loginSchema.parse(credentials)
-  const normalizedCallbackUrl = callbackUrl?.startsWith("/")
-    ? callbackUrl
-    : authConfig.defaultRedirectPath
+  const normalizedCallbackUrl =
+    sanitizeCallbackPath(callbackUrl) ?? authConfig.defaultRedirectPath
 
   const result = await signIn("credentials", {
     ...validatedCredentials,

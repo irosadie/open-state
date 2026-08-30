@@ -1,11 +1,10 @@
 /**
- * Local durability bridge for the State Builder (PRD 128, epic #5).
+ * Legacy browser bridge for the State Builder (PRD 128, epic #5).
  *
- * The backend currently persists the full workflow definition only at publish
- * (immutable version); the draft *body* (nodes/graph) has no server column yet.
- * Until that lands, the draft definition and the authoritative API workflow id
- * are mirrored to the browser so an in-progress edit survives a refresh. The
- * API remains the source of truth for workflow identity (create/update/publish).
+ * The server-side workflow draft is now authoritative. The draft key is read
+ * only as an explicit migration fallback for work created before API drafts;
+ * API identity/version keys remain a small browser convenience for reopening
+ * the last workflow.
  */
 import type { WorkflowDefinition } from "../types/workflow"
 
@@ -22,16 +21,17 @@ function safeParse<T>(raw: string | null): T | null {
   }
 }
 
-export function saveDraftLocal(wf: WorkflowDefinition): void {
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(wf))
-  } catch {
-    // storage unavailable (e.g. SSR) — non-fatal
-  }
-}
-
 export function loadDraftLocal(): WorkflowDefinition | null {
   return safeParse<WorkflowDefinition>(localStorage.getItem(DRAFT_KEY))
+}
+
+/** Remove a legacy local draft after an explicit, successful migration. */
+export function clearDraftLocal(): void {
+  try {
+    localStorage.removeItem(DRAFT_KEY)
+  } catch {
+    // ignore
+  }
 }
 
 export function saveApiId(id: string | null): void {

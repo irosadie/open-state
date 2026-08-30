@@ -1,3 +1,4 @@
+import { tenantConfig } from "$/configs/tenant"
 import { apiRouters, queryKeys } from "$/constants"
 import { axios } from "$/services/axios"
 import type { ErrorResponse } from "$/types/generals"
@@ -13,6 +14,7 @@ const getCurrentUser = async () => {
   const result = await axios<AuthCurrentUserResponse>({
     method: "GET",
     url: apiRouters.auth.me,
+    headers: { "X-Tenant-ID": tenantConfig.tenantId },
   })
 
   return result
@@ -25,9 +27,9 @@ const useCurrentUser = (args?: UseCurrentUserArgs) => {
     AuthCurrentUserResponse,
     ErrorResponse<AxiosError>,
     AuthCurrentUserResponse,
-    [string]
+    [string, string]
   >({
-    queryKey: [queryKeys.auth.me],
+    queryKey: [queryKeys.auth.me, tenantConfig.tenantId],
     queryFn: getCurrentUser,
     enabled,
   })

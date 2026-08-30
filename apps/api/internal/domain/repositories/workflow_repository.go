@@ -13,7 +13,7 @@ import (
 // on domain entities (DB-agnostic, ADR-001).
 type IWorkflowRepository interface {
 	// Create persists a new workflow definition root within a project.
-	Create(ctx context.Context, tenantID, projectID, slug, name string, description *string) (*entities.Workflow, error)
+	Create(ctx context.Context, tenantID, projectID, slug, name string, description *string, draftDefinition []byte) (*entities.Workflow, error)
 	// FindByID returns a workflow by id within a tenant and project.
 	FindByID(ctx context.Context, tenantID, projectID, id string) (*entities.Workflow, error)
 	// FindBySlug returns a workflow by slug within a tenant and project (PRD §5).
@@ -22,6 +22,9 @@ type IWorkflowRepository interface {
 	ListByTenant(ctx context.Context, tenantID, projectID string) ([]entities.Workflow, error)
 	// UpdateStatus updates workflow status using optimistic concurrency (PRD §31).
 	UpdateStatus(ctx context.Context, tenantID, projectID, id string, status entities.WorkflowStatus, expectedVersion int) (*entities.Workflow, error)
+	// UpdateDraft atomically replaces the editable graph and metadata under an
+	// optimistic lock, incrementing the workflow version on success.
+	UpdateDraft(ctx context.Context, tenantID, projectID, id, name string, description *string, draftDefinition []byte, expectedVersion int) (*entities.Workflow, error)
 
 	// CreateVersion persists a new immutable workflow version snapshot.
 	CreateVersion(ctx context.Context, tenantID, projectID, workflowID string, versionNo int, definition []byte, status entities.VersionStatus, isCurrent bool) (*entities.WorkflowVersion, error)

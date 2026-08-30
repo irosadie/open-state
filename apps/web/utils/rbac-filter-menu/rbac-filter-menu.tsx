@@ -1,3 +1,4 @@
+import { canAccessRoute, getRoutePolicy, hasAnyPermission } from "$/utils/rbac"
 import type { ReactNode } from "react"
 
 type Permission = string
@@ -46,35 +47,6 @@ export const rbacFilterMenu = (
       })
   }
 
-  const hasMatchingPermissions = (
-    permissionsArray: Permission[],
-    userPermissions: Permission[],
-  ) => {
-    const checkPermissionArray =
-      permissionsArray?.some((perm) => {
-        if (perm.includes("*")) {
-          const base = perm.replace(/\.\*$/, "")
-          const regex = new RegExp(`^${base}(\\.[a-zA-Z0-9_-]+)*(\\.[*])?$`)
-
-          return userPermissions.some((permArray) => regex.test(permArray))
-        }
-        return userPermissions.includes(perm)
-      }) ?? false
-
-    const checkUserPermission =
-      userPermissions?.some((perm) => {
-        if (perm.includes("*")) {
-          const base = perm.replace(/\.\*$/, "")
-          const regex = new RegExp(`^${base}(\\.[a-zA-Z0-9_-]+)*(\\.[*])?$`)
-
-          return permissionsArray.some((permArray) => regex.test(permArray))
-        }
-        return permissionsArray.includes(perm)
-      }) ?? false
-
-    return checkPermissionArray || checkUserPermission
-  }
-
   const recursiveFilter = (items: MenuProps[]) =>
     items
       .map((item) => {
@@ -84,10 +56,17 @@ export const rbacFilterMenu = (
           newItem.children = recursiveFilter(newItem.children)
         }
 
-        const isPermissionValid =
-          newItem.hasPermissions &&
-          hasMatchingPermissions(newItem.hasPermissions, permissions)
-        const noHasPermission = !newItem.hasPermissions
+        const hasRoutePolicy = Boolean(
+          newItem.href && getRoutePolicy(newItem.href),
+        )
+        const hasExplicitPermission = newItem.hasPermissions
+          ? hasAnyPermission(newItem.hasPermissions, permissions)
+          : true
+        const hasRoutePermission = newItem.href
+          ? !hasRoutePolicy || canAccessRoute(newItem.href, permissions)
+          : true
+        const isPermissionValid = hasExplicitPermission && hasRoutePermission
+        const noHasPermission = !newItem.hasPermissions && !hasRoutePolicy
 
         if (isPermissionValid) {
           return { ...newItem, isValid: true }

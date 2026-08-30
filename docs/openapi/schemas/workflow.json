@@ -1,7 +1,7 @@
 {
   "Workflow": {
     "type": "object",
-    "required": ["id", "tenantId", "projectId", "slug", "name", "status", "currentVersion", "version", "createdAt", "updatedAt"],
+    "required": ["id", "tenantId", "projectId", "slug", "name", "status", "currentVersion", "version", "definition", "createdAt", "updatedAt"],
     "properties": {
       "id": { "type": "string" },
       "tenantId": { "type": "string" },
@@ -15,42 +15,119 @@
       },
       "currentVersion": { "type": "integer" },
       "version": { "type": "integer", "description": "Optimistic-lock version (PRD §31)" },
+      "definition": { "type": "object", "description": "Complete editable WorkflowDefinition graph" },
       "createdAt": { "type": "string", "format": "date-time" },
       "updatedAt": { "type": "string", "format": "date-time" }
     }
   },
   "CreateWorkflowRequest": {
     "type": "object",
-    "required": ["slug", "name"],
+    "required": ["slug", "name", "definition"],
     "properties": {
       "projectId": { "type": "string", "description": "Optional; defaults to the tenant's default project" },
       "slug": { "type": "string" },
       "name": { "type": "string" },
-      "description": { "type": "string" }
+      "description": { "type": "string" },
+      "definition": { "type": "object", "description": "Complete initial WorkflowDefinition graph" }
     }
   },
   "UpdateWorkflowRequest": {
     "type": "object",
-    "required": ["version"],
+    "required": ["version", "definition"],
     "properties": {
       "name": { "type": "string" },
       "description": { "type": "string" },
-      "version": { "type": "integer", "description": "Expected optimistic version; conflicts return 409" }
+      "version": { "type": "integer", "description": "Expected optimistic version; conflicts return 409" },
+      "definition": { "type": "object", "description": "Complete replacement WorkflowDefinition graph" }
     }
   },
   "PublishWorkflowRequest": {
     "type": "object",
-    "required": ["version", "definition"],
+    "required": ["version"],
     "properties": {
-      "version": { "type": "integer" },
-      "definition": {
-        "description": "Full WorkflowDefinition envelope stored as JSONB (PRD §68)"
+      "version": { "type": "integer", "description": "Expected optimistic version" }
+    }
+  },
+  "SimulateWorkflowRequest": {
+    "type": "object",
+    "required": ["definition"],
+    "properties": {
+      "definition": { "type": "object", "description": "Complete unsaved WorkflowDefinition snapshot" },
+      "initialContext": { "type": "object", "additionalProperties": true, "description": "Optional context available before the first event" },
+      "events": {
+        "type": "array",
+        "maxItems": 100,
+        "items": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "type": "string" },
+            "payload": { "type": "object", "additionalProperties": true }
+          }
+        }
       }
+    }
+  },
+  "SimulationState": {
+    "type": "object",
+    "required": ["id", "name", "kind"],
+    "properties": {
+      "id": { "type": "string" },
+      "name": { "type": "string" },
+      "kind": { "type": "string", "enum": ["START", "STATE", "DECISION", "EVENT", "END"] }
+    }
+  },
+  "SimulationCandidate": {
+    "type": "object",
+    "required": ["transitionId", "event", "priority", "guardPassed"],
+    "properties": {
+      "transitionId": { "type": "string" },
+      "event": { "type": "string" },
+      "priority": { "type": "integer" },
+      "guardPassed": { "type": "boolean" },
+      "guardError": { "type": "string" }
+    }
+  },
+  "SimulationCapabilityRequest": {
+    "type": "object",
+    "required": ["name", "mock", "status"],
+    "properties": {
+      "name": { "type": "string" },
+      "mock": { "type": "boolean", "enum": [true] },
+      "status": { "type": "string", "enum": ["PLANNED"] }
+    }
+  },
+  "SimulationStep": {
+    "type": "object",
+    "required": ["sequence", "outcome", "stateBefore", "candidates", "context", "capabilityRequests"],
+    "properties": {
+      "sequence": { "type": "integer", "minimum": 0 },
+      "outcome": { "type": "string", "enum": ["ENTERED", "TRANSITIONED", "REJECTED"] },
+      "eventType": { "type": "string" },
+      "eventPayload": { "type": "object", "additionalProperties": true },
+      "stateBefore": { "$ref": "#/components/schemas/SimulationState" },
+      "stateAfter": { "$ref": "#/components/schemas/SimulationState" },
+      "candidates": { "type": "array", "items": { "$ref": "#/components/schemas/SimulationCandidate" } },
+      "selectedTransitionId": { "type": "string" },
+      "context": { "type": "object", "additionalProperties": true },
+      "capabilityRequests": { "type": "array", "items": { "$ref": "#/components/schemas/SimulationCapabilityRequest" } },
+      "errorCode": { "type": "string", "enum": ["EVENT_NOT_ALLOWED", "GUARD_FAILED", "GUARD_EVALUATION_ERROR"] },
+      "errorMessage": { "type": "string" }
+    }
+  },
+  "SimulationResult": {
+    "type": "object",
+    "required": ["finalState", "finalContext", "finalStatus", "steps"],
+    "properties": {
+      "finalState": { "$ref": "#/components/schemas/SimulationState" },
+      "finalContext": { "type": "object", "additionalProperties": true },
+      "finalStatus": { "type": "string", "enum": ["RUNNING", "COMPLETED"] },
+      "steps": { "type": "array", "items": { "$ref": "#/components/schemas/SimulationStep" } }
     }
   },
   "WorkflowVersion": {
     "type": "object",
-    "required": ["id", "workflowId", "versionNo", "status", "isCurrent", "createdAt", "updatedAt"],
+    "required": ["id", "workflowId", "versionNo", "status", "isCurrent", "definition", "createdAt", "updatedAt"],
     "properties": {
       "id": { "type": "string" },
       "workflowId": { "type": "string" },
@@ -60,8 +137,48 @@
         "enum": ["DRAFT", "VALIDATING", "VALID", "PUBLISHED", "ARCHIVED"]
       },
       "isCurrent": { "type": "boolean" },
+      "definition": { "type": "object", "description": "Immutable WorkflowDefinition snapshot" },
       "createdAt": { "type": "string", "format": "date-time" },
       "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "WorkflowDiffItem": {
+    "type": "object",
+    "required": ["id"],
+    "properties": {
+      "id": { "type": "string" },
+      "definition": { "type": "object" },
+      "changedFields": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "WorkflowValidationIssue": {
+    "type": "object",
+    "required": ["code", "message"],
+    "properties": {
+      "code": { "type": "string" },
+      "message": { "type": "string" },
+      "nodeId": { "type": "string" },
+      "transitionId": { "type": "string" }
+    }
+  },
+  "WorkflowDiffGroup": {
+    "type": "object",
+    "required": ["added", "removed", "changed"],
+    "properties": {
+      "added": { "type": "array", "items": { "$ref": "#/components/schemas/WorkflowDiffItem" } },
+      "removed": { "type": "array", "items": { "$ref": "#/components/schemas/WorkflowDiffItem" } },
+      "changed": { "type": "array", "items": { "$ref": "#/components/schemas/WorkflowDiffItem" } }
+    }
+  },
+  "WorkflowDiff": {
+    "type": "object",
+    "required": ["workflowId", "baseVersion", "targetVersion", "nodes", "transitions"],
+    "properties": {
+      "workflowId": { "type": "string" },
+      "baseVersion": { "type": "integer" },
+      "targetVersion": { "type": "integer" },
+      "nodes": { "$ref": "#/components/schemas/WorkflowDiffGroup" },
+      "transitions": { "$ref": "#/components/schemas/WorkflowDiffGroup" }
     }
   }
 }

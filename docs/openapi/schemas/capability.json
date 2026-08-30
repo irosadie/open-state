@@ -102,7 +102,11 @@
     "type": "object",
     "required": ["error"],
     "properties": {
-      "error": { "type": "string" }
+      "error": { "type": "string" },
+      "details": {
+        "type": "array",
+        "items": { "$ref": "#/components/schemas/WorkflowValidationIssue" }
+      }
     }
   },
   "NotFoundError": {

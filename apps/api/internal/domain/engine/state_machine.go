@@ -137,12 +137,12 @@ func (e *Engine) ProcessEvent(ctx context.Context, tenantID, instanceID string, 
 	}
 
 	stateInst := &StateInstance{
-		ID:                newID(),
+		ID:                 newID(),
 		WorkflowInstanceID: instance.ID,
-		StateID:           target.ID,
-		Status:            StateActive,
-		EnteredAt:         now,
-		ExitedAt:          ptrTime(now),
+		StateID:            target.ID,
+		Status:             StateActive,
+		EnteredAt:          now,
+		ExitedAt:           ptrTime(now),
 	}
 
 	return instance, stateInst, nil
@@ -179,11 +179,11 @@ func (e *Engine) AllowedTransitions(ctx context.Context, tenantID, instanceID st
 
 // StateInfo is the current node's purpose/instructions/context for a client.
 type StateInfo struct {
-	StateID        string
-	Purpose        string
-	Instructions   string
+	StateID         string
+	Purpose         string
+	Instructions    string
 	RequiredContext []string
-	Capabilities   []string
+	Capabilities    []string
 }
 
 // CurrentStateInfo returns the current node's purpose (description), instructions,
@@ -236,26 +236,49 @@ func transitionsFrom(def *WorkflowDefinition, sourceStateID, eventType string) [
 // highest-priority *passing* transition wins. Only genuine evaluation errors
 // (e.g. an unsupported operator) abort the selection.
 func selectTransition(candidates []TransitionDefinition, ctx map[string]any) (*TransitionDefinition, error) {
+	best, _, err := evaluateTransitions(candidates, ctx)
+	return best, err
+}
+
+// transitionEvaluation captures the outcome of evaluating one candidate. It is
+// intentionally internal; simulation maps it to a response-safe trace while
+// ProcessEvent continues to expose only the selected transition/error.
+type transitionEvaluation struct {
+	transition TransitionDefinition
+	passed     bool
+	err        error
+}
+
+// evaluateTransitions applies the production guard and priority rules while
+// retaining each candidate's result for the simulation trace. A guard failure
+// means only that candidate does not apply; a genuine evaluation error aborts
+// selection, matching the existing ProcessEvent contract.
+func evaluateTransitions(candidates []TransitionDefinition, ctx map[string]any) (*TransitionDefinition, []transitionEvaluation, error) {
 	var best *TransitionDefinition
+	evaluations := make([]transitionEvaluation, 0, len(candidates))
 	for i := range candidates {
 		c := candidates[i]
 		ok, err := EvaluateGuards(c.Guards, ctx)
 		if err != nil {
 			var guardErr *ErrGuardFailed
 			if errors.As(err, &guardErr) {
+				evaluations = append(evaluations, transitionEvaluation{transition: c, passed: false})
 				continue // this candidate doesn't apply; try the next
 			}
-			return nil, err
+			evaluations = append(evaluations, transitionEvaluation{transition: c, err: err})
+			return nil, evaluations, err
 		}
 		if !ok {
+			evaluations = append(evaluations, transitionEvaluation{transition: c, passed: false})
 			continue
 		}
+		evaluations = append(evaluations, transitionEvaluation{transition: c, passed: true})
 		if best == nil || c.Priority < best.Priority {
 			cc := c
 			best = &cc
 		}
 	}
-	return best, nil
+	return best, evaluations, nil
 }
 
 func mergePayload(ctx map[string]any, payload map[string]any) {

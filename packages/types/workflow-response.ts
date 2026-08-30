@@ -25,8 +25,36 @@ export type WorkflowResponse = {
   status: WorkflowStatus
   currentVersion: number
   version: number
+  definition: Record<string, unknown>
   createdAt: string
   updatedAt: string
+}
+
+export type WorkflowValidationIssueResponse = {
+  code: string
+  message: string
+  nodeId?: string
+  transitionId?: string
+}
+
+export type WorkflowDiffItemResponse = {
+  id: string
+  definition?: Record<string, unknown>
+  changedFields?: string[]
+}
+
+export type WorkflowDiffGroupResponse = {
+  added: WorkflowDiffItemResponse[]
+  removed: WorkflowDiffItemResponse[]
+  changed: WorkflowDiffItemResponse[]
+}
+
+export type WorkflowDiffResponse = {
+  workflowId: string
+  baseVersion: number
+  targetVersion: number
+  nodes: WorkflowDiffGroupResponse
+  transitions: WorkflowDiffGroupResponse
 }
 
 // Immutable workflow version snapshot (PRD §3.3, §9).
@@ -38,4 +66,5 @@ export type WorkflowVersionResponse = {
   isCurrent: boolean
   createdAt: string
   updatedAt: string
+  definition: Record<string, unknown>
 }

@@ -2,10 +2,12 @@
 
 import { useCallback, useState } from "react"
 
+import { PermissionGate } from "$/components/auth-guard/permission-gate"
 import { Button } from "$/components/button"
 import { ContentTitle } from "$/components/content-title"
 import { PanelCard } from "$/components/panel-card"
 import { Select } from "$/components/select"
+import { useAuthorization } from "$/providers/authorization-provider"
 import { PlusIcon } from "lucide-react"
 
 import {
@@ -35,6 +37,7 @@ const statusFilterOptions = capabilityStatuses.map((value) => ({
 }))
 
 export default function CapabilitiesPageContent() {
+  const authorization = useAuthorization()
   const [providerType, setProviderType] = useState<
     CapabilityProviderType | undefined
   >(undefined)
@@ -52,12 +55,19 @@ export default function CapabilitiesPageContent() {
     isLoading,
     isError,
     refetch,
-  } = useCapabilitiesList({ providerType, status })
+  } = useCapabilitiesList({
+    providerType,
+    status,
+    enabled:
+      authorization.status === "ready" &&
+      authorization.hasPermission("capability:read"),
+  })
 
   const { mutateAsync: createMutateAsync, isPending: isCreatePending } =
     useCapabilitiesCreate()
   const { mutate: deleteMutate, isPending: isDeletePending } =
     useCapabilitiesDelete()
+  const canDelete = authorization.hasPermission("capability:delete")
 
   const handleCreate = useCallback(
     async (payload: CreateCapabilitySchemaProps) => {
@@ -120,13 +130,15 @@ export default function CapabilitiesPageContent() {
         title="Capability Registry"
         description="Manage the tenant capability registry (PRD §59)"
         action={
-          <Button
-            intent="primary"
-            leftIcon={<PlusIcon size={16} />}
-            onClick={() => setIsFormOpen(true)}
-          >
-            New Capability
-          </Button>
+          <PermissionGate action="capability:create">
+            <Button
+              intent="primary"
+              leftIcon={<PlusIcon size={16} />}
+              onClick={() => setIsFormOpen(true)}
+            >
+              New Capability
+            </Button>
+          </PermissionGate>
         }
       >
         <div className="flex flex-wrap items-center gap-4 px-6 pt-4">
@@ -179,13 +191,17 @@ export default function CapabilitiesPageContent() {
           <CapabilitiesTable
             data={capabilities || []}
             isLoading={isLoading}
-            onDisable={(id) => {
-              const cap = (capabilities || []).find((c) => c.id === id)
+            onDisable={
+              canDelete
+                ? (id) => {
+                    const cap = (capabilities || []).find((c) => c.id === id)
 
-              if (cap) {
-                setPendingDisable(cap)
-              }
-            }}
+                    if (cap) {
+                      setPendingDisable(cap)
+                    }
+                  }
+                : undefined
+            }
           />
         )}
       </PanelCard>
@@ -197,15 +213,17 @@ export default function CapabilitiesPageContent() {
         onSubmit={handleCreate}
       />
 
-      <CapabilityConfirmDialog
-        open={!!pendingDisable}
-        isPending={isDeletePending}
-        title="Disable capability"
-        description={`Disabling "${pendingDisable?.name ?? ""}" also removes its bindings. Continue?`}
-        confirmLabel="Yes, disable"
-        onCancel={() => setPendingDisable(null)}
-        onConfirm={handleConfirmDisable}
-      />
+      <PermissionGate action="capability:delete">
+        <CapabilityConfirmDialog
+          open={!!pendingDisable}
+          isPending={isDeletePending}
+          title="Disable capability"
+          description={`Disabling "${pendingDisable?.name ?? ""}" also removes its bindings. Continue?`}
+          confirmLabel="Yes, disable"
+          onCancel={() => setPendingDisable(null)}
+          onConfirm={handleConfirmDisable}
+        />
+      </PermissionGate>
     </div>
   )
 }

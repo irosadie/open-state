@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -38,17 +39,34 @@ func newPgxWorkflowRepository(q *db.Queries, sqlDB *sql.DB) repositories.IWorkfl
 	return &PgxWorkflowRepository{queries: q, db: sqlDB}
 }
 
-func (r *PgxWorkflowRepository) Create(ctx context.Context, tenantID, projectID, slug, name string, description *string) (*entities.Workflow, error) {
+func (r *PgxWorkflowRepository) Create(ctx context.Context, tenantID, projectID, slug, name string, description *string, draftDefinition []byte) (*entities.Workflow, error) {
 	row, err := r.queries.CreateWorkflow(ctx, db.CreateWorkflowParams{
-		TenantID:    mustUUID(tenantID),
-		ProjectID:   mustUUID(projectID),
-		Slug:        slug,
-		Name:        name,
-		Description: nullString(description),
-		Status:      string(entities.WorkflowDraft),
+		TenantID:        mustUUID(tenantID),
+		ProjectID:       mustUUID(projectID),
+		Slug:            slug,
+		Name:            name,
+		Description:     nullString(description),
+		Status:          string(entities.WorkflowDraft),
+		DraftDefinition: json.RawMessage(draftDefinition),
 	})
 	if err != nil {
 		return nil, mapPgError(err, "create workflow")
+	}
+	return mapWorkflow(row), nil
+}
+
+func (r *PgxWorkflowRepository) UpdateDraft(ctx context.Context, tenantID, projectID, id, name string, description *string, draftDefinition []byte, expectedVersion int) (*entities.Workflow, error) {
+	row, err := r.queries.UpdateWorkflowDraft(ctx, db.UpdateWorkflowDraftParams{
+		ID:              mustUUID(id),
+		TenantID:        mustUUID(tenantID),
+		ProjectID:       mustUUID(projectID),
+		Name:            name,
+		Description:     nullString(description),
+		DraftDefinition: json.RawMessage(draftDefinition),
+		Version:         int32(expectedVersion),
+	})
+	if err != nil {
+		return nil, mapOptimisticError(err)
 	}
 	return mapWorkflow(row), nil
 }
@@ -328,17 +346,18 @@ func (r *PgxWorkflowRepository) ListGuardsByTransition(ctx context.Context, tena
 
 func mapWorkflow(row db.Workflow) *entities.Workflow {
 	return &entities.Workflow{
-		ID:             row.ID.String(),
-		TenantID:       row.TenantID.String(),
-		ProjectID:      row.ProjectID.String(),
-		Slug:           row.Slug,
-		Name:           row.Name,
-		Description:    row.Description,
-		Status:         entities.WorkflowStatus(row.Status),
-		CurrentVersion: int(row.CurrentVersion),
-		Version:        int(row.Version),
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
+		ID:              row.ID.String(),
+		TenantID:        row.TenantID.String(),
+		ProjectID:       row.ProjectID.String(),
+		Slug:            row.Slug,
+		Name:            row.Name,
+		Description:     row.Description,
+		Status:          entities.WorkflowStatus(row.Status),
+		CurrentVersion:  int(row.CurrentVersion),
+		Version:         int(row.Version),
+		DraftDefinition: row.DraftDefinition,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
 	}
 }
 

@@ -8,8 +8,10 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
+	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	"github.com/irosadie/open-state/api/internal/domain/engine"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
+	"github.com/irosadie/open-state/api/internal/domain/repositories"
 )
 
 func testDeps() Dependencies {
@@ -20,6 +22,33 @@ func testDeps() Dependencies {
 }
 
 type fakeOrchestrator struct{}
+
+type mcpTraceRepo struct {
+	entries []entities.RuntimeTraceEntry
+}
+
+func (r *mcpTraceRepo) Append(_ context.Context, tenantID string, input repositories.AppendRuntimeTraceInput) (*entities.RuntimeTraceEntry, error) {
+	entry := entities.RuntimeTraceEntry{
+		ID:                 "trace-1",
+		TenantID:           tenantID,
+		WorkflowInstanceID: input.WorkflowInstanceID,
+		Sequence:           int64(len(r.entries) + 1),
+		Stage:              input.Stage,
+		Source:             input.Source,
+		Status:             input.Status,
+		Attributes:         input.Attributes,
+	}
+	r.entries = append(r.entries, entry)
+	return &r.entries[len(r.entries)-1], nil
+}
+
+func (r *mcpTraceRepo) ListByInstance(context.Context, string, string) ([]entities.RuntimeTraceEntry, error) {
+	return r.entries, nil
+}
+
+func (r *mcpTraceRepo) ListByTurn(context.Context, string, string, string) ([]entities.RuntimeTraceEntry, error) {
+	return r.entries, nil
+}
 
 func (fakeOrchestrator) StartWorkflow(_ context.Context, _ string, workflowID, versionID, correlation string) (*entities.WorkflowInstance, error) {
 	return &entities.WorkflowInstance{ID: "inst-1", WorkflowID: workflowID, WorkflowVersionID: versionID, Status: entities.WorkflowInstanceRunning}, nil
@@ -158,7 +187,7 @@ func TestStartWorkflowToolDispatch(t *testing.T) {
 	call := mcp.CallToolRequest{Params: mcp.CallToolParams{
 		Name: "start_workflow",
 		Arguments: map[string]any{
-			"tenant":  "tenant-1",
+			"tenant":   "tenant-1",
 			"workflow": "wf-1",
 			"version":  "wv-1",
 		},
@@ -169,5 +198,25 @@ func TestStartWorkflowToolDispatch(t *testing.T) {
 	}
 	if res.IsError {
 		t.Fatalf("tool returned error: %+v", res.Content)
+	}
+}
+
+func TestMCPRuntimeBoundaryRecordsOnlyApplicationMetadata(t *testing.T) {
+	repo := &mcpTraceRepo{}
+	deps := testDeps()
+	deps.TraceRecorder = appservices.NewRuntimeTraceRecorder(repo)
+
+	if _, err := handleStartWorkflow(context.Background(), deps, "tenant-1", "workflow-1", "version-1", "conversation-1"); err != nil {
+		t.Fatalf("start workflow: %v", err)
+	}
+	if len(repo.entries) != 1 {
+		t.Fatalf("expected one trace entry, got %d", len(repo.entries))
+	}
+	entry := repo.entries[0]
+	if entry.Stage != entities.RuntimeTraceStageWorkflowLookup || entry.Source != entities.RuntimeTraceSourceOpenState {
+		t.Fatalf("unexpected trace boundary: %+v", entry)
+	}
+	if _, ok := entry.Attributes["raw_response"]; ok {
+		t.Fatal("raw provider data should not be part of an application boundary")
 	}
 }

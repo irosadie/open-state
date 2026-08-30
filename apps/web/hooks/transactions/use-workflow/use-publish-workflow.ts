@@ -54,6 +54,9 @@ const usePublishWorkflow = () => {
       void queryClient.invalidateQueries({
         queryKey: [queryKeys.workflows.versions, data.workflowId],
       })
+      void queryClient.invalidateQueries({
+        queryKey: [queryKeys.workflows.compare, data.workflowId],
+      })
     },
   })
 

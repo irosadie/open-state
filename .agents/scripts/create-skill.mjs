@@ -5,6 +5,7 @@ import {
   createClaudeWrapperContent,
   createOpenAiYamlContent,
   manifestPath,
+  opencodeSkillsRoot,
   parseSkillFrontmatter,
   readManifest,
   readText,
@@ -86,6 +87,10 @@ function planFiles({ name, description, title, displayName, shortDescription, de
     },
     {
       path: path.join(repoRoot, '.claude', 'skills', name, 'SKILL.md'),
+      content: createClaudeWrapperContent({ name, description }),
+    },
+    {
+      path: path.join(opencodeSkillsRoot, name, 'SKILL.md'),
       content: createClaudeWrapperContent({ name, description }),
     },
   ];
@@ -175,6 +180,10 @@ try {
     stdio: 'inherit',
   });
   execFileSync(process.execPath, [path.join(repoRoot, '.agents', 'scripts', 'sync-claude-skills.mjs')], {
+    cwd: repoRoot,
+    stdio: 'inherit',
+  });
+  execFileSync(process.execPath, [path.join(repoRoot, '.agents', 'scripts', 'sync-opencode-skills.mjs')], {
     cwd: repoRoot,
     stdio: 'inherit',
   });

@@ -32,6 +32,9 @@ type Dependencies struct {
 	Orchestrator OrchestratorPort
 	// ContextCompiler compiles minimal per-turn context (PRD 22).
 	ContextCompiler ContextCompilerPort
+	// TraceRecorder records application-observed runtime boundaries. It is
+	// optional so integrations can remain read/command-only during rollout.
+	TraceRecorder *appservices.RuntimeTraceRecorder
 }
 
 // IntentPort resolves conversation intents to workflows.

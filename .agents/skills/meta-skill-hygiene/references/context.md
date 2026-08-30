@@ -6,8 +6,9 @@
 - `.agents/skills/*/agents/openai.yaml` → Codex/OpenAI metadata
 - `.agents/skills/manifest.json` → registry source of truth (`scope`, `path`, `whenToUse`)
 - `.agents/scripts/` → automation for create/sync/validate
-- `.claude/skills/*/SKILL.md` → generated wrapper from the source of truth
-- `.agents/AGENTS.md` and `CLAUDE.md` → generated registry sections via markers
+- `.claude/skills/*/SKILL.md` → generated Claude wrapper from the source of truth
+- `.opencode/skill/*/SKILL.md` → generated OpenCode wrapper from the source of truth
+- `.agents/AGENTS.md`, `CLAUDE.md`, and `opencode.md` → generated registry/list sections via markers
 
 ## Commands
 
@@ -16,12 +17,13 @@ bun run skills:create -- --name {scope-capability} --scope {scope} --description
 bun run skills:sync
 bun run skills:sync-registry
 bun run skills:sync-claude
+bun run skills:sync-opencode
 bun run skills:validate
 ```
 
 ## Key Patterns
 
 - Registry changes must originate from `manifest.json`, never manual table edits.
-- The Claude wrapper must always be regenerated from `SKILL.md`.
+- Claude and OpenCode wrappers must always be regenerated from `SKILL.md`.
 - `openai.yaml` holds interface/policy metadata only — never the main skill instructions.
-- Run the validator before merging changes under `.agents/` or `.claude/`.
+- Run the validator before merging changes under `.agents/`, `.claude/`, or `.opencode/`.

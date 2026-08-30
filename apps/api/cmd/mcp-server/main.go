@@ -69,6 +69,7 @@ func main() {
 		raginfra.StubRAGProvider{},
 		raginfra.NewDefaultRedactor(),
 	)
+	traceRecorder := appservices.NewRuntimeTraceRecorder(adapter.RuntimeTraces())
 
 	// Capability invoker (sandbox/mock provider by default, PRD §2064). Wired with
 	// a repository-backed resolver (authorization, PRD 59-62) and the JSON schema
@@ -90,6 +91,7 @@ func main() {
 		CapabilityInvoker: invoker,
 		Orchestrator:      orchestrator,
 		ContextCompiler:   contextCompiler,
+		TraceRecorder:     traceRecorder,
 	}
 
 	srv := mcpapi.NewServer(deps)
