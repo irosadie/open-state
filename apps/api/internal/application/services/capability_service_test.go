@@ -18,7 +18,7 @@ type fakeCapRepo struct {
 	caps map[string]*entities.Capability
 }
 
-func (f *fakeCapRepo) Create(_ context.Context, tenantID, name string, description *string, pt entities.ProviderType, providerID *string, is, os []byte, version int, credRef *string) (*entities.Capability, error) {
+func (f *fakeCapRepo) Create(_ context.Context, tenantID, name string, description *string, pt entities.ProviderType, providerID, providerTool *string, is, os []byte, version int, credRef *string) (*entities.Capability, error) {
 	if f.caps == nil {
 		f.caps = map[string]*entities.Capability{}
 	}
@@ -37,6 +37,9 @@ func (f *fakeCapRepo) Create(_ context.Context, tenantID, name string, descripti
 	if providerID != nil {
 		c.ProviderID = sql.NullString{String: *providerID, Valid: true}
 	}
+	if providerTool != nil {
+		c.ProviderTool = sql.NullString{String: *providerTool, Valid: true}
+	}
 	if credRef != nil {
 		c.CredentialReference = sql.NullString{String: *credRef, Valid: true}
 	}
@@ -44,18 +47,18 @@ func (f *fakeCapRepo) Create(_ context.Context, tenantID, name string, descripti
 	return c, nil
 }
 
-func (f *fakeCapRepo) FindByID(_ context.Context, _, id string) (*entities.Capability, error) {
+func (f *fakeCapRepo) FindByID(_ context.Context, tenantID, id string) (*entities.Capability, error) {
 	for _, c := range f.caps {
-		if c.ID == id {
+		if c.TenantID == tenantID && c.ID == id {
 			return c, nil
 		}
 	}
 	return nil, domain.NewNotFound("capability not found")
 }
 
-func (f *fakeCapRepo) FindByName(_ context.Context, _, name string) (*entities.Capability, error) {
+func (f *fakeCapRepo) FindByName(_ context.Context, tenantID, name string) (*entities.Capability, error) {
 	c, ok := f.caps[name]
-	if !ok {
+	if !ok || c.TenantID != tenantID {
 		return nil, domain.NewNotFound("capability not found")
 	}
 	return c, nil
@@ -73,7 +76,7 @@ func (f *fakeCapRepo) ListByTenantFiltered(_ context.Context, _ string, _ entiti
 	return f.ListByTenant(context.Background(), "")
 }
 
-func (f *fakeCapRepo) Update(_ context.Context, _, id string, description *string, providerType entities.ProviderType, providerID *string, input, output []byte, status entities.CapabilityStatus, version int, credRef *string) (*entities.Capability, error) {
+func (f *fakeCapRepo) Update(_ context.Context, _, id string, description *string, providerType entities.ProviderType, providerID, providerTool *string, input, output []byte, status entities.CapabilityStatus, version int, credRef *string) (*entities.Capability, error) {
 	for _, c := range f.caps {
 		if c.ID == id {
 			if description != nil {
@@ -82,6 +85,9 @@ func (f *fakeCapRepo) Update(_ context.Context, _, id string, description *strin
 			c.ProviderType = providerType
 			if providerID != nil {
 				c.ProviderID = sql.NullString{String: *providerID, Valid: true}
+			}
+			if providerTool != nil {
+				c.ProviderTool = sql.NullString{String: *providerTool, Valid: true}
 			}
 			c.InputSchema = input
 			c.OutputSchema = output
@@ -162,21 +168,59 @@ func TestCreateEmptyName(t *testing.T) {
 func TestCreateDuplicateNameConflict(t *testing.T) {
 	repo := &fakeCapRepo{}
 	svc := newTestService(repo)
-	_, err := svc.Create(context.Background(), "tenant-1", dtos.CreateCapabilityRequest{Name: "payment.create", ProviderType: "MCP"})
+	_, err := svc.Create(context.Background(), "tenant-1", dtos.CreateCapabilityRequest{Name: "payment.create", ProviderType: "MCP", ProviderID: "provider-mock", ProviderTool: "payment.create"})
 	if err != nil {
 		t.Fatalf("first create failed: %v", err)
 	}
-	_, err = svc.Create(context.Background(), "tenant-1", dtos.CreateCapabilityRequest{Name: "payment.create", ProviderType: "MCP"})
+	_, err = svc.Create(context.Background(), "tenant-1", dtos.CreateCapabilityRequest{Name: "payment.create", ProviderType: "MCP", ProviderID: "provider-mock", ProviderTool: "payment.create"})
 	var de *domain.DomainError
 	if !errors.As(err, &de) || de.Code != domain.ErrConflict {
 		t.Fatalf("expected conflict, got %v", err)
 	}
 }
 
+func TestCreateMCPProviderMappingIsStoredAndReturned(t *testing.T) {
+	repo := &fakeCapRepo{}
+	svc := newTestService(repo)
+
+	created, err := svc.Create(context.Background(), "tenant-1", dtos.CreateCapabilityRequest{
+		Name: "padel.availability.read", ProviderType: "MCP",
+		ProviderID: "padel-provider-mock", ProviderTool: "padel.cek_available",
+	})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+	if created.ProviderID == nil || *created.ProviderID != "padel-provider-mock" {
+		t.Fatalf("expected provider server alias, got %v", created.ProviderID)
+	}
+	if created.ProviderTool == nil || *created.ProviderTool != "padel.cek_available" {
+		t.Fatalf("expected provider tool, got %v", created.ProviderTool)
+	}
+
+	stored, err := repo.FindByName(context.Background(), "tenant-1", "padel.availability.read")
+	if err != nil {
+		t.Fatalf("find stored capability: %v", err)
+	}
+	if stored.ProviderID.String != "padel-provider-mock" || stored.ProviderTool.String != "padel.cek_available" {
+		t.Fatalf("provider mapping was not persisted: %+v", stored)
+	}
+}
+
+func TestCreateMCPRejectsProviderEndpoint(t *testing.T) {
+	svc := newTestService(&fakeCapRepo{})
+	_, err := svc.Create(context.Background(), "tenant-1", dtos.CreateCapabilityRequest{
+		Name: "padel.availability.read", ProviderType: "MCP",
+		ProviderID: "http://localhost:8031/mcp", ProviderTool: "padel.cek_available",
+	})
+	if !isValidation(err) {
+		t.Fatalf("expected provider endpoint validation error, got %v", err)
+	}
+}
+
 func TestUpdateInvalidStatus(t *testing.T) {
 	svc := newTestService(&fakeCapRepo{})
 	created, err := svc.Create(context.Background(), "tenant-1", dtos.CreateCapabilityRequest{
-		Name: "payment.create", ProviderType: "MCP",
+		Name: "payment.create", ProviderType: "MCP", ProviderID: "provider-mock", ProviderTool: "payment.create",
 		InputSchema:  map[string]any{"type": "object", "required": []any{"amount"}},
 		OutputSchema: map[string]any{"type": "object"},
 	})
@@ -196,7 +240,7 @@ func TestUpdateInvalidStatus(t *testing.T) {
 func TestUpdatePreservesUnsetFields(t *testing.T) {
 	svc := newTestService(&fakeCapRepo{})
 	created, err := svc.Create(context.Background(), "tenant-1", dtos.CreateCapabilityRequest{
-		Name: "payment.create", ProviderType: "MCP",
+		Name: "payment.create", ProviderType: "MCP", ProviderID: "provider-mock", ProviderTool: "payment.create",
 		InputSchema:  map[string]any{"type": "object", "required": []any{"amount"}},
 		OutputSchema: map[string]any{"type": "object"},
 	})
@@ -247,7 +291,7 @@ func TestSecretSafety(t *testing.T) {
 	svc := newTestService(repo)
 	secret := "super-secret-token"
 	dto, err := svc.Create(context.Background(), "tenant-1", dtos.CreateCapabilityRequest{
-		Name: "payment.create", ProviderType: "MCP", CredentialReference: secret,
+		Name: "payment.create", ProviderType: "MCP", ProviderID: "provider-mock", ProviderTool: "payment.create", CredentialReference: secret,
 	})
 	if err != nil {
 		t.Fatalf("create failed: %v", err)

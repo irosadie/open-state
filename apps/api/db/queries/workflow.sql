@@ -91,6 +91,12 @@ FROM workflow_versions
 WHERE workflow_id = $1 AND tenant_id = $2 AND project_id = $3 AND is_current = TRUE
 LIMIT 1;
 
+-- name: FindCurrentWorkflowVersionByWorkflow :one
+SELECT id, workflow_id, tenant_id, project_id, version_no, definition, status, is_current, created_at, updated_at
+FROM workflow_versions
+WHERE workflow_id = $1 AND tenant_id = $2 AND is_current = TRUE
+LIMIT 1;
+
 -- name: ListWorkflowVersions :many
 SELECT id, workflow_id, tenant_id, project_id, version_no, definition, status, is_current, created_at, updated_at
 FROM workflow_versions

@@ -7,8 +7,11 @@ import {
   ClipboardListIcon,
   CogIcon,
   FileClockIcon,
+  FolderIcon,
+  KeyRoundIcon,
   LayoutDashboardIcon,
   ListTreeIcon,
+  MessageSquareIcon,
   UsersIcon,
 } from "lucide-react"
 import Link from "next/link"
@@ -36,16 +39,34 @@ const navItems: readonly AdminNavItem[] = [
     icon: CogIcon,
   },
   {
+    href: "/admin/api-keys",
+    label: "State MCP API Keys",
+    permission: "api_key:read",
+    icon: KeyRoundIcon,
+  },
+  {
     href: "/admin/members",
     label: "Members & roles",
     permission: "user:read",
     icon: UsersIcon,
   },
   {
+    href: "/admin/projects",
+    label: "Projects",
+    permission: "workflow:read",
+    icon: FolderIcon,
+  },
+  {
     href: "/admin/workflows",
     label: "Workflows",
     permission: "workflow:read",
     icon: ListTreeIcon,
+  },
+  {
+    href: "/admin/intents",
+    label: "Intents",
+    permission: "workflow:read",
+    icon: MessageSquareIcon,
   },
   {
     href: "/admin/instances",

@@ -44,9 +44,10 @@ const nodeColorByType: Record<string, string> = {
 
 interface StateBuilderProps {
   workflowId?: string
+  projectId?: string
 }
 
-function BuilderInner({ workflowId }: StateBuilderProps) {
+function BuilderInner({ workflowId, projectId }: StateBuilderProps) {
   const nodes = useStateBuilderStore((s) => s.nodes)
   const edges = useStateBuilderStore((s) => s.edges)
   const setNodes = useStateBuilderStore((s) => s.setNodes)
@@ -78,6 +79,7 @@ function BuilderInner({ workflowId }: StateBuilderProps) {
   const persist = useStateBuilderStore((s) => s.persist)
   const publish = useStateBuilderStore((s) => s.publish)
   const apiWorkflowId = useStateBuilderStore((s) => s.apiWorkflowId)
+  const activeProjectId = useStateBuilderStore((s) => s.activeProjectId)
   const removeNode = useStateBuilderStore((s) => s.removeNode)
   const removeTransition = useStateBuilderStore((s) => s.removeTransition)
   const simulationOpen = useStateBuilderStore((s) => s.simulationOpen)
@@ -130,12 +132,14 @@ function BuilderInner({ workflowId }: StateBuilderProps) {
   const [targetVersion, setTargetVersion] = useState<number | null>(null)
   const versionsQuery = useWorkflowsVersions({
     id: apiWorkflowId ?? "",
+    projectId: activeProjectId,
     enabled: showVersions && Boolean(apiWorkflowId),
   })
   const diffQuery = useCompareWorkflowVersions(
     apiWorkflowId ?? "",
     baseVersion,
     targetVersion,
+    activeProjectId,
   )
 
   const { screenToFlowPosition } = useReactFlow()
@@ -143,8 +147,8 @@ function BuilderInner({ workflowId }: StateBuilderProps) {
 
   // Hydrate the draft from the Builder API on first mount.
   useEffect(() => {
-    void hydrate(workflowId)
-  }, [hydrate, workflowId])
+    void hydrate(workflowId, projectId)
+  }, [hydrate, projectId, workflowId])
 
   useEffect(() => {
     if (
@@ -673,10 +677,13 @@ function getErrorMessage(error: unknown): string {
   return "Permintaan gagal"
 }
 
-export function StateBuilder({ workflowId }: StateBuilderProps = {}) {
+export function StateBuilder({
+  workflowId,
+  projectId,
+}: StateBuilderProps = {}) {
   return (
     <ReactFlowProvider>
-      <BuilderInner workflowId={workflowId} />
+      <BuilderInner workflowId={workflowId} projectId={projectId} />
     </ReactFlowProvider>
   )
 }

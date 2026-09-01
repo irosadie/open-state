@@ -35,7 +35,8 @@ type Capability struct {
 	Name                string // logical capability, e.g. payment.create
 	Description         sql.NullString
 	ProviderType        ProviderType
-	ProviderID          sql.NullString
+	ProviderID          sql.NullString  // stable provider MCP server alias
+	ProviderTool        sql.NullString  // concrete provider MCP tool name
 	InputSchema         json.RawMessage // JSON schema of required inputs
 	OutputSchema        json.RawMessage // JSON schema of produced outputs
 	Status              CapabilityStatus

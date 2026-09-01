@@ -63,6 +63,29 @@ func RegisterWorkflowRoutes(e *echo.Echo, ctrl *controllers.WorkflowController, 
 	g.GET("/:id/versions/:versionNo", ctrl.GetVersion, middleware.RequirePermission(authz, "workflow:read", audit))
 }
 
+// RegisterIntentRoutes registers the read-only canonical intent catalog behind
+// the same workflow read permission used by the workflow inventory.
+func RegisterIntentRoutes(e *echo.Echo, ctrl *controllers.IntentController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {
+	g := e.Group("/api/intents", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+	g.GET("", ctrl.List, middleware.RequirePermission(authz, "workflow:read", audit))
+}
+
+// RegisterProjectRoutes exposes read-only tenant project discovery for the
+// Admin Console flow and State MCP API-key creation.
+func RegisterProjectRoutes(e *echo.Echo, ctrl *controllers.ProjectController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {
+	g := e.Group("/api/projects", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+	g.GET("", ctrl.List, middleware.RequirePermission(authz, "workflow:read", audit))
+}
+
+// RegisterAPIKeyRoutes exposes the tenant-admin lifecycle for State MCP
+// machine credentials. Human JWT/RBAC remains the authority for these routes.
+func RegisterAPIKeyRoutes(e *echo.Echo, ctrl *controllers.APIKeyController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {
+	g := e.Group("/api/api-keys", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+	g.GET("", ctrl.List, middleware.RequirePermission(authz, "api_key:read", audit))
+	g.POST("", ctrl.Create, middleware.RequirePermission(authz, "api_key:create", audit))
+	g.POST("/:id/revoke", ctrl.Revoke, middleware.RequirePermission(authz, "api_key:revoke", audit))
+}
+
 // RegisterAuditRoutes registers the tenant-scoped audit trail query API
 // (PRD 50) behind auth + the audit:read RBAC guard.
 func RegisterAuditRoutes(e *echo.Echo, ctrl *controllers.AuditController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {

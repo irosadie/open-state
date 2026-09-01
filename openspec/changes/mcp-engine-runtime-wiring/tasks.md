@@ -16,6 +16,7 @@
 - [x] 2.4 Implement engine-backed `ReplayWorkflow`: replay recorded events through the engine to reproduce state.
 - [x] 2.5 Update `orchestrator_service_test.go` to cover engine-backed propose/transition, guard rejection, and replay (in-memory adapter).
 - [x] 2.6 Ensure existing non-engine callers/tests still pass when the engine is nil.
+- [x] 2.7 Initialize engine-backed `start_workflow` instances at the workflow entry node and persist the `RUNNING` status before MCP reads current state.
 
 ## 3. Composition root wiring (Skill: api-feature)
 

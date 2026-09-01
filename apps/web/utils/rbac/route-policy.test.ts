@@ -13,6 +13,9 @@ describe("route policy", () => {
     expect(canAccessRoute("/admin/audit", ["capability:read"])).toBe(false)
     expect(canAccessRoute("/state-builder", ["workflow:read"])).toBe(true)
     expect(canAccessRoute("/admin/instances", ["instance:read"])).toBe(true)
+    expect(canAccessRoute("/admin/api-keys", ["api_key:read"])).toBe(true)
+    expect(canAccessRoute("/admin/projects", ["workflow:read"])).toBe(true)
+    expect(canAccessRoute("/admin/projects", ["api_key:read"])).toBe(false)
     expect(canAccessRoute("/unknown", ["workflow:*"])).toBe(false)
   })
 
@@ -24,6 +27,7 @@ describe("route policy", () => {
 
   it("uses registered action policies and denies unknown actions", () => {
     expect(canAccessAction("workflow:publish", ["workflow:*"])).toBe(true)
+    expect(canAccessAction("api_key:create", ["api_key:*"])).toBe(true)
     expect(canAccessAction("workflow:publish", ["workflow:read"])).toBe(false)
     expect(canAccessAction("unknown:action", ["unknown:action"])).toBe(false)
   })

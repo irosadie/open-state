@@ -21,6 +21,7 @@ import { type FormEvent, useState } from "react"
 type CreateWorkflowDialogProps = {
   open: boolean
   onCancel: () => void
+  projectId?: string
 }
 
 type FieldErrors = Partial<Record<keyof CreateWorkflowSchemaProps, string>>
@@ -37,6 +38,7 @@ const emptyForm: Pick<
 export function CreateWorkflowDialog({
   open,
   onCancel,
+  projectId,
 }: CreateWorkflowDialogProps) {
   const router = useRouter()
   const { mutateAsync, isPending } = useWorkflowsCreate()
@@ -62,6 +64,7 @@ export function CreateWorkflowDialog({
 
     const parsed = createWorkflowSchema.safeParse({
       ...form,
+      projectId,
       definition: {},
     })
 
@@ -82,7 +85,11 @@ export function CreateWorkflowDialog({
 
     try {
       const data = await mutateAsync(parsed.data)
-      router.push(`/state-builder/${data.id}`)
+      router.push(
+        `/state-builder/${data.id}${
+          projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""
+        }`,
+      )
     } catch (err) {
       setApiError(extractErrorMessage(err) ?? "Failed to create workflow.")
     }

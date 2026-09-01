@@ -31,6 +31,12 @@ export const queryKeys = {
     compare: "workflowsCompare",
     simulate: "workflowsSimulate",
   },
+  intents: {
+    list: "intentsList",
+  },
+  projects: {
+    list: "projectsList",
+  },
   audit: {
     list: "auditList",
   },
@@ -40,6 +46,9 @@ export const queryKeys = {
     debugTrace: "runtimeInstanceDebugTrace",
   },
   admin: {
+    apiKeys: "adminAPIKeys",
+    createAPIKey: "adminCreateAPIKey",
+    revokeAPIKey: "adminRevokeAPIKey",
     tenant: "adminTenant",
     members: "adminMembers",
     updateTenant: "adminUpdateTenant",

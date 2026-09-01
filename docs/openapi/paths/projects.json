@@ -1,0 +1,38 @@
+{
+  "/api/projects": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "List current tenant projects",
+      "description": "Returns projects owned by the tenant selected by X-Tenant-ID. This read-only endpoint supplies project choices for the Admin Console flow and State MCP API-key creation and requires workflow:read.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Tenant-scoped project list",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/Project" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" }
+      }
+    }
+  }
+}

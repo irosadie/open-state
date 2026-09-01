@@ -262,11 +262,10 @@ function reachableStates(wf: WorkflowDefinition): Set<string> {
 
 function hasCycleWithoutExit(
   wf: WorkflowDefinition,
-  _terminalIds: Set<string>,
+  terminalIds: Set<string>,
 ): boolean {
-  // deteksi cycle dengan DFS sederhana
-  const visited = new Set<string>()
-  const inStack = new Set<string>()
+  // Deteksi cycle yang benar-benar tidak bisa mencapai node terminal.
+  // Siklus yang punya cabang keluar ke terminal adalah flow yang valid.
   const outEdges = new Map<string, string[]>()
   for (const tr of wf.transitions) {
     const list = outEdges.get(tr.sourceStateId) ?? []
@@ -274,23 +273,32 @@ function hasCycleWithoutExit(
     outEdges.set(tr.sourceStateId, list)
   }
 
-  function dfs(nodeId: string): boolean {
-    if (inStack.has(nodeId)) return true
-    if (visited.has(nodeId)) return false
-    visited.add(nodeId)
-    inStack.add(nodeId)
-    const targets = outEdges.get(nodeId) ?? []
-    for (const t of targets) {
-      if (dfs(t)) return true
+  function hasPath(
+    startId: string,
+    predicate: (id: string) => boolean,
+  ): boolean {
+    const visited = new Set<string>()
+    const stack = [...(outEdges.get(startId) ?? [])]
+    while (stack.length > 0) {
+      const id = stack.pop()
+      if (id === undefined || visited.has(id)) continue
+      if (predicate(id)) return true
+      visited.add(id)
+      stack.push(...(outEdges.get(id) ?? []))
     }
-    inStack.delete(nodeId)
     return false
   }
 
-  for (const node of wf.nodes) {
-    if (dfs(node.id)) return true
-  }
-  return false
+  const reachesTerminal = (nodeId: string) =>
+    terminalIds.has(nodeId) || hasPath(nodeId, (id) => terminalIds.has(id))
+  const isInCycle = (nodeId: string) => hasPath(nodeId, (id) => id === nodeId)
+
+  return wf.nodes.some(
+    (node) =>
+      !terminalIds.has(node.id) &&
+      isInCycle(node.id) &&
+      !reachesTerminal(node.id),
+  )
 }
 
 /** ------------------------------------------------------------------ */

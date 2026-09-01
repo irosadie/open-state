@@ -20,7 +20,7 @@ type fakeCapabilityRepo struct {
 	bindings []entities.CapabilityBinding
 }
 
-func (f *fakeCapabilityRepo) Create(_ context.Context, _ string, name string, _ *string, pt entities.ProviderType, pid *string, is, os []byte, _ int, _ *string) (*entities.Capability, error) {
+func (f *fakeCapabilityRepo) Create(_ context.Context, _ string, name string, _ *string, pt entities.ProviderType, pid, _ *string, is, os []byte, _ int, _ *string) (*entities.Capability, error) {
 	if f.byName == nil {
 		f.byName = map[string]*entities.Capability{}
 	}
@@ -56,23 +56,35 @@ func (f *fakeCapabilityRepo) ListByTenant(_ context.Context, _ string) ([]entiti
 func (f *fakeCapabilityRepo) ListByTenantFiltered(_ context.Context, _ string, _ entities.ProviderType, _ entities.CapabilityStatus) ([]entities.Capability, error) {
 	return f.ListByTenant(context.Background(), "")
 }
-func (f *fakeCapabilityRepo) Update(_ context.Context, _ string, _ string, _ *string, _ entities.ProviderType, _ *string, _, _ []byte, _ entities.CapabilityStatus, _ int, _ *string) (*entities.Capability, error) {
+func (f *fakeCapabilityRepo) Update(_ context.Context, _ string, _ string, _ *string, _ entities.ProviderType, _, _ *string, _, _ []byte, _ entities.CapabilityStatus, _ int, _ *string) (*entities.Capability, error) {
 	return nil, nil
 }
-func (f *fakeCapabilityRepo) UpdateStatus(_ context.Context, _, _ string, _ entities.CapabilityStatus) (*entities.Capability, error) { return nil, nil }
-func (f *fakeCapabilityRepo) Disable(_ context.Context, _, _ string) (*entities.Capability, error)                                { return nil, nil }
+func (f *fakeCapabilityRepo) UpdateStatus(_ context.Context, _, _ string, _ entities.CapabilityStatus) (*entities.Capability, error) {
+	return nil, nil
+}
+func (f *fakeCapabilityRepo) Disable(_ context.Context, _, _ string) (*entities.Capability, error) {
+	return nil, nil
+}
 func (f *fakeCapabilityRepo) Bind(_ context.Context, _, _ string, st entities.BindingScopeType, _ string, perm entities.BindingPermission) (*entities.CapabilityBinding, error) {
 	f.bindings = append(f.bindings, entities.CapabilityBinding{ScopeType: st, Permission: perm})
 	return nil, nil
 }
-func (f *fakeCapabilityRepo) ListBindingsByCapability(_ context.Context, _, _ string) ([]entities.CapabilityBinding, error) { return f.bindings, nil }
+func (f *fakeCapabilityRepo) ListBindingsByCapability(_ context.Context, _, _ string) ([]entities.CapabilityBinding, error) {
+	return f.bindings, nil
+}
 func (f *fakeCapabilityRepo) ListBindingsByScope(_ context.Context, _ string, _ entities.BindingScopeType, _ string) ([]entities.CapabilityBinding, error) {
 	return f.bindings, nil
 }
 func (f *fakeCapabilityRepo) Unbind(_ context.Context, _, _ string) error { return nil }
-func (f *fakeCapabilityRepo) UpsertPolicy(_ context.Context, _ string, _ entities.PolicyScopeType, _, _ string, _ []byte) (*entities.Policy, error) { return nil, nil }
-func (f *fakeCapabilityRepo) FindPolicyByType(_ context.Context, _ string, _ entities.PolicyScopeType, _, _ string) (*entities.Policy, error)       { return nil, nil }
-func (f *fakeCapabilityRepo) ListPoliciesByScope(_ context.Context, _ string, _ entities.PolicyScopeType, _ string) ([]entities.Policy, error)     { return nil, nil }
+func (f *fakeCapabilityRepo) UpsertPolicy(_ context.Context, _ string, _ entities.PolicyScopeType, _, _ string, _ []byte) (*entities.Policy, error) {
+	return nil, nil
+}
+func (f *fakeCapabilityRepo) FindPolicyByType(_ context.Context, _ string, _ entities.PolicyScopeType, _, _ string) (*entities.Policy, error) {
+	return nil, nil
+}
+func (f *fakeCapabilityRepo) ListPoliciesByScope(_ context.Context, _ string, _ entities.PolicyScopeType, _ string) ([]entities.Policy, error) {
+	return nil, nil
+}
 
 // ---------------------------------------------------------------------------
 // Resolver tests
@@ -82,7 +94,7 @@ func TestResolverResolveAllowed(t *testing.T) {
 	pid := "mcp-payment"
 	schema := []byte(`{"type":"object"}`)
 	repo := &fakeCapabilityRepo{}
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, entities.ProviderTypeMCP, &pid, schema, nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, entities.ProviderTypeMCP, &pid, nil, schema, nil, 1, nil)
 	r := NewCapabilityResolver(repo)
 
 	res, err := r.Resolve(context.Background(), "t", "payment.create", "wf", "st")
@@ -97,7 +109,7 @@ func TestResolverResolveAllowed(t *testing.T) {
 func TestResolverDeniedMostRestrictive(t *testing.T) {
 	pid := "mcp-payment"
 	repo := &fakeCapabilityRepo{}
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, entities.ProviderTypeMCP, &pid, nil, nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, entities.ProviderTypeMCP, &pid, nil, nil, nil, 1, nil)
 	// tenant allows, state denies → deny wins (state more specific)
 	repo.bindings = []entities.CapabilityBinding{
 		{ScopeType: entities.BindingScopeTenant, ScopeID: "t", Permission: entities.BindingPermissionAllow},

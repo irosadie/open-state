@@ -16,6 +16,7 @@
 - [x] 2.6 Implement deterministic node/transition diff calculation keyed by stable ids, including added, removed, changed, and changed-field results.
 - [x] 2.7 Register and test the expanded authenticated/RBAC-protected routes, including scope, malformed compare inputs, 404, validation, and 409 responses.
 - [x] 2.8 Update split OpenAPI documents and regenerate/validate the checked-in OpenAPI artifact for all changed and new workflow endpoints.
+- [x] 2.9 Ensure END nodes expose an incoming React Flow handle and only warn for cycles that cannot reach a terminal node.
 
 ## 3. Shared frontend API integration
 

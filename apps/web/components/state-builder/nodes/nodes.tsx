@@ -87,7 +87,7 @@ function TerminatorNode({ data, selected }: BaseNodeProps) {
       data-testid={`workflow-node-${data.id}`}
       className={`group relative ${selected ? "rounded-full ring-4 ring-violet-300 ring-offset-2" : ""}`}
     >
-      {!isEnd ? <TargetHandle /> : null}
+      <TargetHandle />
       <div
         className="flex min-w-[140px] items-center gap-2 rounded-full border-2 px-5 py-2.5 shadow-sm transition-shadow group-hover:shadow-md"
         style={{

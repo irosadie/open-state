@@ -40,7 +40,7 @@ cp apps/worker/.env.example apps/worker/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
-Edit secrets as needed (`JWT_SECRET`, `DATABASE_URL`, `REDIS_URL`).
+Edit secrets as needed (`JWT_SECRET`, `MCP_API_KEY_PEPPER`, `DATABASE_URL`, `REDIS_URL`).
 
 ### 3. Install deps, migrate, seed
 
@@ -66,6 +66,9 @@ cd apps/worker && go run ./cmd/worker/main.go
 
 # Web (3020)
 cd apps/web && bun run dev
+
+# State MCP (8030; required API key authentication)
+cd apps/api && go run ./cmd/mcp-server/main.go
 ```
 
 Open:
@@ -81,6 +84,8 @@ Open:
 | `API_PORT` | `8020` | HTTP API + MCP server port |
 | `DATABASE_URL` | — | PostgreSQL connection string |
 | `JWT_SECRET` | — | JWT signing secret (API) |
+| `MCP_API_KEY_PEPPER` | — | Required 32+ character verifier pepper for State MCP API keys |
+| `MCP_PORT` | `8030` | State MCP endpoint port (`/mcp`) |
 | `REDIS_URL` | `redis://127.0.0.1:6381` | Redis URL (worker) |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3020` | Web app base URL |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8020` | Backend base URL |
@@ -169,7 +174,12 @@ and their projects under a fixed demo tenant (`00000000-0000-0000-0000-000000000
 
 Canonical definitions live in `docs/*.workflow.json`. Seeding is scoped to the
 demo tenant so it never pollutes other tenants (PRD §4). Re-running the seed
-upserts rather than duplicating workflow/project rows.
+upserts rather than duplicating workflow/project/intent rows.
+
+The MCP routing sequence is `list_intents` → select the canonical intent key →
+`resolve_intent` → `start_workflow`. For example, the seeded `padel` project
+includes `BOOKING_PADEL` with examples such as `saya mau order lapangan` and
+`saya mau booking lapangan padel`.
 
 ## Verification & CI
 

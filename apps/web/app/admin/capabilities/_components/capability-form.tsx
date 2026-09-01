@@ -19,7 +19,6 @@ import {
   createCapabilitySchema,
   providerTypeLabels,
 } from "@openstate/schemas"
-import type { ZodError } from "zod"
 
 type CapabilityFormDialogProps = {
   open: boolean
@@ -33,6 +32,7 @@ type FormState = {
   description: string
   providerType?: CreateCapabilitySchemaProps["providerType"]
   providerId: string
+  providerTool: string
   inputSchema: string
   outputSchema: string
   credentialReference: string
@@ -44,6 +44,7 @@ const emptyForm: FormState = {
   description: "",
   providerType: undefined,
   providerId: "",
+  providerTool: "",
   inputSchema: "",
   outputSchema: "",
   credentialReference: "",
@@ -102,6 +103,7 @@ export function CapabilityFormDialog({
       description: form.description || undefined,
       providerType: form.providerType,
       providerId: form.providerId || undefined,
+      providerTool: form.providerTool || undefined,
       inputSchema,
       outputSchema,
       version: form.version ? Number(form.version) : undefined,
@@ -111,7 +113,7 @@ export function CapabilityFormDialog({
     if (!parsed.success) {
       const errors: FieldErrors = {}
 
-      for (const issue of (parsed.error as ZodError).issues) {
+      for (const issue of parsed.error.issues) {
         const key = issue.path[0] as keyof CreateCapabilitySchemaProps
 
         if (key) {
@@ -169,10 +171,19 @@ export function CapabilityFormDialog({
           />
 
           <Input
-            label="Provider ID"
-            placeholder="Optional provider id"
+            label="Provider MCP server alias"
+            placeholder="padel-provider-mock"
+            required={form.providerType === "MCP"}
             value={form.providerId}
             onChange={(e) => update("providerId", e.target.value)}
+          />
+
+          <Input
+            label="Provider MCP tool"
+            placeholder="padel.check_available"
+            required={form.providerType === "MCP"}
+            value={form.providerTool}
+            onChange={(e) => update("providerTool", e.target.value)}
           />
 
           <Textarea

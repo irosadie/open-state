@@ -30,6 +30,12 @@ export const apiRouters = {
     compare: "/workflows/:id/versions/compare",
     simulate: "/workflows/simulate",
   },
+  intents: {
+    index: "/intents",
+  },
+  projects: {
+    index: "/projects",
+  },
   audit: {
     index: "/audit",
   },
@@ -39,6 +45,8 @@ export const apiRouters = {
     debugTrace: "/runtime/instances/:id/debug-trace",
   },
   admin: {
+    apiKeys: "/api-keys",
+    revokeAPIKey: "/api-keys/:id/revoke",
     tenant: "/admin/tenant",
     members: "/admin/members",
     memberRole: "/admin/members/:userId/role",

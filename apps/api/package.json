@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "go run ./cmd/server/main.go",
+    "dev": "set -a; [ ! -f .env ] || . ./.env; set +a; go run ./cmd/server/main.go",
+    "dev:mcp": "set -a; [ ! -f .env ] || . ./.env; set +a; go run ./cmd/mcp-server/main.go",
     "build": "go build -o dist/server ./cmd/server/main.go",
     "start": "./dist/server",
     "lint": "go vet ./...",

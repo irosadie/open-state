@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/irosadie/open-state/api/internal/application/dtos"
@@ -44,6 +45,9 @@ func (s *CapabilityService) Create(ctx context.Context, tenantID string, req dto
 	if req.Name == "" {
 		return nil, domain.NewValidation("name is required")
 	}
+	if err := validateProviderMapping(providerType, req.ProviderID, req.ProviderTool); err != nil {
+		return nil, err
+	}
 
 	input, err := marshalSchema(req.InputSchema)
 	if err != nil {
@@ -60,7 +64,7 @@ func (s *CapabilityService) Create(ctx context.Context, tenantID string, req dto
 	}
 	credRef := optional(req.CredentialReference)
 
-	cap, err := s.repo.Create(ctx, tenantID, req.Name, optional(req.Description), providerType, optional(req.ProviderID), input, output, version, credRef)
+	cap, err := s.repo.Create(ctx, tenantID, req.Name, optional(req.Description), providerType, optional(req.ProviderID), optional(req.ProviderTool), input, output, version, credRef)
 	if err != nil {
 		return nil, err
 	}
@@ -143,12 +147,19 @@ func (s *CapabilityService) Update(ctx context.Context, tenantID, id string, req
 	if req.ProviderID != "" {
 		providerID = sql.NullString{String: req.ProviderID, Valid: true}
 	}
+	providerTool := existing.ProviderTool
+	if req.ProviderTool != "" {
+		providerTool = sql.NullString{String: req.ProviderTool, Valid: true}
+	}
 	credRef := existing.CredentialReference
 	if req.CredentialReference != "" {
 		credRef = sql.NullString{String: req.CredentialReference, Valid: true}
 	}
+	if err := validateProviderMapping(providerType, providerID.String, providerTool.String); err != nil {
+		return nil, err
+	}
 
-	cap, err := s.repo.Update(ctx, tenantID, id, nilStringPtr(description), providerType, nilStringPtr(providerID), input, output, status, version, nilStringPtr(credRef))
+	cap, err := s.repo.Update(ctx, tenantID, id, nilStringPtr(description), providerType, nilStringPtr(providerID), nilStringPtr(providerTool), input, output, status, version, nilStringPtr(credRef))
 	if err != nil {
 		return nil, err
 	}
@@ -287,6 +298,9 @@ func toCapabilityDTO(c *entities.Capability) *dtos.CapabilityDTO {
 	if c.ProviderID.Valid {
 		out.ProviderID = &c.ProviderID.String
 	}
+	if c.ProviderTool.Valid {
+		out.ProviderTool = &c.ProviderTool.String
+	}
 	return out
 }
 
@@ -313,6 +327,23 @@ func parseProviderType(s string) (entities.ProviderType, error) {
 	default:
 		return "", domain.NewValidation("invalid providerType")
 	}
+}
+
+func validateProviderMapping(providerType entities.ProviderType, providerServer, providerTool string) error {
+	if providerType != entities.ProviderTypeMCP {
+		return nil
+	}
+	if providerServer == "" || providerTool == "" {
+		return domain.NewValidation("MCP capabilities require providerId (server alias) and providerTool")
+	}
+	if containsEndpoint(providerServer) || containsEndpoint(providerTool) {
+		return domain.NewValidation("MCP provider mapping accepts a server alias and tool name, not an endpoint")
+	}
+	return nil
+}
+
+func containsEndpoint(value string) bool {
+	return strings.Contains(value, "://")
 }
 
 func parseCapabilityStatus(s string) (entities.CapabilityStatus, error) {

@@ -2,7 +2,13 @@
   "$schema": "https://turborepo.com/schema.json",
   "globalPassThroughEnv": [
     "API_PORT",
+    "DATABASE_URL",
+    "JWT_SECRET",
+    "MCP_PORT",
+    "MCP_PROVIDER_MOCK_PORT",
+    "MCP_PROVIDER_MOCK_SCENARIO",
     "REDIS_URL",
+    "PORT",
     "NEXT_PUBLIC_API_URL",
     "NODE_ENV"
   ],
@@ -12,6 +18,10 @@
       "outputs": ["dist/**", ".next/**"]
     },
     "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:mcp": {
       "cache": false,
       "persistent": true
     },

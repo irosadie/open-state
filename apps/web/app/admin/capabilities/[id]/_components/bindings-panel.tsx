@@ -31,7 +31,6 @@ import type {
   BindingScopeType,
   CapabilityBindingResponse,
 } from "@openstate/types"
-import type { ZodError } from "zod"
 
 const permissionVariant: Record<BindingPermission, "success" | "danger"> = {
   ALLOW: "success",
@@ -79,7 +78,7 @@ export function BindingsPanel({
     if (!parsed.success) {
       const errors: FieldErrors = {}
 
-      for (const issue of (parsed.error as ZodError).issues) {
+      for (const issue of parsed.error.issues) {
         const key = issue.path[0] as keyof BindingSchemaProps
 
         if (key) {

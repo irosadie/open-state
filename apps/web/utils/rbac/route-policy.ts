@@ -40,6 +40,9 @@ export const actionPolicies: readonly ActionPolicy[] = [
   { id: "user:update", requiredPermissions: ["user:update"] },
   { id: "user:delete", requiredPermissions: ["user:delete"] },
   { id: "audit:read", requiredPermissions: ["audit:read"] },
+  { id: "api_key:read", requiredPermissions: ["api_key:read"] },
+  { id: "api_key:create", requiredPermissions: ["api_key:create"] },
+  { id: "api_key:revoke", requiredPermissions: ["api_key:revoke"] },
 ]
 
 const readPermissions = [
@@ -47,6 +50,7 @@ const readPermissions = [
   "instance:read",
   "capability:read",
   "audit:read",
+  "api_key:read",
 ] as const
 
 export const routePolicies: readonly RoutePolicy[] = [
@@ -75,14 +79,32 @@ export const routePolicies: readonly RoutePolicy[] = [
     landing: true,
   },
   {
+    id: "admin-api-keys",
+    pattern: /^\/admin\/api-keys(?:\/.*)?$/,
+    requiredPermissions: ["api_key:read"],
+    landing: true,
+  },
+  {
     id: "admin-members",
     pattern: /^\/admin\/members(?:\/.*)?$/,
     requiredPermissions: ["user:read"],
     landing: true,
   },
   {
+    id: "admin-projects",
+    pattern: /^\/admin\/projects(?:\/.*)?$/,
+    requiredPermissions: ["workflow:read"],
+    landing: true,
+  },
+  {
     id: "admin-workflows",
     pattern: /^\/admin\/workflows(?:\/.*)?$/,
+    requiredPermissions: ["workflow:read"],
+    landing: true,
+  },
+  {
+    id: "admin-intents",
+    pattern: /^\/admin\/intents(?:\/.*)?$/,
     requiredPermissions: ["workflow:read"],
     landing: true,
   },
@@ -191,8 +213,11 @@ const fallbackPath = (policy: RoutePolicy) => {
     audit: "/admin/audit",
     "state-builder": "/state-builder",
     "admin-tenant": "/admin/tenant",
+    "admin-api-keys": "/admin/api-keys",
     "admin-members": "/admin/members",
+    "admin-projects": "/admin/projects",
     "admin-workflows": "/admin/workflows",
+    "admin-intents": "/admin/intents",
     "admin-runtime-instances": "/admin/runtime-instances",
     "admin-instances": "/admin/instances",
     "admin-events": "/admin/events",

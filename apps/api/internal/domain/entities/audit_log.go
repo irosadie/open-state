@@ -35,6 +35,12 @@ const (
 
 	// SSO login (PRD 79).
 	AuditActionSSOLogin AuditAction = "auth.sso_login"
+
+	// State MCP machine credential lifecycle and authorization decisions.
+	AuditActionAPIKeyCreated AuditAction = "api_key.created"
+	AuditActionAPIKeyRevoked AuditAction = "api_key.revoked"
+	AuditActionAPIKeyUsed    AuditAction = "api_key.used"
+	AuditActionAPIKeyDenied  AuditAction = "api_key.denied"
 )
 
 // AuditLog is an append-only, tenant-isolated audit entry (PRD 50). It records an

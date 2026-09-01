@@ -1,0 +1,29 @@
+{
+  "provider": {
+    "name": "padel-provider-mock",
+    "version": "0.1.0"
+  },
+  "tools": [
+    {
+      "name": "padel.cek_available",
+      "description": "Return availability after a configured delay.",
+      "operation": "availability",
+      "delayMs": 250,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "venue_id": { "type": "string" },
+          "date": { "type": "string" }
+        },
+        "required": ["venue_id", "date"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "data": {
+    "slots": [
+      { "venueId": "padel-senayan", "date": "2026-09-01", "time": "18:00" }
+    ],
+    "bookings": []
+  }
+}

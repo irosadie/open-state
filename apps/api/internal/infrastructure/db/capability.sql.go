@@ -50,9 +50,9 @@ func (q *Queries) BindCapability(ctx context.Context, arg BindCapabilityParams) 
 }
 
 const createCapability = `-- name: CreateCapability :one
-INSERT INTO capabilities (tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+INSERT INTO capabilities (tenant_id, name, description, provider_type, provider_id, provider_tool, input_schema, output_schema, status, version, credential_reference)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, tenant_id, name, description, provider_type, provider_id, provider_tool, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
 `
 
 type CreateCapabilityParams struct {
@@ -61,6 +61,7 @@ type CreateCapabilityParams struct {
 	Description         sql.NullString  `json:"description"`
 	ProviderType        string          `json:"provider_type"`
 	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
 	InputSchema         json.RawMessage `json:"input_schema"`
 	OutputSchema        json.RawMessage `json:"output_schema"`
 	Status              string          `json:"status"`
@@ -75,6 +76,7 @@ func (q *Queries) CreateCapability(ctx context.Context, arg CreateCapabilityPara
 		arg.Description,
 		arg.ProviderType,
 		arg.ProviderID,
+		arg.ProviderTool,
 		arg.InputSchema,
 		arg.OutputSchema,
 		arg.Status,
@@ -89,6 +91,7 @@ func (q *Queries) CreateCapability(ctx context.Context, arg CreateCapabilityPara
 		&i.Description,
 		&i.ProviderType,
 		&i.ProviderID,
+		&i.ProviderTool,
 		&i.InputSchema,
 		&i.OutputSchema,
 		&i.Status,
@@ -131,7 +134,7 @@ const disableCapability = `-- name: DisableCapability :one
 UPDATE capabilities
 SET status = 'DISABLED', updated_at = NOW()
 WHERE id = $1 AND tenant_id = $2
-RETURNING id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+RETURNING id, tenant_id, name, description, provider_type, provider_id, provider_tool, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
 `
 
 type DisableCapabilityParams struct {
@@ -149,6 +152,7 @@ func (q *Queries) DisableCapability(ctx context.Context, arg DisableCapabilityPa
 		&i.Description,
 		&i.ProviderType,
 		&i.ProviderID,
+		&i.ProviderTool,
 		&i.InputSchema,
 		&i.OutputSchema,
 		&i.Status,
@@ -161,7 +165,7 @@ func (q *Queries) DisableCapability(ctx context.Context, arg DisableCapabilityPa
 }
 
 const findCapabilityByID = `-- name: FindCapabilityByID :one
-SELECT id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+SELECT id, tenant_id, name, description, provider_type, provider_id, provider_tool, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
 FROM capabilities
 WHERE id = $1 AND tenant_id = $2
 LIMIT 1
@@ -182,6 +186,7 @@ func (q *Queries) FindCapabilityByID(ctx context.Context, arg FindCapabilityByID
 		&i.Description,
 		&i.ProviderType,
 		&i.ProviderID,
+		&i.ProviderTool,
 		&i.InputSchema,
 		&i.OutputSchema,
 		&i.Status,
@@ -194,7 +199,7 @@ func (q *Queries) FindCapabilityByID(ctx context.Context, arg FindCapabilityByID
 }
 
 const findCapabilityByName = `-- name: FindCapabilityByName :one
-SELECT id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+SELECT id, tenant_id, name, description, provider_type, provider_id, provider_tool, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
 FROM capabilities
 WHERE name = $1 AND tenant_id = $2
 LIMIT 1
@@ -215,6 +220,7 @@ func (q *Queries) FindCapabilityByName(ctx context.Context, arg FindCapabilityBy
 		&i.Description,
 		&i.ProviderType,
 		&i.ProviderID,
+		&i.ProviderTool,
 		&i.InputSchema,
 		&i.OutputSchema,
 		&i.Status,
@@ -351,7 +357,7 @@ func (q *Queries) ListBindingsByScope(ctx context.Context, arg ListBindingsBySco
 }
 
 const listCapabilitiesByTenant = `-- name: ListCapabilitiesByTenant :many
-SELECT id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+SELECT id, tenant_id, name, description, provider_type, provider_id, provider_tool, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
 FROM capabilities
 WHERE tenant_id = $1
 ORDER BY created_at DESC
@@ -373,6 +379,7 @@ func (q *Queries) ListCapabilitiesByTenant(ctx context.Context, tenantID uuid.UU
 			&i.Description,
 			&i.ProviderType,
 			&i.ProviderID,
+			&i.ProviderTool,
 			&i.InputSchema,
 			&i.OutputSchema,
 			&i.Status,
@@ -395,7 +402,7 @@ func (q *Queries) ListCapabilitiesByTenant(ctx context.Context, tenantID uuid.UU
 }
 
 const listCapabilitiesByTenantFiltered = `-- name: ListCapabilitiesByTenantFiltered :many
-SELECT id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+SELECT id, tenant_id, name, description, provider_type, provider_id, provider_tool, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
 FROM capabilities
 WHERE tenant_id = $1
   AND ($2::VARCHAR = '' OR provider_type = $2)
@@ -425,6 +432,7 @@ func (q *Queries) ListCapabilitiesByTenantFiltered(ctx context.Context, arg List
 			&i.Description,
 			&i.ProviderType,
 			&i.ProviderID,
+			&i.ProviderTool,
 			&i.InputSchema,
 			&i.OutputSchema,
 			&i.Status,
@@ -496,14 +504,15 @@ UPDATE capabilities
 SET description = $3,
     provider_type = $4,
     provider_id = $5,
-    input_schema = $6,
-    output_schema = $7,
-    status = $8,
-    version = $9,
-    credential_reference = $10,
+    provider_tool = $6,
+    input_schema = $7,
+    output_schema = $8,
+    status = $9,
+    version = $10,
+    credential_reference = $11,
     updated_at = NOW()
 WHERE id = $1 AND tenant_id = $2
-RETURNING id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+RETURNING id, tenant_id, name, description, provider_type, provider_id, provider_tool, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
 `
 
 type UpdateCapabilityParams struct {
@@ -512,6 +521,7 @@ type UpdateCapabilityParams struct {
 	Description         sql.NullString  `json:"description"`
 	ProviderType        string          `json:"provider_type"`
 	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
 	InputSchema         json.RawMessage `json:"input_schema"`
 	OutputSchema        json.RawMessage `json:"output_schema"`
 	Status              string          `json:"status"`
@@ -526,6 +536,7 @@ func (q *Queries) UpdateCapability(ctx context.Context, arg UpdateCapabilityPara
 		arg.Description,
 		arg.ProviderType,
 		arg.ProviderID,
+		arg.ProviderTool,
 		arg.InputSchema,
 		arg.OutputSchema,
 		arg.Status,
@@ -540,6 +551,7 @@ func (q *Queries) UpdateCapability(ctx context.Context, arg UpdateCapabilityPara
 		&i.Description,
 		&i.ProviderType,
 		&i.ProviderID,
+		&i.ProviderTool,
 		&i.InputSchema,
 		&i.OutputSchema,
 		&i.Status,
@@ -555,7 +567,7 @@ const updateCapabilityStatus = `-- name: UpdateCapabilityStatus :one
 UPDATE capabilities
 SET status = $3, updated_at = NOW()
 WHERE id = $1 AND tenant_id = $2
-RETURNING id, tenant_id, name, description, provider_type, provider_id, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
+RETURNING id, tenant_id, name, description, provider_type, provider_id, provider_tool, input_schema, output_schema, status, version, credential_reference, created_at, updated_at
 `
 
 type UpdateCapabilityStatusParams struct {
@@ -574,6 +586,7 @@ func (q *Queries) UpdateCapabilityStatus(ctx context.Context, arg UpdateCapabili
 		&i.Description,
 		&i.ProviderType,
 		&i.ProviderID,
+		&i.ProviderTool,
 		&i.InputSchema,
 		&i.OutputSchema,
 		&i.Status,

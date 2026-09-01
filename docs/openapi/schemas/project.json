@@ -1,0 +1,15 @@
+{
+  "Project": {
+    "type": "object",
+    "required": ["id", "tenantId", "name", "slug", "status", "createdAt", "updatedAt"],
+    "properties": {
+      "id": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string", "format": "uuid" },
+      "name": { "type": "string" },
+      "slug": { "type": "string" },
+      "status": { "type": "string", "enum": ["ACTIVE", "ARCHIVED"] },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  }
+}

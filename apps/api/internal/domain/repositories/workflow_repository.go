@@ -33,6 +33,8 @@ type IWorkflowRepository interface {
 	Publish(ctx context.Context, tenantID, projectID, workflowID string, versionNo int, definition []byte, status entities.VersionStatus, expectedVersion int) (*entities.WorkflowVersion, error)
 	// FindCurrentVersion returns the active (is_current) version of a workflow (PRD §58).
 	FindCurrentVersion(ctx context.Context, tenantID, projectID, workflowID string) (*entities.WorkflowVersion, error)
+	// FindCurrentVersionByWorkflow returns the active version of a workflow by workflowID+tenantID only.
+	FindCurrentVersionByWorkflow(ctx context.Context, tenantID, workflowID string) (*entities.WorkflowVersion, error)
 	// ListVersions returns all versions of a workflow, newest first.
 	ListVersions(ctx context.Context, tenantID, projectID, workflowID string) ([]entities.WorkflowVersion, error)
 	// FindVersionByNumber returns a specific version of a workflow.

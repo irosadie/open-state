@@ -123,6 +123,15 @@ func (f *fakeWorkflowRepo) FindCurrentVersion(_ context.Context, _, _, _ string)
 	return nil, domain.NewNotFound("workflow version not found")
 }
 
+func (f *fakeWorkflowRepo) FindCurrentVersionByWorkflow(_ context.Context, _, workflowID string) (*entities.WorkflowVersion, error) {
+	for _, version := range f.versions[workflowID] {
+		if version.IsCurrent {
+			return version, nil
+		}
+	}
+	return nil, domain.NewNotFound("workflow version not found")
+}
+
 func (f *fakeWorkflowRepo) ListVersions(_ context.Context, _, _, workflowID string) ([]entities.WorkflowVersion, error) {
 	vs := f.versions[workflowID]
 	out := make([]entities.WorkflowVersion, 0, len(vs))

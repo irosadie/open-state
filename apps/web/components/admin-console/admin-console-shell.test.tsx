@@ -44,6 +44,8 @@ describe("AdminConsoleShell", () => {
     )
 
     expect(screen.getByRole("link", { name: "Workflows" })).toBeTruthy()
+    expect(screen.getByRole("link", { name: "Intents" })).toBeTruthy()
+    expect(screen.getByRole("link", { name: "Projects" })).toBeTruthy()
     expect(screen.getByRole("link", { name: "Instances" })).toBeTruthy()
     expect(screen.queryByRole("link", { name: "Tenant settings" })).toBeNull()
     expect(screen.queryByRole("link", { name: "Members & roles" })).toBeNull()
@@ -67,5 +69,27 @@ describe("AdminConsoleShell", () => {
 
     expect(screen.getByRole("link", { name: "Tenant settings" })).toBeTruthy()
     expect(screen.getByRole("link", { name: "Members & roles" })).toBeTruthy()
+  })
+
+  it("shows State MCP API keys for an API-key administrator", () => {
+    vi.mocked(useAuthorization).mockReturnValue({
+      status: "ready",
+      role: "ADMIN",
+      permissions: ["api_key:read"],
+      hasPermission: (permission) => permission === "api_key:read",
+      refresh: async () => undefined,
+    })
+
+    render(
+      <AdminConsoleShell>
+        <div>content</div>
+      </AdminConsoleShell>,
+    )
+
+    expect(
+      screen
+        .getByRole("link", { name: "State MCP API Keys" })
+        .getAttribute("href"),
+    ).toBe("/admin/api-keys")
   })
 })

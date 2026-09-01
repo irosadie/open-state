@@ -11,22 +11,44 @@ vi.mock("next/link", () => ({
 }))
 
 describe("AdminFlowGuide", () => {
-  it("explains the tenant to builder path and default project scope", () => {
+  it("explains the tenant to state path and makes Project navigable", () => {
     render(<AdminFlowGuide currentStep="workflow" />)
 
     expect(screen.getByText("Tenant")).toBeTruthy()
     expect(screen.getByText("Project")).toBeTruthy()
+    expect(screen.getByText("Intent")).toBeTruthy()
     expect(screen.getByText("Workflow")).toBeTruthy()
-    expect(screen.getByText("Builder")).toBeTruthy()
+    expect(screen.getByText("State")).toBeTruthy()
     expect(screen.getAllByText(/Default Project/).length).toBeGreaterThan(0)
-    expect(
-      screen.getByText(/Project settings and switching are not available yet/),
-    ).toBeTruthy()
     expect(
       screen.getByRole("link", { name: /Tenant/ }).getAttribute("href"),
     ).toBe("/admin/tenant")
     expect(
-      screen.getByRole("link", { name: /Builder/ }).getAttribute("href"),
+      screen.getByRole("link", { name: /State/ }).getAttribute("href"),
     ).toBe("/state-builder")
+    expect(
+      screen.getByRole("link", { name: /Project/ }).getAttribute("href"),
+    ).toBe("/admin/projects")
+    expect(
+      screen.getByRole("link", { name: /Intent/ }).getAttribute("href"),
+    ).toBe("/admin/intents")
+  })
+
+  it("carries a selected project into downstream steps", () => {
+    render(
+      <AdminFlowGuide
+        currentStep="project"
+        projectId="project-1"
+        projectName="Padel"
+      />,
+    )
+
+    expect(screen.getByText(/Padel/)).toBeTruthy()
+    expect(
+      screen.getByRole("link", { name: /Intent/ }).getAttribute("href"),
+    ).toBe("/admin/intents?projectId=project-1")
+    expect(
+      screen.getByRole("link", { name: /Workflow/ }).getAttribute("href"),
+    ).toBe("/admin/workflows?projectId=project-1")
   })
 })

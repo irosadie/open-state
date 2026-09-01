@@ -113,6 +113,33 @@ type AuditLog struct {
 	CreatedAt     time.Time             `json:"created_at"`
 }
 
+type AuthApiKey struct {
+	ID               uuid.UUID     `json:"id"`
+	TenantID         uuid.UUID     `json:"tenant_id"`
+	Name             string        `json:"name"`
+	KeyPrefix        string        `json:"key_prefix"`
+	KeyVerifier      []byte        `json:"key_verifier"`
+	DefaultProjectID uuid.NullUUID `json:"default_project_id"`
+	ExpiresAt        sql.NullTime  `json:"expires_at"`
+	RevokedAt        sql.NullTime  `json:"revoked_at"`
+	LastUsedAt       sql.NullTime  `json:"last_used_at"`
+	CreatedBy        string        `json:"created_by"`
+	CreatedAt        time.Time     `json:"created_at"`
+	UpdatedAt        time.Time     `json:"updated_at"`
+}
+
+type AuthApiKeyProject struct {
+	ApiKeyID  uuid.UUID `json:"api_key_id"`
+	ProjectID uuid.UUID `json:"project_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type AuthApiKeyScope struct {
+	ApiKeyID  uuid.UUID `json:"api_key_id"`
+	Scope     string    `json:"scope"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type AuthRoleBackfillRecord struct {
 	ID               uuid.UUID `json:"id"`
 	RoleAssignmentID uuid.UUID `json:"role_assignment_id"`
@@ -136,6 +163,7 @@ type Capability struct {
 	Description         sql.NullString  `json:"description"`
 	ProviderType        string          `json:"provider_type"`
 	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
 	InputSchema         json.RawMessage `json:"input_schema"`
 	OutputSchema        json.RawMessage `json:"output_schema"`
 	Status              string          `json:"status"`
@@ -154,6 +182,25 @@ type CapabilityBinding struct {
 	Permission   string    `json:"permission"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type CapabilityExecutionEvidence struct {
+	ID                 uuid.UUID             `json:"id"`
+	TenantID           uuid.UUID             `json:"tenant_id"`
+	ProjectID          uuid.UUID             `json:"project_id"`
+	WorkflowInstanceID uuid.UUID             `json:"workflow_instance_id"`
+	StateID            string                `json:"state_id"`
+	CapabilityID       uuid.UUID             `json:"capability_id"`
+	CapabilityName     string                `json:"capability_name"`
+	ProviderServer     string                `json:"provider_server"`
+	ProviderTool       string                `json:"provider_tool"`
+	CorrelationID      sql.NullString        `json:"correlation_id"`
+	IdempotencyKey     string                `json:"idempotency_key"`
+	Status             string                `json:"status"`
+	Result             json.RawMessage       `json:"result"`
+	Error              pqtype.NullRawMessage `json:"error"`
+	CreatedAt          time.Time             `json:"created_at"`
+	UpdatedAt          time.Time             `json:"updated_at"`
 }
 
 type ContextRecord struct {
@@ -222,6 +269,19 @@ type IdempotencyRecord struct {
 	Payload        pqtype.NullRawMessage `json:"payload"`
 	CreatedAt      time.Time             `json:"created_at"`
 	UpdatedAt      time.Time             `json:"updated_at"`
+}
+
+type Intent struct {
+	ID          uuid.UUID       `json:"id"`
+	TenantID    uuid.UUID       `json:"tenant_id"`
+	ProjectID   uuid.UUID       `json:"project_id"`
+	WorkflowID  uuid.UUID       `json:"workflow_id"`
+	IntentKey   string          `json:"intent_key"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Examples    json.RawMessage `json:"examples"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 type MemoryReference struct {

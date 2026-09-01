@@ -185,6 +185,9 @@ cd apps/worker && go run ./cmd/worker/main.go
 
 # Web (port 3020)
 cd apps/web && bun run dev
+
+# State MCP (port 8030, required Bearer API key)
+cd apps/api && go run ./cmd/mcp-server/main.go
 ```
 
 Open:
@@ -200,9 +203,48 @@ Open:
 | `API_PORT` | `8020` | HTTP API port |
 | `DATABASE_URL` | — | PostgreSQL connection string |
 | `JWT_SECRET` | — | JWT signing secret (API) |
+| `MCP_API_KEY_PEPPER` | — | 32+ character server secret used to verify State MCP API keys |
+| `MCP_PORT` | `8030` | State MCP HTTP port (`/mcp`) |
+| `MCP_PROVIDER_MOCK_PORT` | `8031` | Development provider MCP mock port (`/mcp`) |
 | `REDIS_URL` | `redis://127.0.0.1:6381` | Redis URL (worker) |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3020` | Web app base URL |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8020` | Backend base URL |
+
+## State MCP authentication
+
+State MCP runs separately at `http://localhost:8030/mcp`. The development
+provider mock runs at `http://localhost:8031/mcp`; the LLM host connects to both
+servers as separate MCP sessions. It requires
+`Authorization: Bearer osk_...`; tenant identity comes from that API key, not a
+tool argument. Create a key using an authenticated admin session and the target
+tenant header:
+
+```bash
+curl -X POST http://localhost:8020/api/api-keys \
+  -H "Authorization: Bearer <admin-jwt>" \
+  -H "X-Tenant-ID: <tenant-id>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"local Claude","projectIds":["<project-id>"],"defaultProjectId":"<project-id>","scopes":["state:read","state:write","capability:invoke"]}'
+```
+
+Copy `data.key` immediately; it is never returned again. Configure the MCP
+client with that value as a Bearer token. The `project` tool argument is
+optional only when the key has a default project, and it must be in the key's
+allowlist.
+
+Provider alias configuration belongs to the LLM/MCP host, not workflow JSON:
+
+```json
+{
+  "openstate": { "url": "http://localhost:8030/mcp", "authorization": "Bearer osk_..." },
+  "padel-provider-mock": { "url": "http://localhost:8031/mcp" }
+}
+```
+
+When State MCP returns `providerServer` and `providerTool`, call that exact
+tool on the already-connected alias, then report the normalized result with
+`report_capability_result` before calling `propose_event`. Run
+`bun run mcp:check` to detect a wrong or stale listener on either port.
 
 ## Developer Tooling
 
@@ -276,7 +318,8 @@ The platform does not call an LLM internally — intent classification, entity
 extraction, and response generation are done by the 3rd-party LLM via these
 tools:
 
-- `resolve_intent` — conversation → intent → workflow + current state
+- `list_intents` — list canonical intents, descriptions, and example utterances for a tenant/project
+- `resolve_intent` — resolve the selected canonical intent → workflow
 - `get_active_workflow` — active workflow + current state + allowed events
 - `get_context` — available + missing context (PII-redacted)
 - `get_allowed_capabilities` — authorized capabilities per state
@@ -284,6 +327,21 @@ tools:
 - `invoke_capability` — authorized capability execution
 - `start_workflow`, `suspend_workflow`, `resume_workflow`, `cancel_workflow`
 - `get_workflow_instances`, `get_history`, `replay_workflow`
+
+### Intent routing flow
+
+The LLM should discover the available choices before resolving a user request:
+
+1. Call `list_intents` with the tenant and project.
+2. Compare the user's message with each intent's description and examples.
+3. For a message such as `saya mau order lapangan`, select `BOOKING_PADEL`.
+4. Call `resolve_intent` with `BOOKING_PADEL`.
+5. Use the returned workflow with `start_workflow`, then continue through
+   `get_context` and `propose_event`.
+
+OpenState does not classify text internally. The LLM suggests the canonical
+intent, while the tenant/project-scoped catalog and State Engine validate the
+mapping and execution path.
 
 > The full MCP tool contract is tracked in the GitHub issue
 > "[MCP & Integration] Server MCP + capability".

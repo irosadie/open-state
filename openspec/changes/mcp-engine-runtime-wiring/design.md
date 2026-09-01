@@ -103,6 +103,7 @@ production MCP path engine-backed.
 
 ## Open Questions
 
-- Whether `start_workflow` (MCP) should begin via `engine.StartWorkflow` vs the existing
-  `IInstanceRepository.Create`. Default: use the engine for consistency once wired;
-  revisit if it conflicts with lifecycle semantics.
+- `start_workflow` keeps the application repository responsible for creating the
+  durable instance id, then calls an engine initialization step for that existing
+  instance. This preserves one persisted instance across both layers while entering
+  the workflow's declared entry node before MCP reads current state.

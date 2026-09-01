@@ -216,6 +216,17 @@ func (r *PgxWorkflowRepository) FindCurrentVersion(ctx context.Context, tenantID
 	return mapWorkflowVersion(row), nil
 }
 
+func (r *PgxWorkflowRepository) FindCurrentVersionByWorkflow(ctx context.Context, tenantID, workflowID string) (*entities.WorkflowVersion, error) {
+	row, err := r.queries.FindCurrentWorkflowVersionByWorkflow(ctx, db.FindCurrentWorkflowVersionByWorkflowParams{
+		WorkflowID: mustUUID(workflowID),
+		TenantID:   mustUUID(tenantID),
+	})
+	if err != nil {
+		return nil, mapNotFound(err, "workflow version")
+	}
+	return mapWorkflowVersion(row), nil
+}
+
 func (r *PgxWorkflowRepository) ListVersions(ctx context.Context, tenantID, projectID, workflowID string) ([]entities.WorkflowVersion, error) {
 	rows, err := r.queries.ListWorkflowVersions(ctx, db.ListWorkflowVersionsParams{
 		WorkflowID: mustUUID(workflowID),

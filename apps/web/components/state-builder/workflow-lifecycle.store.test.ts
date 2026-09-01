@@ -36,6 +36,7 @@ describe("State Builder workflow persistence", () => {
     useStateBuilderStore.setState({
       apiWorkflowId: null,
       apiVersion: 0,
+      activeProjectId: undefined,
       saveError: null,
       saveConflict: false,
       isSaving: false,
@@ -72,6 +73,17 @@ describe("State Builder workflow persistence", () => {
       expect.objectContaining({ id: "wf-1", version: 4 }),
     )
     expect(useStateBuilderStore.getState().apiVersion).toBe(5)
+  })
+
+  it("keeps the selected project on a new server draft", async () => {
+    useStateBuilderStore.setState({ activeProjectId: "project-1" })
+    vi.mocked(createWorkflowApi).mockResolvedValue(createdWorkflow)
+
+    await useStateBuilderStore.getState().persist()
+
+    expect(createWorkflowApi).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: "project-1" }),
+    )
   })
 
   it("publishes only the persisted draft version and returns its snapshot", async () => {

@@ -13,7 +13,7 @@ import (
 // (DB-agnostic, ADR-001) and returns NOT_FOUND/CONFLICT DomainErrors.
 type ICapabilityRepository interface {
 	// Create persists a new capability in the registry (PRD §59).
-	Create(ctx context.Context, tenantID, name string, description *string, providerType entities.ProviderType, providerID *string, inputSchema, outputSchema []byte, version int, credentialReference *string) (*entities.Capability, error)
+	Create(ctx context.Context, tenantID, name string, description *string, providerType entities.ProviderType, providerID, providerTool *string, inputSchema, outputSchema []byte, version int, credentialReference *string) (*entities.Capability, error)
 	// FindByID returns a capability by id within a tenant.
 	FindByID(ctx context.Context, tenantID, id string) (*entities.Capability, error)
 	// FindByName returns a capability by logical name within a tenant.
@@ -24,7 +24,7 @@ type ICapabilityRepository interface {
 	// filtered by provider type and status (empty values = no filter).
 	ListByTenantFiltered(ctx context.Context, tenantID string, providerType entities.ProviderType, capStatus entities.CapabilityStatus) ([]entities.Capability, error)
 	// Update updates mutable fields of a capability within a tenant.
-	Update(ctx context.Context, tenantID, id string, description *string, providerType entities.ProviderType, providerID *string, inputSchema, outputSchema []byte, status entities.CapabilityStatus, version int, credentialReference *string) (*entities.Capability, error)
+	Update(ctx context.Context, tenantID, id string, description *string, providerType entities.ProviderType, providerID, providerTool *string, inputSchema, outputSchema []byte, status entities.CapabilityStatus, version int, credentialReference *string) (*entities.Capability, error)
 	// UpdateStatus updates a capability's status within a tenant.
 	UpdateStatus(ctx context.Context, tenantID, id string, status entities.CapabilityStatus) (*entities.Capability, error)
 	// Disable marks a capability DISABLED within a tenant.

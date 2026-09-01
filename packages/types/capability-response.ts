@@ -15,6 +15,7 @@ export type CapabilityResponse = {
   description?: string | null
   providerType: CapabilityProviderType
   providerId?: string | null
+  providerTool?: string | null
   inputSchema?: Record<string, unknown> | null
   outputSchema?: Record<string, unknown> | null
   status: CapabilityStatus

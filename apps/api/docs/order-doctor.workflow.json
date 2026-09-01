@@ -1,0 +1,98 @@
+{
+  "workflow": {
+    "slug": "order-doctor",
+    "name": "Order Dokter",
+    "description": "End-to-end flow untuk booking konsultasi dokter: cari dokter, pilih jadwal, konfirmasi, bayar, dan konsultasi.",
+    "schemaVersion": 1,
+    "status": "PUBLISHED",
+    "projectId": "",
+    "entryNodeId": "s_start",
+    "policy": {
+      "maxDurationSeconds": 3600,
+      "interruptible": "USER_REQUESTED",
+      "priority": 1
+    },
+    "triggers": [
+      { "event": "intent.ORDER_DOCTOR", "source": "intent" }
+    ],
+    "nodes": [
+      {
+        "id": "s_start",
+        "kind": "START",
+        "name": "Start",
+        "description": "Mulai proses booking konsultasi dokter."
+      },
+      {
+        "id": "s_search_doctor",
+        "kind": "STATE",
+        "name": "Cari Dokter",
+        "description": "Mencari dokter berdasarkan spesialisasi dan lokasi.",
+        "instructions": "Tanyakan spesialisasi dokter yang dibutuhkan dan lokasi user. Gunakan capability doctor.search untuk mencari dokter yang tersedia. Tampilkan hasilnya.",
+        "requiredContext": ["specialization"],
+        "capabilities": ["doctor.search"]
+      },
+      {
+        "id": "s_select_schedule",
+        "kind": "STATE",
+        "name": "Pilih Jadwal",
+        "description": "Menampilkan jadwal praktik dokter yang dipilih.",
+        "instructions": "Setelah user memilih dokter, gunakan doctor.schedule untuk menampilkan jadwal yang tersedia. Tanyakan tanggal dan jam yang diinginkan.",
+        "requiredContext": ["doctor_id"],
+        "capabilities": ["doctor.schedule"]
+      },
+      {
+        "id": "s_confirm",
+        "kind": "STATE",
+        "name": "Konfirmasi Booking",
+        "description": "Konfirmasi detail konsultasi sebelum booking.",
+        "instructions": "Tampilkan ringkasan booking (dokter, jadwal, biaya konsultasi). Tanyakan keluhan/gejala singkat. Gunakan doctor.book jika user konfirmasi.",
+        "requiredContext": ["doctor_id", "schedule_id", "complaint"],
+        "capabilities": ["doctor.book"]
+      },
+      {
+        "id": "s_payment",
+        "kind": "STATE",
+        "name": "Pembayaran",
+        "description": "Buat payment link dan verifikasi pembayaran.",
+        "instructions": "Gunakan doctor.payment.create untuk membuat payment link. Kirimkan ke user dan tunggu konfirmasi. Gunakan doctor.payment.verify untuk verifikasi.",
+        "requiredContext": ["booking_id"],
+        "capabilities": ["doctor.payment.create", "doctor.payment.verify"]
+      },
+      {
+        "id": "s_reminder",
+        "kind": "STATE",
+        "name": "Kirim Reminder",
+        "description": "Kirim konfirmasi dan reminder konsultasi ke user.",
+        "instructions": "Gunakan doctor.notification.send untuk mengirim konfirmasi booking dan reminder jadwal konsultasi.",
+        "requiredContext": ["booking_id", "payment_id"],
+        "capabilities": ["doctor.notification.send"]
+      },
+      {
+        "id": "s_end",
+        "kind": "END",
+        "name": "Selesai",
+        "description": "Booking konsultasi dokter berhasil.",
+        "isTerminal": true
+      },
+      {
+        "id": "s_cancelled",
+        "kind": "END",
+        "name": "Dibatalkan",
+        "description": "User membatalkan booking.",
+        "isTerminal": true
+      }
+    ],
+    "transitions": [
+      { "id": "t_start_search", "sourceStateId": "s_start", "event": "workflow.started", "targetStateId": "s_search_doctor", "priority": 1 },
+      { "id": "t_search_schedule", "sourceStateId": "s_search_doctor", "event": "doctor.selected", "targetStateId": "s_select_schedule", "priority": 1 },
+      { "id": "t_search_cancelled", "sourceStateId": "s_search_doctor", "event": "user.cancelled", "targetStateId": "s_cancelled", "priority": 2 },
+      { "id": "t_schedule_confirm", "sourceStateId": "s_select_schedule", "event": "schedule.selected", "targetStateId": "s_confirm", "priority": 1 },
+      { "id": "t_schedule_cancelled", "sourceStateId": "s_select_schedule", "event": "user.cancelled", "targetStateId": "s_cancelled", "priority": 2 },
+      { "id": "t_confirm_payment", "sourceStateId": "s_confirm", "event": "booking.confirmed", "targetStateId": "s_payment", "priority": 1 },
+      { "id": "t_confirm_cancelled", "sourceStateId": "s_confirm", "event": "user.cancelled", "targetStateId": "s_cancelled", "priority": 2 },
+      { "id": "t_payment_reminder", "sourceStateId": "s_payment", "event": "payment.verified", "targetStateId": "s_reminder", "priority": 1 },
+      { "id": "t_payment_cancelled", "sourceStateId": "s_payment", "event": "payment.failed", "targetStateId": "s_cancelled", "priority": 2 },
+      { "id": "t_reminder_end", "sourceStateId": "s_reminder", "event": "notification.sent", "targetStateId": "s_end", "priority": 1 }
+    ]
+  }
+}

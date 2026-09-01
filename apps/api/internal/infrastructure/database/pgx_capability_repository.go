@@ -28,13 +28,14 @@ func newPgxCapabilityRepository(q *db.Queries) repositories.ICapabilityRepositor
 	return &PgxCapabilityRepository{queries: q}
 }
 
-func (r *PgxCapabilityRepository) Create(ctx context.Context, tenantID, name string, description *string, providerType entities.ProviderType, providerID *string, inputSchema, outputSchema []byte, version int, credentialReference *string) (*entities.Capability, error) {
+func (r *PgxCapabilityRepository) Create(ctx context.Context, tenantID, name string, description *string, providerType entities.ProviderType, providerID, providerTool *string, inputSchema, outputSchema []byte, version int, credentialReference *string) (*entities.Capability, error) {
 	row, err := r.queries.CreateCapability(ctx, db.CreateCapabilityParams{
 		TenantID:            mustUUID(tenantID),
 		Name:                name,
 		Description:         nullString(description),
 		ProviderType:        string(providerType),
 		ProviderID:          nullString(providerID),
+		ProviderTool:        nullString(providerTool),
 		InputSchema:         inputSchema,
 		OutputSchema:        outputSchema,
 		Status:              string(entities.CapabilityActive),
@@ -97,13 +98,14 @@ func (r *PgxCapabilityRepository) ListByTenantFiltered(ctx context.Context, tena
 	return out, nil
 }
 
-func (r *PgxCapabilityRepository) Update(ctx context.Context, tenantID, id string, description *string, providerType entities.ProviderType, providerID *string, inputSchema, outputSchema []byte, status entities.CapabilityStatus, version int, credentialReference *string) (*entities.Capability, error) {
+func (r *PgxCapabilityRepository) Update(ctx context.Context, tenantID, id string, description *string, providerType entities.ProviderType, providerID, providerTool *string, inputSchema, outputSchema []byte, status entities.CapabilityStatus, version int, credentialReference *string) (*entities.Capability, error) {
 	row, err := r.queries.UpdateCapability(ctx, db.UpdateCapabilityParams{
 		ID:                  mustUUID(id),
 		TenantID:            mustUUID(tenantID),
 		Description:         nullString(description),
 		ProviderType:        string(providerType),
 		ProviderID:          nullString(providerID),
+		ProviderTool:        nullString(providerTool),
 		InputSchema:         inputSchema,
 		OutputSchema:        outputSchema,
 		Status:              string(status),
@@ -248,6 +250,7 @@ func mapCapability(row db.Capability) *entities.Capability {
 		Description:         row.Description,
 		ProviderType:        entities.ProviderType(row.ProviderType),
 		ProviderID:          row.ProviderID,
+		ProviderTool:        row.ProviderTool,
 		InputSchema:         row.InputSchema,
 		OutputSchema:        row.OutputSchema,
 		Status:              entities.CapabilityStatus(row.Status),

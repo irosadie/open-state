@@ -29,6 +29,7 @@ type PostgresAdapter struct {
 	events       repositories.IEventRepository
 	context      repositories.IContextRepository
 	capabilities repositories.ICapabilityRepository
+	evidence     repositories.ICapabilityEvidenceRepository
 	audit        repositories.IAuditRepository
 	roles        repositories.IRoleAssignmentRepository
 	identities   repositories.IUserIdentityRepository
@@ -36,6 +37,8 @@ type PostgresAdapter struct {
 	eventBrowser repositories.IEventBrowserRepository
 	runtimeRead  repositories.IRuntimeReadRepository
 	traces       repositories.IRuntimeTraceRepository
+	intents      repositories.IIntentRepository
+	apiKeys      repositories.IAPIKeyRepository
 }
 
 // NewPostgresAdapter returns a PostgresAdapter composing all six pgx repositories.
@@ -52,6 +55,7 @@ func NewPostgresAdapter(pool *pgxpool.Pool) *PostgresAdapter {
 		events:       eventRepo,
 		context:      NewPgxContextRepository(pool),
 		capabilities: NewPgxCapabilityRepository(pool),
+		evidence:     NewPgxCapabilityEvidenceRepository(pool),
 		audit:        NewPgxAuditRepository(pool),
 		roles:        NewPgxRoleAssignmentRepository(pool),
 		identities:   NewPgxUserIdentityRepository(pool),
@@ -59,6 +63,8 @@ func NewPostgresAdapter(pool *pgxpool.Pool) *PostgresAdapter {
 		eventBrowser: eventRepo,
 		runtimeRead:  NewPgxRuntimeReadRepository(pool),
 		traces:       NewPgxRuntimeTraceRepository(pool),
+		intents:      NewPgxIntentRepository(pool),
+		apiKeys:      NewPgxAPIKeyRepository(pool),
 	}
 }
 
@@ -79,6 +85,9 @@ func (a *PostgresAdapter) Context() repositories.IContextRepository { return a.c
 
 // Capabilities returns the capability registry + policy repository.
 func (a *PostgresAdapter) Capabilities() repositories.ICapabilityRepository { return a.capabilities }
+
+// CapabilityEvidence returns State MCP's explicit provider execution evidence store.
+func (a *PostgresAdapter) CapabilityEvidence() repositories.ICapabilityEvidenceRepository { return a.evidence }
 
 // Audit returns the append-only audit-trail repository.
 func (a *PostgresAdapter) Audit() repositories.IAuditRepository { return a.audit }
@@ -101,6 +110,12 @@ func (a *PostgresAdapter) RuntimeRead() repositories.IRuntimeReadRepository { re
 
 // RuntimeTraces returns the append-only trace repository.
 func (a *PostgresAdapter) RuntimeTraces() repositories.IRuntimeTraceRepository { return a.traces }
+
+// Intents returns the canonical intent catalog repository.
+func (a *PostgresAdapter) Intents() repositories.IIntentRepository { return a.intents }
+
+// APIKeys returns the State MCP machine credential repository.
+func (a *PostgresAdapter) APIKeys() repositories.IAPIKeyRepository { return a.apiKeys }
 
 // WithTx runs fn within a single DB transaction, binding all six repositories to
 // that transaction so multi-repository operations (e.g. append an audit entry and
@@ -127,6 +142,7 @@ func (a *PostgresAdapter) WithTx(ctx context.Context, fn func(adapter *PostgresA
 		events:       newPgxEventRepository(q),
 		context:      newPgxContextRepository(q),
 		capabilities: newPgxCapabilityRepository(q),
+		evidence:     newPgxCapabilityEvidenceRepository(q),
 		audit:        newPgxAuditRepository(q),
 		roles:        newPgxRoleAssignmentRepository(q),
 		identities:   newPgxUserIdentityRepository(q),
@@ -134,6 +150,8 @@ func (a *PostgresAdapter) WithTx(ctx context.Context, fn func(adapter *PostgresA
 		eventBrowser: newPgxEventRepository(q),
 		runtimeRead:  newPgxRuntimeReadRepository(q),
 		traces:       newPgxRuntimeTraceRepository(q),
+		intents:      newPgxIntentRepository(q),
+		apiKeys:      newPgxAPIKeyRepository(q),
 	}
 
 	if err := fn(txAdapter); err != nil {

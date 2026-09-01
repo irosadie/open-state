@@ -78,6 +78,8 @@ interface StateBuilderState {
   apiWorkflowId: string | null
   /** Optimistic version tracked from the API response */
   apiVersion: number
+  /** Project scope carried from the Admin Console flow */
+  activeProjectId: string | undefined
 
   // transient simulation state (never persisted with the workflow draft)
   simulationOpen: boolean
@@ -95,7 +97,7 @@ interface StateBuilderState {
   setSaveError: (message: string | null, conflict?: boolean) => void
 
   // actions
-  hydrate: (workflowId?: string) => Promise<void>
+  hydrate: (workflowId?: string, projectId?: string) => Promise<void>
   setNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
   selectNode: (id: string | null) => void
@@ -330,6 +332,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
     searchQuery: "",
     apiWorkflowId: null,
     apiVersion: 0,
+    activeProjectId: undefined,
 
     simulationOpen: false,
     simulationInitialContextText: "{}",
@@ -342,10 +345,14 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
     simulationStale: false,
     simulationFingerprint: null,
 
-    hydrate: async (workflowId) => {
+    hydrate: async (workflowId, projectId) => {
+      set({ activeProjectId: projectId })
       try {
         if (workflowId) {
-          const serverWorkflow = await getWorkflowApi({ id: workflowId })
+          const serverWorkflow = await getWorkflowApi({
+            id: workflowId,
+            ...(projectId ? { projectId } : {}),
+          })
           const draft = parseServerDraft(serverWorkflow.definition)
           if (!draft) {
             throw new Error("Draft server tidak memiliki graph yang valid")
@@ -367,7 +374,10 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
           const apiId = loadApiId()
           const apiVer = loadApiVersion()
           if (apiId) {
-            const serverWorkflow = await getWorkflowApi({ id: apiId })
+            const serverWorkflow = await getWorkflowApi({
+              id: apiId,
+              ...(projectId ? { projectId } : {}),
+            })
             const draft = parseServerDraft(serverWorkflow.definition)
             if (!draft)
               throw new Error("Draft server tidak memiliki graph yang valid")
@@ -688,7 +698,14 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
       // Serialize all saves so autosave, manual save, and publish cannot race
       // with the same optimistic-lock version.
       const operation = async () => {
-        const { workflow, nodes, edges, apiWorkflowId, apiVersion } = get()
+        const {
+          workflow,
+          nodes,
+          edges,
+          apiWorkflowId,
+          apiVersion,
+          activeProjectId,
+        } = get()
         const snapshot = buildSnapshot(workflow, nodes, edges)
 
         // Sync the workflow root and its complete draft graph to the API.
@@ -700,6 +717,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
               slug: snapshot.slug,
               name: snapshot.name,
               description: snapshot.description,
+              ...(activeProjectId ? { projectId: activeProjectId } : {}),
               definition: snapshot,
             })
             set({ apiWorkflowId: created.id, apiVersion: created.version })
@@ -716,6 +734,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
               version: apiVersion,
               name: snapshot.name,
               description: snapshot.description,
+              ...(activeProjectId ? { projectId: activeProjectId } : {}),
               definition: snapshot,
             })
             set({ apiVersion: updated.version })
@@ -749,7 +768,14 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
         persistTimer = null
       }
       await get().persist()
-      const { workflow, nodes, edges, apiWorkflowId, apiVersion } = get()
+      const {
+        workflow,
+        nodes,
+        edges,
+        apiWorkflowId,
+        apiVersion,
+        activeProjectId,
+      } = get()
       const snapshot = buildSnapshot(workflow, nodes, edges)
       const validation = validateWorkflow(snapshot)
       set({ validation })
@@ -765,6 +791,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
           slug: snapshot.slug,
           name: snapshot.name,
           description: snapshot.description,
+          ...(activeProjectId ? { projectId: activeProjectId } : {}),
           definition: snapshot,
         })
         id = created.id
@@ -777,6 +804,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
       const published = await publishWorkflowApi({
         id,
         version: ver,
+        ...(activeProjectId ? { projectId: activeProjectId } : {}),
       })
       // After publish, update the local version tracking.
       set({ apiVersion: ver + 1, lastSavedAt: new Date().toISOString() })

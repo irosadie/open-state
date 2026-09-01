@@ -1,0 +1,30 @@
+{
+  "provider": {
+    "name": "padel-provider-mock",
+    "version": "0.1.0"
+  },
+  "tools": [
+    {
+      "name": "padel.cek_available",
+      "description": "Return a configured provider error.",
+      "operation": "availability",
+      "error": {
+        "code": "provider_unavailable",
+        "message": "padel provider is temporarily unavailable"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "venue_id": { "type": "string" },
+          "date": { "type": "string" }
+        },
+        "required": ["venue_id", "date"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "data": {
+    "slots": [],
+    "bookings": []
+  }
+}

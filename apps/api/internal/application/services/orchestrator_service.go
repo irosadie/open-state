@@ -26,6 +26,8 @@ type OrchestratorService struct {
 	events    repositories.IEventRepository
 	context   repositories.IContextRepository
 	capabs    repositories.ICapabilityRepository
+	workflows repositories.IWorkflowRepository
+	evidence  repositories.ICapabilityEvidenceRepository
 	engine    *engine.Engine
 	now       func() time.Time
 }
@@ -36,14 +38,21 @@ func NewOrchestratorService(
 	events repositories.IEventRepository,
 	context repositories.IContextRepository,
 	capabs repositories.ICapabilityRepository,
+	workflows repositories.IWorkflowRepository,
+	evidence ...repositories.ICapabilityEvidenceRepository,
 ) *OrchestratorService {
-	return &OrchestratorService{
+	svc := &OrchestratorService{
 		instances: instances,
 		events:    events,
 		context:   context,
 		capabs:    capabs,
+		workflows: workflows,
 		now:       time.Now,
 	}
+	if len(evidence) > 0 {
+		svc.evidence = evidence[0]
+	}
+	return svc
 }
 
 // NewEngineOrchestratorService builds an OrchestratorService wired to a runtime
@@ -54,30 +63,60 @@ func NewEngineOrchestratorService(
 	context repositories.IContextRepository,
 	capabs repositories.ICapabilityRepository,
 	eng *engine.Engine,
+	workflows repositories.IWorkflowRepository,
+	evidence ...repositories.ICapabilityEvidenceRepository,
 ) *OrchestratorService {
-	return &OrchestratorService{
+	svc := &OrchestratorService{
 		instances: instances,
 		events:    events,
 		context:   context,
 		capabs:    capabs,
+		workflows: workflows,
 		engine:    eng,
 		now:       time.Now,
 	}
+	if len(evidence) > 0 {
+		svc.evidence = evidence[0]
+	}
+	return svc
 }
 
 // StartWorkflow creates a new workflow instance in RUNNING state.
+// If workflowVersionID is empty, the current published version is resolved automatically.
 func (s *OrchestratorService) StartWorkflow(ctx context.Context, tenantID, workflowID, workflowVersionID, correlationKey string) (*entities.WorkflowInstance, error) {
+	if workflowVersionID == "" {
+		if s.workflows == nil {
+			return nil, domain.NewValidation("workflow_version_id is required (no workflow repository configured)")
+		}
+		ver, err := s.workflows.FindCurrentVersionByWorkflow(ctx, tenantID, workflowID)
+		if err != nil {
+			return nil, err
+		}
+		workflowVersionID = ver.ID
+	}
 	var corr *string
 	if correlationKey != "" {
 		corr = &correlationKey
 	}
-	return s.instances.Create(ctx, tenantID, repositories.CreateWorkflowInstanceInput{
+	created, err := s.instances.Create(ctx, tenantID, repositories.CreateWorkflowInstanceInput{
 		WorkflowID:        workflowID,
 		WorkflowVersionID: workflowVersionID,
 		CorrelationKey:    corr,
 		StartedAt:         nil,
 		ExpiresAt:         nil,
 	})
+	if err != nil {
+		return nil, err
+	}
+	if s.engine == nil || created.Status != entities.WorkflowInstanceCreated {
+		return created, nil
+	}
+
+	started, err := s.engine.InitializeWorkflow(ctx, tenantID, created.ID)
+	if err != nil {
+		return nil, err
+	}
+	return s.instances.UpdateStatus(ctx, tenantID, created.ID, entities.WorkflowInstanceRunning, started.Version)
 }
 
 // SuspendWorkflow pauses a running instance (PRD 42-43).
@@ -245,6 +284,9 @@ func (s *OrchestratorService) ProposeEvent(ctx context.Context, tenantID, instan
 	}
 
 	if s.engine != nil {
+		if err := s.validateCapabilityEvidence(ctx, tenantID, inst, instanceID); err != nil {
+			return nil, err
+		}
 		evt := &engine.Event{
 			ID:                 uuid.NewString(),
 			TenantID:           tenantID,
@@ -298,6 +340,48 @@ func (s *OrchestratorService) ProposeEvent(ctx context.Context, tenantID, instan
 		IdempotencyKey:     nil,
 	}
 	return s.events.Append(ctx, tenantID, evt)
+}
+
+// validateCapabilityEvidence enforces the State MCP gate for external MCP
+// capabilities. It runs before engine.ProcessEvent so a rejected proposal
+// cannot mutate the instance, context, or event history.
+func (s *OrchestratorService) validateCapabilityEvidence(ctx context.Context, tenantID string, inst *entities.WorkflowInstance, instanceID string) error {
+	if s.evidence == nil || s.capabs == nil {
+		return nil
+	}
+	info, err := s.engine.CurrentStateInfo(ctx, tenantID, instanceID)
+	if err != nil {
+		return err
+	}
+	if len(info.Capabilities) == 0 {
+		return nil
+	}
+	evidence, err := s.evidence.ListByInstanceState(ctx, tenantID, instanceID, info.StateID)
+	if err != nil {
+		return err
+	}
+	satisfied := make(map[string]bool, len(evidence))
+	for _, item := range evidence {
+		if item.Status == entities.CapabilityEvidenceSucceeded {
+			satisfied[item.CapabilityID] = true
+		}
+	}
+	for _, name := range info.Capabilities {
+		cap, findErr := s.capabs.FindByName(ctx, tenantID, name)
+		if findErr != nil {
+			return domain.NewConflict("capability requirement not satisfied: " + name)
+		}
+		// Internal capabilities continue through invoke_capability. This gate is
+		// specifically for the direct two-MCP provider path.
+		if cap.ProviderType != entities.ProviderTypeMCP {
+			continue
+		}
+		if !cap.ProviderID.Valid || !cap.ProviderTool.Valid || !satisfied[cap.ID] {
+			return domain.NewConflict("capability requirement not satisfied: " + name)
+		}
+	}
+	_ = inst
+	return nil
 }
 
 // ListAllowedCapabilities returns the capabilities authorized for a scope (PRD 59-62).

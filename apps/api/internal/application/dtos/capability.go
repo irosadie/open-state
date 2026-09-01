@@ -9,6 +9,7 @@ type CreateCapabilityRequest struct {
 	Description         string `json:"description"`
 	ProviderType        string `json:"providerType"`
 	ProviderID          string `json:"providerId"`
+	ProviderTool        string `json:"providerTool"`
 	InputSchema         any    `json:"inputSchema"`
 	OutputSchema        any    `json:"outputSchema"`
 	Version             int    `json:"version"`
@@ -20,6 +21,7 @@ type UpdateCapabilityRequest struct {
 	Description         string `json:"description"`
 	ProviderType        string `json:"providerType"`
 	ProviderID          string `json:"providerId"`
+	ProviderTool        string `json:"providerTool"`
 	InputSchema         any    `json:"inputSchema"`
 	OutputSchema        any    `json:"outputSchema"`
 	Status              string `json:"status"`
@@ -36,6 +38,7 @@ type CapabilityDTO struct {
 	Description         *string `json:"description"`
 	ProviderType        string  `json:"providerType"`
 	ProviderID          *string `json:"providerId"`
+	ProviderTool        *string `json:"providerTool"`
 	InputSchema         any     `json:"inputSchema"`
 	OutputSchema        any     `json:"outputSchema"`
 	Status              string  `json:"status"`

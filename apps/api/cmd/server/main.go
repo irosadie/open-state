@@ -87,7 +87,7 @@ func main() {
 	runtimeInspectorSvc := services.NewRuntimeInspectorService(
 		adapter.Instances(), adapter.RuntimeRead(), adapter.Events(), adapter.Context(), adapter.Audit(), adapter.RuntimeTraces(),
 	)
-	orchestratorSvc := services.NewOrchestratorService(adapter.Instances(), adapter.Events(), adapter.Context(), adapter.Capabilities())
+	orchestratorSvc := services.NewOrchestratorService(adapter.Instances(), adapter.Events(), adapter.Context(), adapter.Capabilities(), adapter.Workflows())
 	adminIdentitySvc := services.NewAdminIdentityService(adapter.Admin(), auditWriter)
 	adminRuntimeSvc := services.NewAdminRuntimeService(orchestratorSvc, adapter.EventBrowser(), auditWriter)
 
@@ -111,7 +111,11 @@ func main() {
 
 	// Builder API service (workflow-definition drafts + publish + versions, PRD 146)
 	builderSvc := services.NewBuilderService(adapter.Workflows(), adapter.Projects(), auditWriter)
+	intentSvc := services.NewIntentService(adapter.Intents(), adapter.Workflows())
+	intentCatalogSvc := services.NewIntentCatalogService(intentSvc, adapter.Projects())
+	projectSvc := services.NewProjectService(adapter.Projects())
 	simulationSvc := services.NewSimulationService()
+	apiKeySvc := services.NewAPIKeyService(adapter.APIKeys(), adapter.Projects(), auditWriter, cfg.MCPAPIKeyPepper)
 
 	// Services
 	authSvc := services.NewAuthService(registerUC, loginUC, logoutUC, getMeUC, authzSvc)
@@ -148,13 +152,16 @@ func main() {
 	systemCtrl := controllers.NewSystemController(healthUC, appInfoUC)
 	capCtrl := controllers.NewCapabilityController(capSvc)
 	workflowCtrl := controllers.NewWorkflowController(builderSvc, simulationSvc)
+	intentCtrl := controllers.NewIntentController(intentCatalogSvc)
+	projectCtrl := controllers.NewProjectController(projectSvc)
 	auditCtrl := controllers.NewAuditController(auditSvc)
 	adminIdentityCtrl := controllers.NewAdminIdentityController(adminIdentitySvc)
 	adminRuntimeCtrl := controllers.NewAdminRuntimeController(adminRuntimeSvc)
 	runtimeInspectorCtrl := controllers.NewRuntimeInspectorController(runtimeInspectorSvc)
+	apiKeyCtrl := controllers.NewAPIKeyController(apiKeySvc)
 
 	// Echo app
-	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, workflowCtrl, auditCtrl, ssoCtrl, authRepo, tokenSvc, authzSvc, auditWriter, loginLimiter, registerLimiter, logger, metricsRecorder, adminIdentityCtrl, adminRuntimeCtrl, runtimeInspectorCtrl)
+	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, workflowCtrl, intentCtrl, auditCtrl, ssoCtrl, authRepo, tokenSvc, authzSvc, auditWriter, loginLimiter, registerLimiter, logger, metricsRecorder, adminIdentityCtrl, adminRuntimeCtrl, apiKeyCtrl, projectCtrl, runtimeInspectorCtrl)
 
 	// Distributed tracing middleware (PRD §84): server span per request + traceparent
 	// extraction. Applied after CreateApp to keep the interfaces layer free of

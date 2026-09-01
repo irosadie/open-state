@@ -1,0 +1,31 @@
+{
+  "Intent": {
+    "type": "object",
+    "required": [
+      "id",
+      "tenantId",
+      "projectId",
+      "workflowId",
+      "key",
+      "name",
+      "description",
+      "examples",
+      "workflowSlug"
+    ],
+    "properties": {
+      "id": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string", "format": "uuid" },
+      "projectId": { "type": "string", "format": "uuid" },
+      "workflowId": { "type": "string", "format": "uuid" },
+      "key": { "type": "string", "description": "Canonical intent key used for routing" },
+      "name": { "type": "string" },
+      "description": { "type": "string" },
+      "examples": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Natural-language example utterances"
+      },
+      "workflowSlug": { "type": "string" }
+    }
+  }
+}

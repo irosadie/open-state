@@ -69,7 +69,7 @@ func baseInvocation() Invocation {
 func TestInvokerSuccess(t *testing.T) {
 	repo := &fakeCapabilityRepo{}
 	pid := "mcp"
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, []byte(`{}`), nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, []byte(`{}`), nil, 1, nil)
 	prov := &fakeProvider{result: InvocationResult{Data: map[string]any{"ok": true}}}
 	inv := NewCapabilityInvoker(
 		NewCapabilityResolver(repo), stubProviderResolver{prov},
@@ -90,7 +90,7 @@ func TestInvokerSuccess(t *testing.T) {
 func TestInvokerSchemaValidationFails(t *testing.T) {
 	repo := &fakeCapabilityRepo{}
 	pid := "mcp"
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, []byte(`{}`), nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, []byte(`{}`), nil, 1, nil)
 	prov := &fakeProvider{}
 	inv := NewCapabilityInvoker(
 		NewCapabilityResolver(repo), stubProviderResolver{prov},
@@ -109,7 +109,7 @@ func TestInvokerSchemaValidationFails(t *testing.T) {
 func TestInvokerRateLimitedNoInvoke(t *testing.T) {
 	repo := &fakeCapabilityRepo{}
 	pid := "mcp"
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, []byte(`{}`), nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, []byte(`{}`), nil, 1, nil)
 	prov := &fakeProvider{}
 	inv := NewCapabilityInvoker(
 		NewCapabilityResolver(repo), stubProviderResolver{prov},
@@ -131,7 +131,7 @@ func TestInvokerRateLimitedNoInvoke(t *testing.T) {
 func TestInvokerRateLimitedKeyScoped(t *testing.T) {
 	repo := &fakeCapabilityRepo{}
 	pid := "mcp"
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, []byte(`{}`), nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, []byte(`{}`), nil, 1, nil)
 	prov := &fakeProvider{}
 
 	// Capture the key passed to the rate limiter to verify tenant+capability scope.
@@ -154,7 +154,7 @@ func TestInvokerRateLimitedKeyScoped(t *testing.T) {
 func TestInvokerDeniedNoInvoke(t *testing.T) {
 	repo := &fakeCapabilityRepo{}
 	pid := "mcp"
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, nil, nil, 1, nil)
 	repo.bindings = []entities.CapabilityBinding{
 		{ScopeType: entities.BindingScopeState, ScopeID: "st", Permission: entities.BindingPermissionDeny},
 	}
@@ -175,7 +175,7 @@ func TestInvokerDeniedNoInvoke(t *testing.T) {
 func TestInvokerRetryOnRetryable(t *testing.T) {
 	repo := &fakeCapabilityRepo{}
 	pid := "mcp"
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, nil, nil, 1, nil)
 	prov := &fakeProvider{err: NewCapabilityError(ErrorKindTimeout, "capability.timeout", "timeout")}
 	inv := NewCapabilityInvoker(
 		NewCapabilityResolver(repo), stubProviderResolver{prov},
@@ -195,7 +195,7 @@ func TestInvokerRetryOnRetryable(t *testing.T) {
 func TestInvokerNonRetryableNoRetry(t *testing.T) {
 	repo := &fakeCapabilityRepo{}
 	pid := "mcp"
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, nil, nil, 1, nil)
 	prov := &fakeProvider{err: NewCapabilityError(ErrorKindUnauthorized, "capability.unauthorized", "denied")}
 	inv := NewCapabilityInvoker(
 		NewCapabilityResolver(repo), stubProviderResolver{prov},
@@ -215,7 +215,7 @@ func TestInvokerNonRetryableNoRetry(t *testing.T) {
 func TestInvokerIdempotency(t *testing.T) {
 	repo := &fakeCapabilityRepo{}
 	pid := "mcp"
-	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, nil, 1, nil)
+	_, _ = repo.Create(context.Background(), "t", "payment.create", nil, "MCP", &pid, nil, nil, nil, 1, nil)
 	prov := &fakeProvider{result: InvocationResult{Data: map[string]any{"ok": true}}}
 	store := NewInMemoryIdempotencyStore()
 	inv := NewCapabilityInvoker(

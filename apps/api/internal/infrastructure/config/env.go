@@ -7,16 +7,17 @@ import (
 
 // Config holds all environment-sourced configuration.
 type Config struct {
-	DatabaseURL    string
-	Port           string
-	JWTSecret      string
-	LogFormat      string
-	LogLevel       string
-	MetricsEnabled bool
-	OTel           OTelConfig
-	RateLimit      RateLimitConfig
-	SSO            SSOConfig
-	Security       SecurityConfig
+	DatabaseURL     string
+	Port            string
+	JWTSecret       string
+	MCPAPIKeyPepper string
+	LogFormat       string
+	LogLevel        string
+	MetricsEnabled  bool
+	OTel            OTelConfig
+	RateLimit       RateLimitConfig
+	SSO             SSOConfig
+	Security        SecurityConfig
 }
 
 // OTelConfig controls OpenTelemetry tracing (PRD §84). When the OTLP endpoint is
@@ -43,18 +44,24 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("JWT_SECRET must be at least 32 characters")
 	}
 
+	mcpAPIKeyPepper := os.Getenv("MCP_API_KEY_PEPPER")
+	if len(mcpAPIKeyPepper) < 32 {
+		return nil, fmt.Errorf("MCP_API_KEY_PEPPER must be at least 32 characters")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8020"
 	}
 
 	return &Config{
-		DatabaseURL:    dbURL,
-		Port:           port,
-		JWTSecret:      jwtSecret,
-		LogFormat:      envDefault("LOG_FORMAT", "json"),
-		LogLevel:       envDefault("LOG_LEVEL", "info"),
-		MetricsEnabled: envBool("METRICS_ENABLED", true),
+		DatabaseURL:     dbURL,
+		Port:            port,
+		JWTSecret:       jwtSecret,
+		MCPAPIKeyPepper: mcpAPIKeyPepper,
+		LogFormat:       envDefault("LOG_FORMAT", "json"),
+		LogLevel:        envDefault("LOG_LEVEL", "info"),
+		MetricsEnabled:  envBool("METRICS_ENABLED", true),
 		OTel: OTelConfig{
 			OTLPEndpoint: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 			ServiceName:  envDefault("OTEL_SERVICE_NAME", "openstate-api"),

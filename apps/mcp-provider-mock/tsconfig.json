@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "strict": true,
+    "target": "ESNext",
+    "types": ["bun-types", "node"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

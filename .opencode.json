@@ -11,6 +11,10 @@
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"],
       "type": "stdio"
+    },
+    "BINARY DEV": {
+      "url": "http://localhost:8030/mcp",
+      "type": "sse"
     }
   },
   "lsp": {

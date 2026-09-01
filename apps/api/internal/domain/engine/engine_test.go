@@ -181,6 +181,39 @@ func TestStartWorkflow(t *testing.T) {
 	}
 }
 
+func TestInitializeWorkflow(t *testing.T) {
+	repos := newFakeRepos()
+	def := padelDef()
+	_ = repos.Workflows.Save(context.Background(), def)
+	instanceRepo := repos.Instances.(*fakeInstanceRepo)
+	instanceRepo.insts = map[string]*WorkflowInstance{
+		"inst-1": {
+			ID:                "inst-1",
+			TenantID:          "tenant-1",
+			ProjectID:         def.ProjectID,
+			WorkflowID:        def.Slug,
+			WorkflowVersionID: "version-1",
+			Status:            InstanceCreated,
+			Version:           0,
+		},
+	}
+	eng := NewEngine(repos)
+
+	inst, err := eng.InitializeWorkflow(context.Background(), "tenant-1", "inst-1")
+	if err != nil {
+		t.Fatalf("InitializeWorkflow error: %v", err)
+	}
+	if inst.CurrentStateID != def.EntryNodeID {
+		t.Errorf("expected entry state %q, got %q", def.EntryNodeID, inst.CurrentStateID)
+	}
+	if inst.Status != InstanceRunning {
+		t.Errorf("expected RUNNING, got %q", inst.Status)
+	}
+	if inst.Version != 1 {
+		t.Errorf("expected version 1, got %d", inst.Version)
+	}
+}
+
 func TestProcessEventHappyPath(t *testing.T) {
 	repos := newFakeRepos()
 	def := padelDef()

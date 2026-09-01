@@ -590,6 +590,162 @@
         }
       }
     },
+    "/api/api-keys": {
+      "get": {
+        "tags": [
+          "State MCP API Keys"
+        ],
+        "summary": "List State MCP API keys",
+        "description": "Lists non-secret machine credential metadata for the tenant selected by X-Tenant-ID. Requires api_key:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Non-secret API key metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StateMCPAPIKey"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "State MCP API Keys"
+        ],
+        "summary": "Create a State MCP API key",
+        "description": "Creates a tenant-scoped key. The raw key is returned exactly once in this response and cannot be retrieved later. Requires api_key:create.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStateMCPAPIKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created key and one-time secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateStateMCPAPIKeyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "422": {
+            "$ref": "#/components/schemas/ValidationError"
+          }
+        }
+      }
+    },
+    "/api/api-keys/{id}/revoke": {
+      "post": {
+        "tags": [
+          "State MCP API Keys"
+        ],
+        "summary": "Revoke a State MCP API key",
+        "description": "Revokes an active tenant-owned key. The key is denied on every subsequent State MCP request. Requires api_key:revoke.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked non-secret key metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/StateMCPAPIKey"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -1214,6 +1370,120 @@
           },
           "404": {
             "$ref": "#/components/schemas/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/intents": {
+      "get": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "List routable intents",
+        "description": "Returns the published intent mappings for the requested project. When projectId is omitted, the tenant's existing Default Project is used. Requires workflow:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Optional project scope; defaults to the tenant's existing Default Project"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant/project-scoped routable intent mappings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Intent"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/schemas/NotFoundError"
+          },
+          "422": {
+            "$ref": "#/components/schemas/ValidationError"
+          }
+        }
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "tags": [
+          "Admin Console"
+        ],
+        "summary": "List current tenant projects",
+        "description": "Returns projects owned by the tenant selected by X-Tenant-ID. This read-only endpoint supplies project choices for the Admin Console flow and State MCP API-key creation and requires workflow:read.",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant-scoped project list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Project"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/ForbiddenError"
           }
         }
       }
@@ -2419,6 +2689,148 @@
           }
         }
       },
+      "StateMCPAPIKey": {
+        "type": "object",
+        "required": [
+          "id",
+          "tenantId",
+          "name",
+          "prefix",
+          "projectIds",
+          "scopes",
+          "createdBy",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string",
+            "example": "osk_a1b2c3d4e5f6"
+          },
+          "projectIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "defaultProjectId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "state:read",
+                "state:write",
+                "capability:invoke"
+              ]
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateStateMCPAPIKeyRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "projectIds",
+          "scopes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "projectIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "defaultProjectId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "enum": [
+                "state:read",
+                "state:write",
+                "capability:invoke"
+              ]
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "CreateStateMCPAPIKeyResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": [
+              "key",
+              "apiKey"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Raw secret shown only in this response."
+              },
+              "apiKey": {
+                "$ref": "#/components/schemas/StateMCPAPIKey"
+              }
+            }
+          }
+        }
+      },
       "AuditEntry": {
         "type": "object",
         "required": [
@@ -2551,6 +2963,13 @@
               "null"
             ]
           },
+          "providerTool": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Concrete provider MCP tool name; providerId is a server alias."
+          },
           "inputSchema": {},
           "outputSchema": {},
           "status": {
@@ -2606,6 +3025,9 @@
           "providerId": {
             "type": "string"
           },
+          "providerTool": {
+            "type": "string"
+          },
           "inputSchema": {},
           "outputSchema": {},
           "version": {
@@ -2633,6 +3055,9 @@
             ]
           },
           "providerId": {
+            "type": "string"
+          },
+          "providerTool": {
             "type": "string"
           },
           "inputSchema": {},
@@ -2902,6 +3327,101 @@
             "items": {
               "$ref": "#/components/schemas/ApiError"
             }
+          }
+        }
+      },
+      "Intent": {
+        "type": "object",
+        "required": [
+          "id",
+          "tenantId",
+          "projectId",
+          "workflowId",
+          "key",
+          "name",
+          "description",
+          "examples",
+          "workflowSlug"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workflowId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "description": "Canonical intent key used for routing"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Natural-language example utterances"
+          },
+          "workflowSlug": {
+            "type": "string"
+          }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "required": [
+          "id",
+          "tenantId",
+          "name",
+          "slug",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

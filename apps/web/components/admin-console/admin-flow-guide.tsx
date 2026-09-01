@@ -5,6 +5,7 @@ import {
   FolderIcon,
   ListTreeIcon,
   type LucideIcon,
+  MessageSquareIcon,
   PaintbrushIcon,
 } from "lucide-react"
 import Link from "next/link"
@@ -12,10 +13,17 @@ import Link from "next/link"
 import { PanelCard } from "$/components/panel-card"
 import { tenantConfig } from "$/configs/tenant"
 
-export type AdminFlowStep = "tenant" | "project" | "workflow" | "builder"
+export type AdminFlowStep =
+  | "tenant"
+  | "project"
+  | "intent"
+  | "workflow"
+  | "builder"
 
 type AdminFlowGuideProps = {
   currentStep?: AdminFlowStep
+  projectId?: string
+  projectName?: string
 }
 
 type FlowStep = {
@@ -37,26 +45,53 @@ const flowSteps: readonly FlowStep[] = [
   {
     key: "project",
     label: "Project",
-    description: "Default Project is used automatically",
+    description: "Choose the business area for the flow",
+    href: "/admin/projects",
     icon: FolderIcon,
+  },
+  {
+    key: "intent",
+    label: "Intent",
+    description: "Choose what the user wants to do",
+    href: "/admin/intents",
+    icon: MessageSquareIcon,
   },
   {
     key: "workflow",
     label: "Workflow",
-    description: "Create the business flow",
+    description: "Map the request to a business flow",
     href: "/admin/workflows",
     icon: ListTreeIcon,
   },
   {
     key: "builder",
-    label: "Builder",
+    label: "State",
     description: "Design states and transitions",
     href: "/state-builder",
     icon: PaintbrushIcon,
   },
 ] as const
 
-export function AdminFlowGuide({ currentStep }: AdminFlowGuideProps) {
+export function AdminFlowGuide({
+  currentStep,
+  projectId,
+  projectName,
+}: AdminFlowGuideProps) {
+  const getStepHref = (step: FlowStep) => {
+    if (
+      !step.href ||
+      !projectId ||
+      (step.key !== "project" &&
+        step.key !== "intent" &&
+        step.key !== "workflow" &&
+        step.key !== "builder")
+    ) {
+      return step.href
+    }
+
+    return `${step.href}?projectId=${encodeURIComponent(projectId)}`
+  }
+
   return (
     <PanelCard
       title="How the workspace fits together"
@@ -64,11 +99,12 @@ export function AdminFlowGuide({ currentStep }: AdminFlowGuideProps) {
     >
       <ol
         aria-label="Admin Console setup path"
-        className="grid gap-3 md:grid-cols-4"
+        className="grid gap-3 md:grid-cols-5"
       >
         {flowSteps.map((step, index) => {
           const Icon = step.icon
           const isCurrent = step.key === currentStep
+          const href = getStepHref(step)
           const content = (
             <div
               className={`h-full rounded-lg border p-4 transition-colors ${
@@ -102,9 +138,9 @@ export function AdminFlowGuide({ currentStep }: AdminFlowGuideProps) {
 
           return (
             <li key={step.key}>
-              {step.href ? (
+              {href ? (
                 <Link
-                  href={step.href}
+                  href={href}
                   className="block h-full rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
                 >
                   {content}
@@ -127,14 +163,19 @@ export function AdminFlowGuide({ currentStep }: AdminFlowGuideProps) {
         <div>
           <p className="font-semibold">Current project</p>
           <p className="mt-1 text-blue-800">
-            Default Project <span className="text-blue-700">(automatic)</span>
+            {projectName ??
+              (projectId ? "Selected Project" : "Default Project")}{" "}
+            <span className="text-blue-700">
+              {projectId ? `(${projectId})` : "(automatic)"}
+            </span>
           </p>
         </div>
       </div>
 
       <p className="mt-4 text-xs text-slate-500">
-        Project settings and switching are not available yet. New workflows
-        created from this console are placed in Default Project.
+        Choose a project to scope its Intents, Workflows, and States. If no
+        project is selected, the console uses Default Project automatically;
+        each published Intent maps user language to a Workflow.
       </p>
     </PanelCard>
   )

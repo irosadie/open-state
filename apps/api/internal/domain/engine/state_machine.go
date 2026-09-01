@@ -52,6 +52,42 @@ func (e *Engine) StartWorkflow(ctx context.Context, tenantID, projectID, convers
 	return instance, nil
 }
 
+// InitializeWorkflow enters the entry node for an already-persisted workflow
+// instance. The application service creates the instance first so the returned
+// id remains the same across the persistence and engine layers.
+func (e *Engine) InitializeWorkflow(ctx context.Context, tenantID, instanceID string) (*WorkflowInstance, error) {
+	instance, err := e.repos.Instances.Get(ctx, tenantID, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if instance.CurrentStateID != "" {
+		return instance, nil
+	}
+	if instance.Status != InstanceCreated {
+		return nil, domain.NewConflict("workflow instance is not in CREATED state")
+	}
+
+	def, err := e.loadDefinition(ctx, tenantID, instance.ProjectID, instance.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	if def.EntryNodeID == "" {
+		return nil, domain.NewValidation("workflow entry node is missing")
+	}
+	if _, ok := nodeByID(def, def.EntryNodeID); !ok {
+		return nil, domain.NewValidation("workflow entry node not found: " + def.EntryNodeID)
+	}
+
+	instance.CurrentStateID = def.EntryNodeID
+	instance.Status = InstanceRunning
+	instance.Version++
+	instance.UpdatedAt = e.now()
+	if err := e.repos.Instances.UpdateWithVersion(ctx, instance, instance.Version-1); err != nil {
+		return nil, err
+	}
+	return instance, nil
+}
+
 // ProcessEvent runs the deterministic event pipeline:
 // load → validate event allowed → evaluate guards → pick transition →
 // apply → emit result. (PRD §152)

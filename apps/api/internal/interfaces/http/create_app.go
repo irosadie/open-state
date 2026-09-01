@@ -18,6 +18,7 @@ func CreateApp(
 	systemCtrl *controllers.SystemController,
 	capabilityCtrl *controllers.CapabilityController,
 	workflowCtrl *controllers.WorkflowController,
+	intentCtrl *controllers.IntentController,
 	auditCtrl *controllers.AuditController,
 	ssoCtrl *controllers.SSOController,
 	repo repositories.IAuthRepository,
@@ -30,6 +31,8 @@ func CreateApp(
 	metricsRec middleware.MetricsRecorder,
 	adminIdentityCtrl *controllers.AdminIdentityController,
 	adminRuntimeCtrl *controllers.AdminRuntimeController,
+	apiKeyCtrl *controllers.APIKeyController,
+	projectCtrl *controllers.ProjectController,
 	runtimeCtrls ...*controllers.RuntimeInspectorController,
 ) *echo.Echo {
 	e := echo.New()
@@ -48,6 +51,13 @@ func CreateApp(
 	routes.RegisterSSORoutes(e, ssoCtrl)
 	routes.RegisterCapabilityRoutes(e, capabilityCtrl, repo, tokenSvc, authz, audit)
 	routes.RegisterWorkflowRoutes(e, workflowCtrl, repo, tokenSvc, authz, audit)
+	routes.RegisterIntentRoutes(e, intentCtrl, repo, tokenSvc, authz, audit)
+	if apiKeyCtrl != nil {
+		routes.RegisterAPIKeyRoutes(e, apiKeyCtrl, repo, tokenSvc, authz, audit)
+	}
+	if projectCtrl != nil {
+		routes.RegisterProjectRoutes(e, projectCtrl, repo, tokenSvc, authz, audit)
+	}
 	routes.RegisterAuditRoutes(e, auditCtrl, repo, tokenSvc, authz, audit)
 	if adminIdentityCtrl != nil && adminRuntimeCtrl != nil {
 		routes.RegisterAdminRoutes(e, adminIdentityCtrl, adminRuntimeCtrl, repo, tokenSvc, authz, audit)

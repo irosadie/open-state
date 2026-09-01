@@ -10,6 +10,7 @@ import (
 
 	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	"github.com/irosadie/open-state/api/internal/domain/capability"
+	domaincap "github.com/irosadie/open-state/api/internal/domain/capability"
 	"github.com/irosadie/open-state/api/internal/domain/engine"
 	capinfra "github.com/irosadie/open-state/api/internal/infrastructure/capability"
 	"github.com/irosadie/open-state/api/internal/infrastructure/config"
@@ -60,6 +61,8 @@ func main() {
 		adapter.Context(),
 		adapter.Capabilities(),
 		runtimeEngine,
+		adapter.Workflows(),
+		adapter.CapabilityEvidence(),
 	)
 
 	// Context compiler: minimal per-turn context with PII redaction (PRD 22, 90).
@@ -70,42 +73,61 @@ func main() {
 		raginfra.NewDefaultRedactor(),
 	)
 	traceRecorder := appservices.NewRuntimeTraceRecorder(adapter.RuntimeTraces())
+	apiKeySvc := appservices.NewAPIKeyService(adapter.APIKeys(), adapter.Projects(), nil, cfg.MCPAPIKeyPepper)
 
 	// Capability invoker (sandbox/mock provider by default, PRD §2064). Wired with
 	// a repository-backed resolver (authorization, PRD 59-62) and the JSON schema
 	// validator (payload validation, PRD 62).
+	// When FIXTURE_FILE is set, use the JSON-file provider for flow testing.
 	capResolver := capability.NewCapabilityResolver(adapter.Capabilities())
+	var providerResolver domaincap.ProviderResolver
+	if fixturePath := os.Getenv("FIXTURE_FILE"); fixturePath != "" {
+		fr, err := capinfra.NewJSONFileProviderResolver(fixturePath)
+		if err != nil {
+			logger.Error("fixture provider error", "error", err.Error(), "path", fixturePath)
+			return
+		}
+		logger.Info("using JSON fixture provider", "path", fixturePath)
+		providerResolver = fr
+	} else {
+		providerResolver = capinfra.MockProviderResolver{}
+	}
 	invoker := capability.NewCapabilityInvoker(
 		capResolver,
-		capinfra.MockProviderResolver{},
+		providerResolver,
 		capinfra.JSONSchemaValidator{},
 		nil, // rate limiter not wired in this slice
 		capability.NewInMemoryIdempotencyStore(),
 	)
 
 	// Intent service: resolves conversation intents to real workflows (PRD 38, 171).
-	intentSvc := appservices.NewIntentService(adapter.Workflows())
+	intentSvc := appservices.NewIntentService(adapter.Intents(), adapter.Workflows())
 
 	deps := mcpapi.Dependencies{
-		IntentResolver:    intentSvc,
-		CapabilityInvoker: invoker,
-		Orchestrator:      orchestrator,
-		ContextCompiler:   contextCompiler,
-		TraceRecorder:     traceRecorder,
+		APIKeyAuth:                apiKeySvc,
+		IntentResolver:            intentSvc,
+		CapabilityInvoker:         invoker,
+		Orchestrator:              orchestrator,
+		ContextCompiler:           contextCompiler,
+		TraceRecorder:             traceRecorder,
+		ContextRepo:               adapter.Context(),
+		CapabilityRegistry:        adapter.Capabilities(),
+		CapabilityEvidence:        adapter.CapabilityEvidence(),
+		CapabilityOutputValidator: capinfra.JSONSchemaValidator{},
 	}
 
 	srv := mcpapi.NewServer(deps)
 	streamable := server.NewStreamableHTTPServer(srv)
 
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", streamable)
+	mux.Handle("/mcp", mcpapi.APIKeyAuthentication(apiKeySvc)(streamable))
 	mux.HandleFunc("/health/live", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 	mux.HandleFunc("/health/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ready"}`))
+		_, _ = w.Write([]byte(`{"status":"ready","server":"openstate"}`))
 	})
 
 	addr := ":" + port

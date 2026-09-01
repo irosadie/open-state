@@ -1,0 +1,47 @@
+{
+  "/api/intents": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "List routable intents",
+      "description": "Returns the published intent mappings for the requested project. When projectId is omitted, the tenant's existing Default Project is used. Requires workflow:read.",
+      "parameters": [
+        {
+          "name": "X-Tenant-ID",
+          "in": "header",
+          "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        },
+        {
+          "name": "projectId",
+          "in": "query",
+          "required": false,
+          "schema": { "type": "string", "format": "uuid" },
+          "description": "Optional project scope; defaults to the tenant's existing Default Project"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Tenant/project-scoped routable intent mappings",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/Intent" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    }
+  }
+}

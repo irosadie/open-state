@@ -1,0 +1,45 @@
+{
+  "/api/api-keys": {
+    "get": {
+      "tags": ["State MCP API Keys"],
+      "summary": "List State MCP API keys",
+      "description": "Lists non-secret machine credential metadata for the tenant selected by X-Tenant-ID. Requires api_key:read.",
+      "parameters": [{ "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "responses": {
+        "200": { "description": "Non-secret API key metadata", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/StateMCPAPIKey" } } } } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" }
+      }
+    },
+    "post": {
+      "tags": ["State MCP API Keys"],
+      "summary": "Create a State MCP API key",
+      "description": "Creates a tenant-scoped key. The raw key is returned exactly once in this response and cannot be retrieved later. Requires api_key:create.",
+      "parameters": [{ "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateStateMCPAPIKeyRequest" } } } },
+      "responses": {
+        "201": { "description": "Created key and one-time secret", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateStateMCPAPIKeyResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    }
+  },
+  "/api/api-keys/{id}/revoke": {
+    "post": {
+      "tags": ["State MCP API Keys"],
+      "summary": "Revoke a State MCP API key",
+      "description": "Revokes an active tenant-owned key. The key is denied on every subsequent State MCP request. Requires api_key:revoke.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": {
+        "200": { "description": "Revoked non-secret key metadata", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/StateMCPAPIKey" } } } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    }
+  }
+}

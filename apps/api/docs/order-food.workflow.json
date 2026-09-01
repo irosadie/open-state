@@ -1,0 +1,98 @@
+{
+  "workflow": {
+    "slug": "order-food",
+    "name": "Order Makanan",
+    "description": "End-to-end flow untuk memesan makanan: pilih menu, konfirmasi pesanan, bayar, dan lacak pengiriman.",
+    "schemaVersion": 1,
+    "status": "PUBLISHED",
+    "projectId": "",
+    "entryNodeId": "s_start",
+    "policy": {
+      "maxDurationSeconds": 3600,
+      "interruptible": "USER_REQUESTED",
+      "priority": 1
+    },
+    "triggers": [
+      { "event": "intent.ORDER_FOOD", "source": "intent" }
+    ],
+    "nodes": [
+      {
+        "id": "s_start",
+        "kind": "START",
+        "name": "Start",
+        "description": "Mulai proses order makanan."
+      },
+      {
+        "id": "s_browse_menu",
+        "kind": "STATE",
+        "name": "Lihat Menu",
+        "description": "Menampilkan daftar menu yang tersedia.",
+        "instructions": "Gunakan capability food.menu.list untuk mengambil daftar menu. Tampilkan kepada user dan tanyakan apa yang ingin dipesan.",
+        "requiredContext": [],
+        "capabilities": ["food.menu.list"]
+      },
+      {
+        "id": "s_build_cart",
+        "kind": "STATE",
+        "name": "Tambah ke Keranjang",
+        "description": "User memilih item dan jumlah pesanan.",
+        "instructions": "Gunakan capability food.cart.add untuk menambahkan item ke keranjang. Tanyakan apakah user ingin menambah item lain atau langsung checkout.",
+        "requiredContext": ["menu_item_id", "quantity"],
+        "capabilities": ["food.cart.add", "food.cart.get"]
+      },
+      {
+        "id": "s_confirm_order",
+        "kind": "STATE",
+        "name": "Konfirmasi Pesanan",
+        "description": "Tampilkan ringkasan pesanan sebelum checkout.",
+        "instructions": "Gunakan capability food.cart.get untuk menampilkan ringkasan pesanan. Tanyakan alamat pengiriman dan konfirmasi total harga. Gunakan food.order.create jika user konfirmasi.",
+        "requiredContext": ["delivery_address"],
+        "capabilities": ["food.cart.get", "food.order.create"]
+      },
+      {
+        "id": "s_payment",
+        "kind": "STATE",
+        "name": "Pembayaran",
+        "description": "Buat payment link dan verifikasi pembayaran.",
+        "instructions": "Gunakan food.payment.create untuk membuat payment link. Kirimkan ke user dan tunggu konfirmasi. Gunakan food.payment.verify untuk verifikasi.",
+        "requiredContext": ["order_id"],
+        "capabilities": ["food.payment.create", "food.payment.verify"]
+      },
+      {
+        "id": "s_track",
+        "kind": "STATE",
+        "name": "Lacak Pesanan",
+        "description": "Lacak status pengiriman pesanan.",
+        "instructions": "Gunakan food.order.track untuk mengecek status pengiriman dan update user.",
+        "requiredContext": ["order_id"],
+        "capabilities": ["food.order.track"]
+      },
+      {
+        "id": "s_end",
+        "kind": "END",
+        "name": "Selesai",
+        "description": "Pesanan berhasil diterima.",
+        "isTerminal": true
+      },
+      {
+        "id": "s_cancelled",
+        "kind": "END",
+        "name": "Dibatalkan",
+        "description": "User membatalkan pesanan.",
+        "isTerminal": true
+      }
+    ],
+    "transitions": [
+      { "id": "t_start_browse", "sourceStateId": "s_start", "event": "workflow.started", "targetStateId": "s_browse_menu", "priority": 1 },
+      { "id": "t_browse_cart", "sourceStateId": "s_browse_menu", "event": "item.selected", "targetStateId": "s_build_cart", "priority": 1 },
+      { "id": "t_browse_cancelled", "sourceStateId": "s_browse_menu", "event": "user.cancelled", "targetStateId": "s_cancelled", "priority": 2 },
+      { "id": "t_cart_confirm", "sourceStateId": "s_build_cart", "event": "cart.checkout", "targetStateId": "s_confirm_order", "priority": 1 },
+      { "id": "t_cart_cancelled", "sourceStateId": "s_build_cart", "event": "user.cancelled", "targetStateId": "s_cancelled", "priority": 2 },
+      { "id": "t_confirm_payment", "sourceStateId": "s_confirm_order", "event": "order.confirmed", "targetStateId": "s_payment", "priority": 1 },
+      { "id": "t_confirm_cancelled", "sourceStateId": "s_confirm_order", "event": "user.cancelled", "targetStateId": "s_cancelled", "priority": 2 },
+      { "id": "t_payment_track", "sourceStateId": "s_payment", "event": "payment.verified", "targetStateId": "s_track", "priority": 1 },
+      { "id": "t_payment_cancelled", "sourceStateId": "s_payment", "event": "payment.failed", "targetStateId": "s_cancelled", "priority": 2 },
+      { "id": "t_track_end", "sourceStateId": "s_track", "event": "order.delivered", "targetStateId": "s_end", "priority": 1 }
+    ]
+  }
+}

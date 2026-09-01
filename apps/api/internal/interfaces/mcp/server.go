@@ -18,11 +18,15 @@ import (
 	"github.com/irosadie/open-state/api/internal/domain/capability"
 	"github.com/irosadie/open-state/api/internal/domain/engine"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
+	"github.com/irosadie/open-state/api/internal/domain/repositories"
 )
 
 // Dependencies bundles the domain services the MCP server needs. This keeps
 // the package decoupled from concrete infrastructure wiring.
 type Dependencies struct {
+	// APIKeyAuth authenticates State MCP machine principals and writes safe
+	// authorization audit entries. It is required for every production tool call.
+	APIKeyAuth *appservices.APIKeyService
 	// IntentResolver resolves an intent to its workflow (PRD 38, 171).
 	IntentResolver IntentPort
 	// CapabilityInvoker executes authorized capabilities.
@@ -35,11 +39,22 @@ type Dependencies struct {
 	// TraceRecorder records application-observed runtime boundaries. It is
 	// optional so integrations can remain read/command-only during rollout.
 	TraceRecorder *appservices.RuntimeTraceRecorder
+	// ContextRepo persists capability response data into workflow instance
+	// context so downstream capabilities can read it (PRD §24, §31).
+	ContextRepo repositories.IContextRepository
+	// CapabilityRegistry resolves logical state capabilities to safe provider
+	// server aliases and concrete tools.
+	CapabilityRegistry repositories.ICapabilityRepository
+	// CapabilityEvidence persists State MCP's accepted provider execution reports.
+	CapabilityEvidence repositories.ICapabilityEvidenceRepository
+	// CapabilityOutputValidator validates normalized provider results when a
+	// capability declares an output schema.
+	CapabilityOutputValidator capability.InputSchemaValidator
 }
 
 // IntentPort resolves conversation intents to workflows.
 type IntentPort interface {
-	ListIntents(ctx context.Context, tenantID, projectID string) ([]entities.Workflow, error)
+	ListIntents(ctx context.Context, tenantID, projectID string) ([]entities.Intent, error)
 	ResolveIntent(ctx context.Context, tenantID, projectID, intentID string) (*entities.Workflow, error)
 }
 
@@ -69,16 +84,17 @@ type ContextCompilerPort interface {
 
 // IntentInfo is a lightweight projection of an intent for the MCP tool.
 type IntentInfo struct {
-	ID           string `json:"id"`
-	ProjectID    string `json:"projectId"`
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	WorkflowSlug string `json:"workflowSlug"`
+	ID           string   `json:"id"`
+	ProjectID    string   `json:"projectId"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	Examples     []string `json:"examples"`
+	WorkflowSlug string   `json:"workflowSlug"`
 }
 
 // NewServer builds an MCP server with the standard OpenState toolset.
 func NewServer(deps Dependencies) *server.MCPServer {
-	srv := server.NewMCPServer("openstate", "0.1.0")
+	srv := server.NewMCPServer("openstate", "0.1.0", server.WithInstructions(`OpenState is the mandatory state controller and gatekeeper. Always read State MCP intent and current-state requirements before acting. When a state declares a provider capability, call the exact tool on the pre-configured provider MCP server alias, report its normalized result to report_capability_result, and only then propose a transition. Provider endpoints and credentials are managed by the LLM/MCP host; never guess or submit arbitrary endpoints.`))
 	registerTools(srv, deps)
 	return srv
 }
@@ -92,48 +108,67 @@ func getArgs(req mcp.CallToolRequest) map[string]any {
 	return args
 }
 
-// registerTools registers the four MCP tools.
+// registerTools registers the standard OpenState MCP tools.
 func registerTools(srv *server.MCPServer, deps Dependencies) {
+	// list_intents
+	listIntentsTool := mcp.NewTool("list_intents",
+		mcp.WithDescription("List canonical intents and example user utterances for the authenticated tenant/project. Use the returned intent id with resolve_intent."),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+		mcp.WithString("project", mcp.Description("Allowed project id; defaults to the API key default project")),
+	)
+	srv.AddTool(listIntentsTool, authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := getArgs(req)
+		projectID, err := projectForPrincipal(ctx, deps, principal, str(args, "project"))
+		if err != nil {
+			return toolError(err)
+		}
+		return handleListIntents(ctx, deps, principal.TenantID, projectID)
+	}))
+
 	// resolve_intent
 	resolveTool := mcp.NewTool("resolve_intent",
-		mcp.WithDescription("Resolve a conversation intent to its workflow."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
+		mcp.WithDescription("Resolve a canonical intent id from list_intents to its mapped workflow. Do not pass a workflow id or slug."),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
 		mcp.WithString("intent", mcp.Required(), mcp.Description("Intent id, e.g. BOOKING_PADEL")),
-		mcp.WithString("project", mcp.Required(), mcp.Description("Project id owning the intent")),
+		mcp.WithString("project", mcp.Description("Allowed project id; defaults to the API key default project")),
 	)
-	srv.AddTool(resolveTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	srv.AddTool(resolveTool, authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		intentID, _ := args["intent"].(string)
-		projectID, _ := args["project"].(string)
-		tenantID, _ := args["tenant"].(string)
-		return handleResolveIntent(ctx, deps, tenantID, projectID, intentID)
-	})
+		projectID, err := projectForPrincipal(ctx, deps, principal, str(args, "project"))
+		if err != nil {
+			return toolError(err)
+		}
+		return handleResolveIntent(ctx, deps, principal.TenantID, projectID, str(args, "intent"))
+	}))
 
 	// get_active_workflow
 	activeTool := mcp.NewTool("get_active_workflow",
 		mcp.WithDescription("Return the active workflow and current state for a conversation."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("conversation", mcp.Required(), mcp.Description("Conversation id")),
 	)
-	srv.AddTool(activeTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	srv.AddTool(activeTool, authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		conv, _ := args["conversation"].(string)
-		tenantID, _ := args["tenant"].(string)
-		return handleGetActiveWorkflow(ctx, deps, tenantID, conv)
-	})
+		return handleGetActiveWorkflow(ctx, deps, principal.TenantID, str(args, "conversation"))
+	}))
 
 	// invoke_capability
 	invokeTool := mcp.NewTool("invoke_capability",
 		mcp.WithDescription("Invoke an authorized capability for the context."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("workflow", mcp.Description("Workflow id")),
 		mcp.WithString("state", mcp.Description("State id")),
+		mcp.WithString("instance", mcp.Description("Workflow instance id — when provided, capability response is persisted to context")),
 		mcp.WithString("capability", mcp.Required(), mcp.Description("Capability name, e.g. payment.create")),
 		mcp.WithObject("payload", mcp.Description("Invocation payload")),
 	)
-	srv.AddTool(invokeTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleInvokeCapability(ctx, deps, req)
-	})
+	srv.AddTool(invokeTool, authorizedTool(deps, entities.MCPAPIScopeCapabilityInvoke, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return handleInvokeCapability(ctx, deps, principal.TenantID, req)
+	}))
 
 	registerOrchestratorTools(srv, deps)
 	registerContextTool(srv, deps)
@@ -144,121 +179,131 @@ func registerOrchestratorTools(srv *server.MCPServer, deps Dependencies) {
 	// get_current_state
 	srv.AddTool(mcp.NewTool("get_current_state",
 		mcp.WithDescription("Return the current state and allowed events for a workflow instance."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	), authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleGetCurrentState(ctx, deps, str(args, "tenant"), str(args, "instance"))
-	})
+		return handleGetCurrentState(ctx, deps, principal.TenantID, str(args, "instance"))
+	}))
 
 	// get_allowed_capabilities
 	srv.AddTool(mcp.NewTool("get_allowed_capabilities",
 		mcp.WithDescription("List capabilities authorized for a scope."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("scopeType", mcp.Required(), mcp.Description("TENANT | WORKFLOW | STATE")),
 		mcp.WithString("scopeId", mcp.Required(), mcp.Description("Scope id")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	), authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleGetAllowedCapabilities(ctx, deps, str(args, "tenant"), str(args, "scopeType"), str(args, "scopeId"))
-	})
+		return handleGetAllowedCapabilities(ctx, deps, principal.TenantID, str(args, "scopeType"), str(args, "scopeId"))
+	}))
 
 	// propose_event
 	srv.AddTool(mcp.NewTool("propose_event",
 		mcp.WithDescription("Propose an event for a workflow instance; the engine validates and transitions."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
 		mcp.WithString("type", mcp.Required(), mcp.Description("Event type")),
 		mcp.WithObject("payload", mcp.Description("Event payload")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleProposeEvent(ctx, deps, req)
-	})
+	), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return handleProposeEvent(ctx, deps, principal.TenantID, req)
+	}))
+
+	// report_capability_result
+	srv.AddTool(mcp.NewTool("report_capability_result",
+		mcp.WithDescription("Report a direct provider MCP result to State MCP. A successful report is required before a guarded state transition can proceed."),
+		mcp.WithString("project", mcp.Description("Allowed project id; defaults to the API key default project")),
+		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
+		mcp.WithString("state", mcp.Required(), mcp.Description("Current state id or state key")),
+		mcp.WithString("capability", mcp.Required(), mcp.Description("Logical capability declared by the current state")),
+		mcp.WithString("providerServer", mcp.Required(), mcp.Description("Configured provider MCP server alias; endpoints are not accepted")),
+		mcp.WithString("providerTool", mcp.Required(), mcp.Description("Concrete provider MCP tool name")),
+		mcp.WithString("correlationId", mcp.Required(), mcp.Description("Correlation identifier for the provider call")),
+		mcp.WithString("idempotencyKey", mcp.Required(), mcp.Description("Stable key for the provider operation")),
+		mcp.WithString("status", mcp.Required(), mcp.Description("SUCCEEDED or FAILED")),
+		mcp.WithObject("result", mcp.Description("Normalized provider result")),
+		mcp.WithObject("error", mcp.Description("Classified provider failure when status is FAILED")),
+	), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		projectID, err := projectForPrincipal(ctx, deps, principal, str(getArgs(req), "project"))
+		if err != nil {
+			return toolError(err)
+		}
+		return handleReportCapabilityResult(ctx, deps, principal.TenantID, projectID, req)
+	}))
 
 	// start_workflow
 	srv.AddTool(mcp.NewTool("start_workflow",
 		mcp.WithDescription("Start a new workflow instance."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("workflow", mcp.Required(), mcp.Description("Workflow id")),
 		mcp.WithString("version", mcp.Description("Workflow version id (optional)")),
 		mcp.WithString("correlation", mcp.Description("Business/conversation correlation")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleStartWorkflow(ctx, deps, str(args, "tenant"), str(args, "workflow"), str(args, "version"), str(args, "correlation"))
-	})
+		return handleStartWorkflow(ctx, deps, principal.TenantID, str(args, "workflow"), str(args, "version"), str(args, "correlation"))
+	}))
 
 	// suspend_workflow
 	srv.AddTool(mcp.NewTool("suspend_workflow",
 		mcp.WithDescription("Suspend a running workflow instance."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleLifecycle(ctx, deps, "suspend", str(args, "tenant"), str(args, "instance"))
-	})
+		return handleLifecycle(ctx, deps, "suspend", principal.TenantID, str(args, "instance"))
+	}))
 
 	// resume_workflow
 	srv.AddTool(mcp.NewTool("resume_workflow",
 		mcp.WithDescription("Resume a suspended workflow instance."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleLifecycle(ctx, deps, "resume", str(args, "tenant"), str(args, "instance"))
-	})
+		return handleLifecycle(ctx, deps, "resume", principal.TenantID, str(args, "instance"))
+	}))
 
 	// cancel_workflow
 	srv.AddTool(mcp.NewTool("cancel_workflow",
 		mcp.WithDescription("Cancel a workflow instance."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleLifecycle(ctx, deps, "cancel", str(args, "tenant"), str(args, "instance"))
-	})
+		return handleLifecycle(ctx, deps, "cancel", principal.TenantID, str(args, "instance"))
+	}))
 
 	// get_workflow_instances
 	srv.AddTool(mcp.NewTool("get_workflow_instances",
-		mcp.WithDescription("List workflow instances for a tenant."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := getArgs(req)
-		return handleListInstances(ctx, deps, str(args, "tenant"))
-	})
+		mcp.WithDescription("List workflow instances for the authenticated tenant."),
+	), authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return handleListInstances(ctx, deps, principal.TenantID)
+	}))
 
 	// get_history
 	srv.AddTool(mcp.NewTool("get_history",
 		mcp.WithDescription("Return the event history for a workflow instance."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	), authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleListHistory(ctx, deps, str(args, "tenant"), str(args, "instance"))
-	})
+		return handleListHistory(ctx, deps, principal.TenantID, str(args, "instance"))
+	}))
 
 	// replay_workflow
 	srv.AddTool(mcp.NewTool("replay_workflow",
 		mcp.WithDescription("Replay the event history of a workflow instance to reproduce its resulting state."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	), authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleReplayWorkflow(ctx, deps, str(args, "tenant"), str(args, "instance"))
-	})
+		return handleReplayWorkflow(ctx, deps, principal.TenantID, str(args, "instance"))
+	}))
 }
 
 // registerContextTool registers the context compiler backed get_context tool.
 func registerContextTool(srv *server.MCPServer, deps Dependencies) {
 	srv.AddTool(mcp.NewTool("get_context",
 		mcp.WithDescription("Return the compiled, PII-redacted runtime context for a turn."),
-		mcp.WithString("tenant", mcp.Required(), mcp.Description("Tenant id")),
 		mcp.WithString("conversation", mcp.Required(), mcp.Description("Conversation id")),
 		mcp.WithString("instance", mcp.Description("Workflow instance id (optional)")),
 		mcp.WithString("ownerType", mcp.Description("Memory owner type (e.g. CUSTOMER)")),
 		mcp.WithString("ownerId", mcp.Description("Memory owner id")),
 		mcp.WithString("query", mcp.Description("RAG query (optional)")),
-	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	), authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleCompiledContext(ctx, deps, args)
-	})
+		return handleCompiledContext(ctx, deps, principal.TenantID, args)
+	}))
 }
 
 // str returns a string argument or the empty string.

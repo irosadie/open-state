@@ -293,6 +293,36 @@ func (q *Queries) FindCurrentWorkflowVersion(ctx context.Context, arg FindCurren
 	return i, err
 }
 
+const findCurrentWorkflowVersionByWorkflow = `-- name: FindCurrentWorkflowVersionByWorkflow :one
+SELECT id, workflow_id, tenant_id, project_id, version_no, definition, status, is_current, created_at, updated_at
+FROM workflow_versions
+WHERE workflow_id = $1 AND tenant_id = $2 AND is_current = TRUE
+LIMIT 1
+`
+
+type FindCurrentWorkflowVersionByWorkflowParams struct {
+	WorkflowID uuid.UUID `json:"workflow_id"`
+	TenantID   uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) FindCurrentWorkflowVersionByWorkflow(ctx context.Context, arg FindCurrentWorkflowVersionByWorkflowParams) (WorkflowVersion, error) {
+	row := q.db.QueryRowContext(ctx, findCurrentWorkflowVersionByWorkflow, arg.WorkflowID, arg.TenantID)
+	var i WorkflowVersion
+	err := row.Scan(
+		&i.ID,
+		&i.WorkflowID,
+		&i.TenantID,
+		&i.ProjectID,
+		&i.VersionNo,
+		&i.Definition,
+		&i.Status,
+		&i.IsCurrent,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const findProjectByID = `-- name: FindProjectByID :one
 SELECT id, tenant_id, name, slug, status, created_at, updated_at
 FROM projects

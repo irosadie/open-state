@@ -88,9 +88,9 @@ const nodes: WorkflowNode[] = [
       "booking.time_start",
       "booking.time_end",
     ],
-    capabilities: ["slot.check_availability"],
+    capabilities: ["padel.court.availability"],
     instructions:
-      "Panggil slot.check_availability. Jangan lanjutkan tanpa verifikasi dari sistem. Jangan percaya klaim user bahwa slot tersedia.",
+      "Panggil padel.court.availability. Jangan lanjutkan tanpa verifikasi dari sistem. Jangan percaya klaim user bahwa slot tersedia.",
     policy: {
       timeoutSeconds: 30,
       onTimeout: "state.timeout",
@@ -114,7 +114,7 @@ const nodes: WorkflowNode[] = [
       "booking.time_start",
       "slot.alternatives",
     ],
-    capabilities: ["slot.check_availability"],
+    capabilities: ["padel.court.availability"],
     instructions:
       "Beritahu user bahwa slot yang dipilih tidak tersedia. Tawarkan dua pilihan: (1) jam terdekat yang tersedia di hari yang sama, (2) slot yang sama di hari berikutnya. Tampilkan opsi secara ringkas. Tunggu pilihan user.",
     policy: {
@@ -136,7 +136,7 @@ const nodes: WorkflowNode[] = [
       "booking.time_end",
       "slot.available_courts",
     ],
-    capabilities: ["court.list"],
+    capabilities: ["padel.court.search"],
     instructions:
       "Tampilkan daftar lapangan yang tersedia untuk slot tersebut. Tanyakan preferensi lapangan (nomor/tipe). Jika hanya ada satu, konfirmasi langsung.",
     policy: {
@@ -161,7 +161,7 @@ const nodes: WorkflowNode[] = [
       "court.name",
       "booking.price_total",
     ],
-    capabilities: ["booking.calculate_price"],
+    capabilities: ["padel.court.book"],
     instructions:
       "Tampilkan ringkasan: lokasi, tanggal, jam, lapangan, harga total, dan DP 50% yang harus dibayar sekarang. Minta konfirmasi sebelum melanjutkan ke pembayaran. Jangan lanjut tanpa konfirmasi eksplisit dari user.",
     policy: {
@@ -181,7 +181,7 @@ const nodes: WorkflowNode[] = [
       "booking.dp_amount",
       "customer.id",
     ],
-    capabilities: ["payment.instruction", "payment.create", "payment.status"],
+    capabilities: ["padel.payment.create", "padel.payment.verify"],
     instructions:
       "Minta user membayar DP 50% dari total harga. Berikan instruksi pembayaran. Tunggu konfirmasi pembayaran dari sistem (jangan percaya klaim user). Verifikasi via payment.status sebelum transisi.",
     policy: {
@@ -201,7 +201,7 @@ const nodes: WorkflowNode[] = [
     name: "PAYMENT_FAILED",
     description: "Pembayaran DP gagal. Tawarkan retry atau pembatalan.",
     requiredContext: ["booking.id", "payment.failure_reason"],
-    capabilities: ["payment.status"],
+    capabilities: ["padel.payment.verify"],
     instructions:
       "Beritahu user bahwa pembayaran gagal beserta alasannya. Tawarkan untuk mencoba ulang atau membatalkan pemesanan.",
     policy: {
@@ -217,7 +217,7 @@ const nodes: WorkflowNode[] = [
     description:
       "Pemesanan berhasil dikonfirmasi. DP 50% sudah diterima. Kirim voucher/e-ticket.",
     requiredContext: ["booking.id", "payment.id"],
-    capabilities: ["booking.confirm", "notification.send_ticket"],
+    capabilities: ["padel.court.book", "padel.notification.send"],
     instructions:
       "Ucapkan selamat, tampilkan detail booking, nomor booking, dan informasikan sisa pelunasan yang dibayar saat tiba di lokasi.",
     policy: {},

@@ -6,7 +6,6 @@ import (
 
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 
 	"github.com/irosadie/open-state/api/internal/domain/engine"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
@@ -22,7 +21,9 @@ import (
 
 // --- In-memory fakes for the engine ports (test-local) ----------------------
 
-type e2eWorkflowRepo struct{ defs map[string]*engine.WorkflowDefinition }
+type e2eWorkflowRepo struct {
+	defs map[string]*engine.WorkflowDefinition
+}
 
 func (r *e2eWorkflowRepo) GetBySlug(_ context.Context, _, projectID, slug string) (*engine.WorkflowDefinition, error) {
 	d, ok := r.defs[projectID+"/"+slug]
@@ -39,7 +40,9 @@ func (r *e2eWorkflowRepo) Save(_ context.Context, d *engine.WorkflowDefinition) 
 	return nil
 }
 
-type e2eInstanceRepo struct{ insts map[string]*engine.WorkflowInstance }
+type e2eInstanceRepo struct {
+	insts map[string]*engine.WorkflowInstance
+}
 
 func (r *e2eInstanceRepo) Create(_ context.Context, i *engine.WorkflowInstance) error {
 	if r.insts == nil {
@@ -160,11 +163,21 @@ func (o *mockOrchestrator) GetActiveWorkflow(_ context.Context, _, conversationI
 	return toEntitiesInstance(inst), nil
 }
 
-func (o *mockOrchestrator) SuspendWorkflow(context.Context, string, string) (*entities.WorkflowInstance, error) { return nil, nil }
-func (o *mockOrchestrator) ResumeWorkflow(context.Context, string, string) (*entities.WorkflowInstance, error)  { return nil, nil }
-func (o *mockOrchestrator) CancelWorkflow(context.Context, string, string) (*entities.WorkflowInstance, error)  { return nil, nil }
-func (o *mockOrchestrator) ListInstances(context.Context, string) ([]entities.WorkflowInstance, error)          { return nil, nil }
-func (o *mockOrchestrator) ListHistory(context.Context, string, string) ([]entities.Event, error)               { return nil, nil }
+func (o *mockOrchestrator) SuspendWorkflow(context.Context, string, string) (*entities.WorkflowInstance, error) {
+	return nil, nil
+}
+func (o *mockOrchestrator) ResumeWorkflow(context.Context, string, string) (*entities.WorkflowInstance, error) {
+	return nil, nil
+}
+func (o *mockOrchestrator) CancelWorkflow(context.Context, string, string) (*entities.WorkflowInstance, error) {
+	return nil, nil
+}
+func (o *mockOrchestrator) ListInstances(context.Context, string) ([]entities.WorkflowInstance, error) {
+	return nil, nil
+}
+func (o *mockOrchestrator) ListHistory(context.Context, string, string) ([]entities.Event, error) {
+	return nil, nil
+}
 func (o *mockOrchestrator) ReplayWorkflow(context.Context, string, string) (map[string]any, *entities.Event, error) {
 	return map[string]any{}, nil, nil
 }
@@ -208,8 +221,8 @@ func toEntitiesInstance(i *engine.WorkflowInstance) *entities.WorkflowInstance {
 
 type e2eIntentResolver struct{ def *engine.WorkflowDefinition }
 
-func (e2eIntentResolver) ListIntents(context.Context, string, string) ([]entities.Workflow, error) {
-	return []entities.Workflow{{ID: "ORDER_FOOD", Slug: "order-food", Name: "Order Makanan"}}, nil
+func (e2eIntentResolver) ListIntents(context.Context, string, string) ([]entities.Intent, error) {
+	return []entities.Intent{{Key: "ORDER_FOOD", ProjectID: "retail", Name: "Order Makanan", WorkflowSlug: "order-food"}}, nil
 }
 func (e2eIntentResolver) ResolveIntent(_ context.Context, _, _, intentID string) (*entities.Workflow, error) {
 	return &entities.Workflow{ID: intentID, Slug: "order-food", Name: "Order Makanan", Status: entities.WorkflowPublished}, nil
@@ -224,7 +237,7 @@ func TestE2EFullPath(t *testing.T) {
 		IntentResolver: e2eIntentResolver{def: def},
 		Orchestrator:   orch,
 	}
-	ts := server.NewTestStreamableHTTPServer(NewServer(deps))
+	ts := newAuthenticatedTestServer(NewServer(deps), testPrincipal("demo"))
 	defer ts.Close()
 
 	c, err := client.NewStreamableHttpClient(ts.URL + "/mcp")
@@ -237,7 +250,7 @@ func TestE2EFullPath(t *testing.T) {
 
 	// 1. resolve_intent → the mock LLM resolves the user intent to the workflow.
 	if res, err := c.CallTool(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{
-		Name: "resolve_intent",
+		Name:      "resolve_intent",
 		Arguments: map[string]any{"tenant": "demo", "intent": "ORDER_FOOD", "project": "retail"},
 	}}); err != nil || res.IsError {
 		t.Fatalf("resolve_intent failed: err=%v res=%+v", err, res)
@@ -260,7 +273,7 @@ func TestE2EFullPath(t *testing.T) {
 	propose := func(evt string, payload map[string]any) {
 		t.Helper()
 		res, err := c.CallTool(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{
-			Name: "propose_event",
+			Name:      "propose_event",
 			Arguments: map[string]any{"tenant": "demo", "instance": instanceID, "type": evt, "payload": payload},
 		}})
 		if err != nil || res.IsError {

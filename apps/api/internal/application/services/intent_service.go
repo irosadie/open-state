@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 	"github.com/irosadie/open-state/api/internal/domain/repositories"
@@ -12,33 +13,40 @@ import (
 // It queries the published workflow definitions within a tenant+project, so
 // `resolve_intent` returns real workflow data instead of a hardcoded stub.
 type IntentService struct {
+	intents   repositories.IIntentRepository
 	workflows repositories.IWorkflowRepository
 }
 
 // NewIntentService builds an IntentService.
-func NewIntentService(workflows repositories.IWorkflowRepository) *IntentService {
-	return &IntentService{workflows: workflows}
+func NewIntentService(intents repositories.IIntentRepository, workflows repositories.IWorkflowRepository) *IntentService {
+	return &IntentService{intents: intents, workflows: workflows}
 }
 
-// ListIntents returns the workflows in a tenant+project as candidate intents.
-func (s *IntentService) ListIntents(ctx context.Context, tenantID, projectID string) ([]entities.Workflow, error) {
-	return s.workflows.ListByTenant(ctx, tenantID, projectID)
+// ListIntents returns the published workflow mappings in a tenant+project.
+func (s *IntentService) ListIntents(ctx context.Context, tenantID, projectID string) ([]entities.Intent, error) {
+	if strings.TrimSpace(tenantID) == "" || strings.TrimSpace(projectID) == "" {
+		return nil, domain.NewValidation("tenant and project are required")
+	}
+	return s.intents.ListRoutable(ctx, tenantID, projectID)
 }
 
-// ResolveIntent returns the workflow whose id (or slug) matches the intent within
-// a tenant+project, or a not-found error.
+// ResolveIntent returns the workflow mapped to a canonical intent key within a
+// tenant+project, or a not-found error. Workflow IDs and slugs are not accepted.
 func (s *IntentService) ResolveIntent(ctx context.Context, tenantID, projectID, intentID string) (*entities.Workflow, error) {
-	if intentID == "" {
+	if strings.TrimSpace(tenantID) == "" || strings.TrimSpace(projectID) == "" {
+		return nil, domain.NewValidation("tenant and project are required")
+	}
+	key := strings.ToUpper(strings.TrimSpace(intentID))
+	if key == "" {
 		return nil, domain.NewValidation("intent is required")
 	}
-	wf, err := s.workflows.FindByID(ctx, tenantID, projectID, intentID)
-	if err == nil {
-		return wf, nil
+	intent, err := s.intents.FindRoutable(ctx, tenantID, projectID, key)
+	if err != nil {
+		return nil, err
 	}
-	// Fall back to slug resolution.
-	wf, err2 := s.workflows.FindBySlug(ctx, tenantID, projectID, intentID)
-	if err2 != nil {
-		return nil, domain.NewNotFound("intent not found")
+	wf, err := s.workflows.FindByID(ctx, tenantID, projectID, intent.WorkflowID)
+	if err != nil {
+		return nil, err
 	}
 	return wf, nil
 }

@@ -14,7 +14,6 @@ import {
   updateCapabilitySchema,
 } from "@openstate/schemas"
 import type { CapabilityResponse } from "@openstate/types"
-import type { ZodError } from "zod"
 
 type CapabilityEditFormProps = {
   capability: CapabilityResponse
@@ -44,6 +43,9 @@ export function CapabilityEditForm({
   const [description, setDescription] = useState(capability.description || "")
   const [providerType, setProviderType] = useState(capability.providerType)
   const [providerId, setProviderId] = useState(capability.providerId || "")
+  const [providerTool, setProviderTool] = useState(
+    capability.providerTool || "",
+  )
   const [inputSchema, setInputSchema] = useState(
     JSON.stringify(capability.inputSchema || {}, null, 2),
   )
@@ -77,6 +79,7 @@ export function CapabilityEditForm({
       description: description || undefined,
       providerType,
       providerId: providerId || undefined,
+      providerTool: providerTool || undefined,
       inputSchema: parsedInput,
       outputSchema: parsedOutput,
       status,
@@ -87,7 +90,7 @@ export function CapabilityEditForm({
     if (!parsed.success) {
       const errors: FieldErrors = {}
 
-      for (const issue of (parsed.error as ZodError).issues) {
+      for (const issue of parsed.error.issues) {
         const key = issue.path[0] as keyof UpdateCapabilitySchemaProps
 
         if (key) {
@@ -129,9 +132,19 @@ export function CapabilityEditForm({
       />
 
       <Input
-        label="Provider ID"
+        label="Provider MCP server alias"
+        placeholder="padel-provider-mock"
+        required={providerType === "MCP"}
         value={providerId}
         onChange={(e) => setProviderId(e.target.value)}
+      />
+
+      <Input
+        label="Provider MCP tool"
+        placeholder="padel.check_available"
+        required={providerType === "MCP"}
+        value={providerTool}
+        onChange={(e) => setProviderTool(e.target.value)}
       />
 
       <Select<(typeof capabilityStatusLabels)[number]>

@@ -11,7 +11,10 @@ import {
   BlocksIcon,
   ClipboardListIcon,
   CogIcon,
+  FolderIcon,
+  KeyRoundIcon,
   ListTreeIcon,
+  MessageSquareIcon,
   UsersIcon,
 } from "lucide-react"
 
@@ -24,6 +27,13 @@ const cards = [
     icon: CogIcon,
   },
   {
+    href: "/admin/api-keys",
+    permission: "api_key:read",
+    title: "State MCP API Keys",
+    description: "Create and revoke machine credentials for State MCP clients.",
+    icon: KeyRoundIcon,
+  },
+  {
     href: "/admin/members",
     permission: "user:read",
     title: "Members & roles",
@@ -31,11 +41,26 @@ const cards = [
     icon: UsersIcon,
   },
   {
+    href: "/admin/projects",
+    permission: "workflow:read",
+    title: "Projects",
+    description:
+      "Choose the project that scopes intents, workflows, and states.",
+    icon: FolderIcon,
+  },
+  {
     href: "/admin/workflows",
     permission: "workflow:read",
     title: "Workflow inventory",
     description: "Open workflows in the Builder lifecycle experience.",
     icon: ListTreeIcon,
+  },
+  {
+    href: "/admin/intents",
+    permission: "workflow:read",
+    title: "Intent catalog",
+    description: "See how user requests route to published workflows.",
+    icon: MessageSquareIcon,
   },
   {
     href: "/admin/instances",

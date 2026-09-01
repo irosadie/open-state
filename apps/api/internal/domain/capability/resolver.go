@@ -12,12 +12,13 @@ import (
 // ResolvedCapability is the output of resolving a logical capability to a
 // provider + schema + bindings (PRD §59, §60).
 type ResolvedCapability struct {
-	ID                 string
-	Name               string
-	ProviderType       entities.ProviderType
-	ProviderID         string
-	InputSchema        []byte
-	OutputSchema       []byte
+	ID                  string
+	Name                string
+	ProviderType        entities.ProviderType
+	ProviderID          string
+	ProviderTool        string
+	InputSchema         []byte
+	OutputSchema        []byte
 	CredentialReference string
 }
 
@@ -64,6 +65,7 @@ func (r *CapabilityResolver) Resolve(ctx context.Context, tenantID, name, workfl
 		Name:                cap.Name,
 		ProviderType:        cap.ProviderType,
 		ProviderID:          cap.ProviderID.String,
+		ProviderTool:        cap.ProviderTool.String,
 		InputSchema:         cap.InputSchema,
 		OutputSchema:        cap.OutputSchema,
 		CredentialReference: cap.CredentialReference.String,

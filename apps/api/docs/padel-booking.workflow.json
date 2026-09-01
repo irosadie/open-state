@@ -1,0 +1,158 @@
+{
+  "workflow": {
+    "slug": "padel-court-booking",
+    "name": "Padel Court Booking",
+    "description": "End-to-end flow untuk booking lapangan padel: cari lapangan, cek ketersediaan, konfirmasi, bayar, dan notifikasi.",
+    "schemaVersion": 1,
+    "status": "PUBLISHED",
+    "projectId": "",
+    "entryNodeId": "s_start",
+    "policy": {
+      "maxDurationSeconds": 1800,
+      "interruptible": "USER_REQUESTED",
+      "priority": 1
+    },
+    "triggers": [
+      { "event": "intent.BOOKING_PADEL", "source": "intent" }
+    ],
+    "nodes": [
+      {
+        "id": "s_start",
+        "kind": "START",
+        "name": "Start",
+        "description": "Mulai proses booking lapangan padel."
+      },
+      {
+        "id": "s_search",
+        "kind": "STATE",
+        "name": "Cari Lapangan",
+        "description": "Mencari lapangan padel yang tersedia berdasarkan lokasi dan tanggal.",
+        "instructions": "Tanyakan kepada user lokasi dan tanggal yang diinginkan, lalu gunakan capability padel.court.search untuk mencari lapangan yang tersedia. Tampilkan hasilnya kepada user.",
+        "requiredContext": ["location", "date"],
+        "capabilities": ["padel.court.search"]
+      },
+      {
+        "id": "s_availability",
+        "kind": "STATE",
+        "name": "Cek Ketersediaan",
+        "description": "Mengecek slot waktu yang tersedia untuk lapangan yang dipilih user.",
+        "instructions": "Setelah user memilih lapangan, gunakan capability padel.court.availability untuk mengecek slot waktu yang tersedia. Tampilkan slot yang available kepada user.",
+        "requiredContext": ["court_id", "date"],
+        "capabilities": ["padel.court.availability"]
+      },
+      {
+        "id": "s_confirm",
+        "kind": "STATE",
+        "name": "Konfirmasi Booking",
+        "description": "User mengkonfirmasi pilihan lapangan, tanggal, dan jam.",
+        "instructions": "Tampilkan ringkasan booking kepada user (lapangan, tanggal, jam, harga). Tanyakan apakah user ingin melanjutkan. Gunakan capability padel.court.book jika user konfirmasi.",
+        "requiredContext": ["court_id", "date", "time_slot"],
+        "capabilities": ["padel.court.book"]
+      },
+      {
+        "id": "s_payment",
+        "kind": "STATE",
+        "name": "Pembayaran",
+        "description": "Membuat payment link dan menunggu konfirmasi pembayaran.",
+        "instructions": "Gunakan capability padel.payment.create untuk membuat payment link. Kirimkan link kepada user dan tunggu konfirmasi. Gunakan padel.payment.verify untuk memverifikasi status pembayaran.",
+        "requiredContext": ["booking_id"],
+        "capabilities": ["padel.payment.create", "padel.payment.verify"]
+      },
+      {
+        "id": "s_notify",
+        "kind": "STATE",
+        "name": "Kirim Notifikasi",
+        "description": "Mengirimkan konfirmasi booking kepada user via WhatsApp/email.",
+        "instructions": "Gunakan capability padel.notification.send untuk mengirim notifikasi konfirmasi booking kepada user.",
+        "requiredContext": ["booking_id", "payment_id"],
+        "capabilities": ["padel.notification.send"]
+      },
+      {
+        "id": "s_end",
+        "kind": "END",
+        "name": "Selesai",
+        "description": "Booking lapangan padel berhasil dikonfirmasi.",
+        "isTerminal": true
+      },
+      {
+        "id": "s_cancelled",
+        "kind": "END",
+        "name": "Dibatalkan",
+        "description": "User membatalkan proses booking.",
+        "isTerminal": true
+      }
+    ],
+    "transitions": [
+      {
+        "id": "t_start_search",
+        "sourceStateId": "s_start",
+        "event": "workflow.started",
+        "targetStateId": "s_search",
+        "priority": 1
+      },
+      {
+        "id": "t_search_availability",
+        "sourceStateId": "s_search",
+        "event": "court.selected",
+        "targetStateId": "s_availability",
+        "priority": 1
+      },
+      {
+        "id": "t_search_cancelled",
+        "sourceStateId": "s_search",
+        "event": "user.cancelled",
+        "targetStateId": "s_cancelled",
+        "priority": 2
+      },
+      {
+        "id": "t_availability_confirm",
+        "sourceStateId": "s_availability",
+        "event": "slot.selected",
+        "targetStateId": "s_confirm",
+        "priority": 1
+      },
+      {
+        "id": "t_availability_cancelled",
+        "sourceStateId": "s_availability",
+        "event": "user.cancelled",
+        "targetStateId": "s_cancelled",
+        "priority": 2
+      },
+      {
+        "id": "t_confirm_payment",
+        "sourceStateId": "s_confirm",
+        "event": "booking.confirmed",
+        "targetStateId": "s_payment",
+        "priority": 1
+      },
+      {
+        "id": "t_confirm_cancelled",
+        "sourceStateId": "s_confirm",
+        "event": "user.cancelled",
+        "targetStateId": "s_cancelled",
+        "priority": 2
+      },
+      {
+        "id": "t_payment_notify",
+        "sourceStateId": "s_payment",
+        "event": "payment.verified",
+        "targetStateId": "s_notify",
+        "priority": 1
+      },
+      {
+        "id": "t_payment_cancelled",
+        "sourceStateId": "s_payment",
+        "event": "payment.failed",
+        "targetStateId": "s_cancelled",
+        "priority": 2
+      },
+      {
+        "id": "t_notify_end",
+        "sourceStateId": "s_notify",
+        "event": "notification.sent",
+        "targetStateId": "s_end",
+        "priority": 1
+      }
+    ]
+  }
+}
