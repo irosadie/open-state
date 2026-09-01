@@ -639,6 +639,7 @@ function BuilderInner({ workflowId, projectId }: StateBuilderProps) {
           <PropertiesPanel
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
+            projectId={activeProjectId}
           />
         </aside>
       </div>

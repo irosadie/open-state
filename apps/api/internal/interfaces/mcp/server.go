@@ -47,9 +47,21 @@ type Dependencies struct {
 	CapabilityRegistry repositories.ICapabilityRepository
 	// CapabilityEvidence persists State MCP's accepted provider execution reports.
 	CapabilityEvidence repositories.ICapabilityEvidenceRepository
+	// ProjectCapabilityBindings resolves logical capabilities to the active,
+	// project-scoped discovered MCP tool. Legacy capability provider fields are
+	// not a runtime fallback when this mapping is absent.
+	ProjectCapabilityBindings repositories.IProjectCapabilityMCPBindingRepository
+	// WorkflowRegistry resolves the project for a persisted workflow instance
+	// when the orchestration adapter returns a legacy instance projection.
+	WorkflowRegistry repositories.IWorkflowRepository
 	// CapabilityOutputValidator validates normalized provider results when a
 	// capability declares an output schema.
 	CapabilityOutputValidator capability.InputSchemaValidator
+	// Gateway is the server-side provider execution path used in secure mode.
+	Gateway *appservices.MCPGatewayService
+	// GatewayMode controls the externally advertised execution contract. Empty
+	// keeps the compatibility-safe advisory mode.
+	GatewayMode appservices.MCPGatewayMode
 }
 
 // IntentPort resolves conversation intents to workflows.
@@ -94,7 +106,16 @@ type IntentInfo struct {
 
 // NewServer builds an MCP server with the standard OpenState toolset.
 func NewServer(deps Dependencies) *server.MCPServer {
-	srv := server.NewMCPServer("openstate", "0.1.0", server.WithInstructions(`OpenState is the mandatory state controller and gatekeeper. Always read State MCP intent and current-state requirements before acting. When a state declares a provider capability, call the exact tool on the pre-configured provider MCP server alias, report its normalized result to report_capability_result, and only then propose a transition. Provider endpoints and credentials are managed by the LLM/MCP host; never guess or submit arbitrary endpoints.`))
+	mode := deps.GatewayMode
+	if mode == "" {
+		mode = appservices.MCPGatewayModeAdvisory
+	}
+	instructions := `OpenState is the mandatory state controller and gatekeeper for every configured intent and workflow. Always call list_intents and resolve_intent before starting work, then call get_current_state before proposing a transition. If requiredCapabilities contains a provider requirement, use only the listed project-scoped provider server alias and exact tool name, report the normalized result to report_capability_result, and wait for the gatekeeper response before proposing a transition. A MISSING_MAPPING or UNAVAILABLE requirement is a hard stop: do not guess an endpoint, server, tool, or substitute another MCP. Provider endpoints and credentials are never returned by OpenState and remain managed by the MCP host.`
+	if mode == appservices.MCPGatewayModeSecure {
+		instructions = `OpenState is the mandatory state controller and enforced gateway for every configured intent and workflow. Always call list_intents and resolve_intent before starting work, then call get_current_state. When the current state declares a capability, call invoke_capability with only the workflow instance, logical capability, correlationId, idempotencyKey, and capability input. OpenState resolves the project binding and calls the provider internally. Never connect to a provider MCP directly, never select a provider server or tool, and never guess a replacement. A MISSING_MAPPING, UNAVAILABLE, timeout, or validation failure is a hard stop; wait for OpenState before proposing a transition. Provider endpoints, credentials, aliases, catalogs, and raw provider errors are never returned to the client.`
+	}
+	srv := server.NewMCPServer("openstate", "0.1.0", server.WithInstructions(instructions))
+	deps.GatewayMode = mode
 	registerTools(srv, deps)
 	return srv
 }
@@ -157,18 +178,33 @@ func registerTools(srv *server.MCPServer, deps Dependencies) {
 		return handleGetActiveWorkflow(ctx, deps, principal.TenantID, str(args, "conversation"))
 	}))
 
-	// invoke_capability
-	invokeTool := mcp.NewTool("invoke_capability",
-		mcp.WithDescription("Invoke an authorized capability for the context."),
-		mcp.WithString("workflow", mcp.Description("Workflow id")),
-		mcp.WithString("state", mcp.Description("State id")),
-		mcp.WithString("instance", mcp.Description("Workflow instance id — when provided, capability response is persisted to context")),
-		mcp.WithString("capability", mcp.Required(), mcp.Description("Capability name, e.g. payment.create")),
-		mcp.WithObject("payload", mcp.Description("Invocation payload")),
-	)
-	srv.AddTool(invokeTool, authorizedTool(deps, entities.MCPAPIScopeCapabilityInvoke, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleInvokeCapability(ctx, deps, principal.TenantID, req)
-	}))
+	// invoke_capability. Secure mode exposes only logical workflow context; the
+	// server resolves the provider target internally from the active binding.
+	if deps.GatewayMode == appservices.MCPGatewayModeSecure {
+		invokeTool := mcp.NewTool("invoke_capability",
+			mcp.WithDescription("Invoke a capability through the enforced OpenState gateway. OpenState derives the current state, project binding, provider connection, and exact tool; provider routing fields are not accepted."),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
+			mcp.WithString("capability", mcp.Required(), mcp.Description("Logical capability declared by the current state")),
+			mcp.WithString("correlationId", mcp.Required(), mcp.Description("Correlation identifier for this capability operation")),
+			mcp.WithString("idempotencyKey", mcp.Required(), mcp.Description("Stable key preventing duplicate provider side effects")),
+			mcp.WithObject("payload", mcp.Description("Capability input")),
+		)
+		srv.AddTool(invokeTool, authorizedTool(deps, entities.MCPAPIScopeCapabilityInvoke, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return handleGatewayInvokeCapability(ctx, deps, principal.TenantID, req)
+		}))
+	} else {
+		invokeTool := mcp.NewTool("invoke_capability",
+			mcp.WithDescription("Invoke an authorized capability for the context. Advisory mode does not prevent a client from connecting directly to a provider MCP."),
+			mcp.WithString("workflow", mcp.Description("Workflow id")),
+			mcp.WithString("state", mcp.Description("State id")),
+			mcp.WithString("instance", mcp.Description("Workflow instance id — when provided, capability response is persisted to context")),
+			mcp.WithString("capability", mcp.Required(), mcp.Description("Capability name, e.g. payment.create")),
+			mcp.WithObject("payload", mcp.Description("Invocation payload")),
+		)
+		srv.AddTool(invokeTool, authorizedTool(deps, entities.MCPAPIScopeCapabilityInvoke, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return handleInvokeCapability(ctx, deps, principal.TenantID, req)
+		}))
+	}
 
 	registerOrchestratorTools(srv, deps)
 	registerContextTool(srv, deps)
@@ -190,9 +226,14 @@ func registerOrchestratorTools(srv *server.MCPServer, deps Dependencies) {
 		mcp.WithDescription("List capabilities authorized for a scope."),
 		mcp.WithString("scopeType", mcp.Required(), mcp.Description("TENANT | WORKFLOW | STATE")),
 		mcp.WithString("scopeId", mcp.Required(), mcp.Description("Scope id")),
+		mcp.WithString("project", mcp.Description("Allowed project id; defaults to the API key default project")),
 	), authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
-		return handleGetAllowedCapabilities(ctx, deps, principal.TenantID, str(args, "scopeType"), str(args, "scopeId"))
+		projectID, err := projectForPrincipal(ctx, deps, principal, str(args, "project"))
+		if err != nil {
+			return toolError(err)
+		}
+		return handleGetAllowedCapabilities(ctx, deps, principal.TenantID, projectID, str(args, "scopeType"), str(args, "scopeId"))
 	}))
 
 	// propose_event
@@ -205,27 +246,30 @@ func registerOrchestratorTools(srv *server.MCPServer, deps Dependencies) {
 		return handleProposeEvent(ctx, deps, principal.TenantID, req)
 	}))
 
-	// report_capability_result
-	srv.AddTool(mcp.NewTool("report_capability_result",
-		mcp.WithDescription("Report a direct provider MCP result to State MCP. A successful report is required before a guarded state transition can proceed."),
-		mcp.WithString("project", mcp.Description("Allowed project id; defaults to the API key default project")),
-		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
-		mcp.WithString("state", mcp.Required(), mcp.Description("Current state id or state key")),
-		mcp.WithString("capability", mcp.Required(), mcp.Description("Logical capability declared by the current state")),
-		mcp.WithString("providerServer", mcp.Required(), mcp.Description("Configured provider MCP server alias; endpoints are not accepted")),
-		mcp.WithString("providerTool", mcp.Required(), mcp.Description("Concrete provider MCP tool name")),
-		mcp.WithString("correlationId", mcp.Required(), mcp.Description("Correlation identifier for the provider call")),
-		mcp.WithString("idempotencyKey", mcp.Required(), mcp.Description("Stable key for the provider operation")),
-		mcp.WithString("status", mcp.Required(), mcp.Description("SUCCEEDED or FAILED")),
-		mcp.WithObject("result", mcp.Description("Normalized provider result")),
-		mcp.WithObject("error", mcp.Description("Classified provider failure when status is FAILED")),
-	), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		projectID, err := projectForPrincipal(ctx, deps, principal, str(getArgs(req), "project"))
-		if err != nil {
-			return toolError(err)
-		}
-		return handleReportCapabilityResult(ctx, deps, principal.TenantID, projectID, req)
-	}))
+	// report_capability_result is retained only for advisory direct-two-MCP
+	// compatibility. It is not part of the secure gateway surface.
+	if deps.GatewayMode != appservices.MCPGatewayModeSecure {
+		srv.AddTool(mcp.NewTool("report_capability_result",
+			mcp.WithDescription("Report a direct provider MCP result to State MCP. A successful report is required before a guarded state transition can proceed."),
+			mcp.WithString("project", mcp.Description("Allowed project id; defaults to the API key default project")),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
+			mcp.WithString("state", mcp.Required(), mcp.Description("Current state id or state key")),
+			mcp.WithString("capability", mcp.Required(), mcp.Description("Logical capability declared by the current state")),
+			mcp.WithString("providerServer", mcp.Required(), mcp.Description("Configured provider MCP server alias; endpoints are not accepted")),
+			mcp.WithString("providerTool", mcp.Required(), mcp.Description("Concrete provider MCP tool name")),
+			mcp.WithString("correlationId", mcp.Required(), mcp.Description("Correlation identifier for the provider call")),
+			mcp.WithString("idempotencyKey", mcp.Required(), mcp.Description("Stable key for the provider operation")),
+			mcp.WithString("status", mcp.Required(), mcp.Description("SUCCEEDED or FAILED")),
+			mcp.WithObject("result", mcp.Description("Normalized provider result")),
+			mcp.WithObject("error", mcp.Description("Classified provider failure when status is FAILED")),
+		), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			projectID, err := projectForPrincipal(ctx, deps, principal, str(getArgs(req), "project"))
+			if err != nil {
+				return toolError(err)
+			}
+			return handleReportCapabilityResult(ctx, deps, principal.TenantID, projectID, req)
+		}))
+	}
 
 	// start_workflow
 	srv.AddTool(mcp.NewTool("start_workflow",

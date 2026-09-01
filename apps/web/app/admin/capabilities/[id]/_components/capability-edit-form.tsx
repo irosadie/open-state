@@ -42,10 +42,8 @@ export function CapabilityEditForm({
 }: CapabilityEditFormProps) {
   const [description, setDescription] = useState(capability.description || "")
   const [providerType, setProviderType] = useState(capability.providerType)
-  const [providerId, setProviderId] = useState(capability.providerId || "")
-  const [providerTool, setProviderTool] = useState(
-    capability.providerTool || "",
-  )
+  const providerId = capability.providerId || ""
+  const providerTool = capability.providerTool || ""
   const [inputSchema, setInputSchema] = useState(
     JSON.stringify(capability.inputSchema || {}, null, 2),
   )
@@ -131,21 +129,13 @@ export function CapabilityEditForm({
         error={fieldErrors.providerType}
       />
 
-      <Input
-        label="Provider MCP server alias"
-        placeholder="padel-provider-mock"
-        required={providerType === "MCP"}
-        value={providerId}
-        onChange={(e) => setProviderId(e.target.value)}
-      />
-
-      <Input
-        label="Provider MCP tool"
-        placeholder="padel.check_available"
-        required={providerType === "MCP"}
-        value={providerTool}
-        onChange={(e) => setProviderTool(e.target.value)}
-      />
+      {providerType === "MCP" ? (
+        <p className="rounded-md bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
+          MCP capabilities are logical registry entries. Choose the project
+          connection and discovered tool in State Builder. Existing provider
+          metadata is retained only for compatibility.
+        </p>
+      ) : null}
 
       <Select<(typeof capabilityStatusLabels)[number]>
         label="Status"

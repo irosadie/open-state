@@ -660,6 +660,23 @@ func TestOrchestratorMCPGateAcceptsEvidenceAndIsTenantScoped(t *testing.T) {
 	}
 }
 
+func TestOrchestratorMCPGateRequiresProjectBindingWhenConfigured(t *testing.T) {
+	svc, _, _, evidence := capabilityGateOrchestrator()
+	svc.SetProjectCapabilityMCPBindings(&fakeProjectCapabilityMCPBindingRepository{})
+	_, err := evidence.Upsert(context.Background(), repositories.CapabilityEvidenceInput{
+		TenantID: "tenant-1", ProjectID: "proj", WorkflowInstanceID: "inst-1", StateID: "s1",
+		CapabilityID: "cap-padel", CapabilityName: "padel.availability.read",
+		ProviderServer: "legacy-alias", ProviderTool: "legacy-tool", IdempotencyKey: "binding-required",
+		Status: entities.CapabilityEvidenceSucceeded, Result: []byte(`{"available":true}`),
+	})
+	if err != nil {
+		t.Fatalf("seed success evidence: %v", err)
+	}
+	if _, err := svc.ProposeEvent(context.Background(), "tenant-1", "inst-1", "availability.confirmed", nil, "corr-1"); err == nil || !strings.Contains(err.Error(), "capability requirement not satisfied") {
+		t.Fatalf("expected missing project binding to reject transition, got %v", err)
+	}
+}
+
 var _ repositories.IInstanceRepository = (*fakeInstanceRepo)(nil)
 var _ repositories.IEventRepository = (*fakeEventRepo)(nil)
 var _ repositories.ICapabilityEvidenceRepository = (*fakeCapabilityEvidenceRepo)(nil)

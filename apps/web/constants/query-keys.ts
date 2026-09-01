@@ -37,6 +37,25 @@ export const queryKeys = {
   projects: {
     list: "projectsList",
   },
+  mcpConnections: {
+    list: "mcpConnectionsList",
+    get: "mcpConnectionsGet",
+    create: "mcpConnectionsCreate",
+    update: "mcpConnectionsUpdate",
+    delete: "mcpConnectionsDelete",
+    enable: "mcpConnectionsEnable",
+    disable: "mcpConnectionsDisable",
+    test: "mcpConnectionsTest",
+    tools: "mcpConnectionsTools",
+    refreshTools: "mcpConnectionsRefreshTools",
+    updateTool: "mcpConnectionsUpdateTool",
+  },
+  projectMCPBindings: {
+    options: "projectMCPBindingOptions",
+    list: "projectMCPBindingsList",
+    upsert: "projectMCPBindingUpsert",
+    delete: "projectMCPBindingDelete",
+  },
   audit: {
     list: "auditList",
   },

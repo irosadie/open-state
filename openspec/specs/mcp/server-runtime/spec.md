@@ -76,3 +76,16 @@ policy.
 - **WHEN** the server presents available capabilities to the LLM
 - **THEN** it includes only those allowed by the resolved binding
 - **AND** never exposes the complete global MCP registry
+
+### Requirement: Secure gateway tool surface
+
+When secure gateway mode is enabled, the State MCP server SHALL advertise only the
+state-control and gateway invocation operations needed by the authenticated project.
+It SHALL not expose a raw provider endpoint, provider credential, or unrestricted
+provider-tool registry.
+
+#### Scenario: Initialize secure gateway mode
+
+- **WHEN** a client initializes State MCP in secure gateway mode
+- **THEN** the server declares the state-control and gateway tool surface
+- **AND** omits external provider connection secrets and endpoint details.

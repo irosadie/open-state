@@ -43,6 +43,28 @@ export const actionPolicies: readonly ActionPolicy[] = [
   { id: "api_key:read", requiredPermissions: ["api_key:read"] },
   { id: "api_key:create", requiredPermissions: ["api_key:create"] },
   { id: "api_key:revoke", requiredPermissions: ["api_key:revoke"] },
+  { id: "mcp_connection:read", requiredPermissions: ["mcp_connection:read"] },
+  {
+    id: "mcp_connection:create",
+    requiredPermissions: ["mcp_connection:create"],
+  },
+  {
+    id: "mcp_connection:update",
+    requiredPermissions: ["mcp_connection:update"],
+  },
+  {
+    id: "mcp_connection:delete",
+    requiredPermissions: ["mcp_connection:delete"],
+  },
+  {
+    id: "mcp_connection:enable",
+    requiredPermissions: ["mcp_connection:enable"],
+  },
+  {
+    id: "mcp_connection:disable",
+    requiredPermissions: ["mcp_connection:disable"],
+  },
+  { id: "mcp_connection:test", requiredPermissions: ["mcp_connection:test"] },
 ]
 
 const readPermissions = [
@@ -51,6 +73,7 @@ const readPermissions = [
   "capability:read",
   "audit:read",
   "api_key:read",
+  "mcp_connection:read",
 ] as const
 
 export const routePolicies: readonly RoutePolicy[] = [
@@ -106,6 +129,12 @@ export const routePolicies: readonly RoutePolicy[] = [
     id: "admin-intents",
     pattern: /^\/admin\/intents(?:\/.*)?$/,
     requiredPermissions: ["workflow:read"],
+    landing: true,
+  },
+  {
+    id: "admin-mcp",
+    pattern: /^\/admin\/mcp(?:\/.*)?$/,
+    requiredPermissions: ["mcp_connection:read"],
     landing: true,
   },
   {
@@ -218,6 +247,7 @@ const fallbackPath = (policy: RoutePolicy) => {
     "admin-projects": "/admin/projects",
     "admin-workflows": "/admin/workflows",
     "admin-intents": "/admin/intents",
+    "admin-mcp": "/admin/mcp",
     "admin-runtime-instances": "/admin/runtime-instances",
     "admin-instances": "/admin/instances",
     "admin-events": "/admin/events",

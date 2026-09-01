@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Config holds all environment-sourced configuration.
@@ -11,6 +12,7 @@ type Config struct {
 	Port            string
 	JWTSecret       string
 	MCPAPIKeyPepper string
+	MCPGatewayMode  string
 	LogFormat       string
 	LogLevel        string
 	MetricsEnabled  bool
@@ -49,6 +51,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("MCP_API_KEY_PEPPER must be at least 32 characters")
 	}
 
+	mcpGatewayMode := strings.ToLower(envDefault("MCP_GATEWAY_MODE", "advisory"))
+	if mcpGatewayMode != "advisory" && mcpGatewayMode != "secure" {
+		return nil, fmt.Errorf("MCP_GATEWAY_MODE must be advisory or secure")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8020"
@@ -59,6 +66,7 @@ func Load() (*Config, error) {
 		Port:            port,
 		JWTSecret:       jwtSecret,
 		MCPAPIKeyPepper: mcpAPIKeyPepper,
+		MCPGatewayMode:  mcpGatewayMode,
 		LogFormat:       envDefault("LOG_FORMAT", "json"),
 		LogLevel:        envDefault("LOG_LEVEL", "info"),
 		MetricsEnabled:  envBool("METRICS_ENABLED", true),

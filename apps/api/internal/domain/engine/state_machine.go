@@ -215,6 +215,7 @@ func (e *Engine) AllowedTransitions(ctx context.Context, tenantID, instanceID st
 
 // StateInfo is the current node's purpose/instructions/context for a client.
 type StateInfo struct {
+	ProjectID       string
 	StateID         string
 	Purpose         string
 	Instructions    string
@@ -238,6 +239,7 @@ func (e *Engine) CurrentStateInfo(ctx context.Context, tenantID, instanceID stri
 		return nil, domain.NewNotFound("current state not found in workflow")
 	}
 	return &StateInfo{
+		ProjectID:       instance.ProjectID,
 		StateID:         node.ID,
 		Purpose:         node.Description,
 		Instructions:    node.Instructions,

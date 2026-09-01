@@ -365,6 +365,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
             validation: validateWorkflow(draft),
             apiWorkflowId: serverWorkflow.id,
             apiVersion: serverWorkflow.version,
+            activeProjectId: serverWorkflow.projectId,
           })
           saveApiId(serverWorkflow.id)
           saveApiVersion(serverWorkflow.version)
@@ -389,6 +390,7 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
               validation: validateWorkflow(draft),
               apiWorkflowId: serverWorkflow.id,
               apiVersion: serverWorkflow.version,
+              activeProjectId: serverWorkflow.projectId,
             })
           } else {
             const localDraft = loadDraftLocal()
@@ -720,7 +722,11 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
               ...(activeProjectId ? { projectId: activeProjectId } : {}),
               definition: snapshot,
             })
-            set({ apiWorkflowId: created.id, apiVersion: created.version })
+            set({
+              apiWorkflowId: created.id,
+              apiVersion: created.version,
+              activeProjectId: created.projectId,
+            })
             saveApiId(created.id)
             saveApiVersion(created.version)
             if (legacyImportPending) {
@@ -737,7 +743,10 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
               ...(activeProjectId ? { projectId: activeProjectId } : {}),
               definition: snapshot,
             })
-            set({ apiVersion: updated.version })
+            set({
+              apiVersion: updated.version,
+              activeProjectId: updated.projectId,
+            })
             saveApiVersion(updated.version)
           }
 
@@ -796,7 +805,11 @@ export const useStateBuilderStore = create<StateBuilderState>()((set, get) => {
         })
         id = created.id
         ver = created.version
-        set({ apiWorkflowId: id, apiVersion: ver })
+        set({
+          apiWorkflowId: id,
+          apiVersion: ver,
+          activeProjectId: created.projectId,
+        })
         saveApiId(id)
         saveApiVersion(ver)
       }

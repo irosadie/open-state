@@ -121,6 +121,9 @@ export default function ProjectsPageContent() {
                   <Link href={scopedHref("/admin/workflows", project.id)}>
                     <Button intent="clean">Open Workflows</Button>
                   </Link>
+                  <Link href={scopedHref("/admin/mcp", project.id)}>
+                    <Button intent="clean">MCP Connections</Button>
+                  </Link>
                 </div>
               </article>
             ))}

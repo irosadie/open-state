@@ -333,8 +333,13 @@ func validateProviderMapping(providerType entities.ProviderType, providerServer,
 	if providerType != entities.ProviderTypeMCP {
 		return nil
 	}
+	if providerServer == "" && providerTool == "" {
+		// Provider resolution is project-scoped. New MCP capabilities are logical
+		// registry entries and receive their concrete target in State Builder.
+		return nil
+	}
 	if providerServer == "" || providerTool == "" {
-		return domain.NewValidation("MCP capabilities require providerId (server alias) and providerTool")
+		return domain.NewValidation("providerId and providerTool must be provided together when legacy metadata is retained")
 	}
 	if containsEndpoint(providerServer) || containsEndpoint(providerTool) {
 		return domain.NewValidation("MCP provider mapping accepts a server alias and tool name, not an endpoint")

@@ -163,7 +163,6 @@ type Capability struct {
 	Description         sql.NullString  `json:"description"`
 	ProviderType        string          `json:"provider_type"`
 	ProviderID          sql.NullString  `json:"provider_id"`
-	ProviderTool        sql.NullString  `json:"provider_tool"`
 	InputSchema         json.RawMessage `json:"input_schema"`
 	OutputSchema        json.RawMessage `json:"output_schema"`
 	Status              string          `json:"status"`
@@ -171,6 +170,7 @@ type Capability struct {
 	CredentialReference sql.NullString  `json:"credential_reference"`
 	CreatedAt           time.Time       `json:"created_at"`
 	UpdatedAt           time.Time       `json:"updated_at"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
 }
 
 type CapabilityBinding struct {
@@ -284,6 +284,65 @@ type Intent struct {
 	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
+type McpConnection struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	ProjectID           uuid.UUID       `json:"project_id"`
+	Name                string          `json:"name"`
+	Alias               string          `json:"alias"`
+	Transport           string          `json:"transport"`
+	Endpoint            sql.NullString  `json:"endpoint"`
+	StdioProfile        sql.NullString  `json:"stdio_profile"`
+	StdioArgs           json.RawMessage `json:"stdio_args"`
+	AuthType            string          `json:"auth_type"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CredentialStatus    string          `json:"credential_status"`
+	Status              string          `json:"status"`
+	LastTestStatus      string          `json:"last_test_status"`
+	LastTestErrorCode   sql.NullString  `json:"last_test_error_code"`
+	LastTestedAt        sql.NullTime    `json:"last_tested_at"`
+	CreatedBy           string          `json:"created_by"`
+	UpdatedBy           string          `json:"updated_by"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+type McpDiscoveredTool struct {
+	ID             uuid.UUID       `json:"id"`
+	TenantID       uuid.UUID       `json:"tenant_id"`
+	ProjectID      uuid.UUID       `json:"project_id"`
+	ConnectionID   uuid.UUID       `json:"connection_id"`
+	ToolName       string          `json:"tool_name"`
+	Title          sql.NullString  `json:"title"`
+	Description    string          `json:"description"`
+	InputSchema    json.RawMessage `json:"input_schema"`
+	Annotations    json.RawMessage `json:"annotations"`
+	Fingerprint    string          `json:"fingerprint"`
+	Enabled        bool            `json:"enabled"`
+	Availability   string          `json:"availability"`
+	DriftStatus    string          `json:"drift_status"`
+	FirstSeenAt    time.Time       `json:"first_seen_at"`
+	LastSeenAt     time.Time       `json:"last_seen_at"`
+	RemovedAt      sql.NullTime    `json:"removed_at"`
+	DiscoveryRunID uuid.NullUUID   `json:"discovery_run_id"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+type McpDiscoveryRun struct {
+	ID                 uuid.UUID      `json:"id"`
+	TenantID           uuid.UUID      `json:"tenant_id"`
+	ProjectID          uuid.UUID      `json:"project_id"`
+	ConnectionID       uuid.UUID      `json:"connection_id"`
+	Status             string         `json:"status"`
+	ToolCount          int32          `json:"tool_count"`
+	CatalogFingerprint sql.NullString `json:"catalog_fingerprint"`
+	ErrorCode          sql.NullString `json:"error_code"`
+	StartedAt          time.Time      `json:"started_at"`
+	CompletedAt        time.Time      `json:"completed_at"`
+	CreatedBy          string         `json:"created_by"`
+}
+
 type MemoryReference struct {
 	ID                       uuid.UUID       `json:"id"`
 	TenantID                 uuid.UUID       `json:"tenant_id"`
@@ -315,6 +374,18 @@ type Project struct {
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type ProjectCapabilityMcpBinding struct {
+	ID                   uuid.UUID `json:"id"`
+	TenantID             uuid.UUID `json:"tenant_id"`
+	ProjectID            uuid.UUID `json:"project_id"`
+	CapabilityID         uuid.UUID `json:"capability_id"`
+	McpConnectionID      uuid.UUID `json:"mcp_connection_id"`
+	McpDiscoveredToolID  uuid.UUID `json:"mcp_discovered_tool_id"`
+	BoundToolFingerprint string    `json:"bound_tool_fingerprint"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 type RoleAssignment struct {

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/mark3labs/mcp-go/server"
 
@@ -64,6 +65,7 @@ func main() {
 		adapter.Workflows(),
 		adapter.CapabilityEvidence(),
 	)
+	orchestrator.SetProjectCapabilityMCPBindings(adapter.ProjectMCPBindings())
 
 	// Context compiler: minimal per-turn context with PII redaction (PRD 22, 90).
 	// A stub RAG provider is wired until a concrete backend lands (PRD 171).
@@ -100,6 +102,25 @@ func main() {
 		capability.NewInMemoryIdempotencyStore(),
 	)
 
+	// The secure gateway uses the same trusted transport adapter as the MCP
+	// connection admin service. It resolves the connection and exact discovered
+	// tool from project bindings before this adapter can call a provider.
+	mcpGatewayProvider := capinfra.NewMCPConnectionTester(nil, capinfra.EnvCredentialResolver{Prefix: "CRED_"}, 10*time.Second)
+	mcpGateway := appservices.NewMCPGatewayService(
+		orchestrator,
+		adapter.Capabilities(),
+		adapter.ProjectMCPBindings(),
+		adapter.MCPConnections(),
+		adapter.MCPToolCatalog(),
+		adapter.CapabilityEvidence(),
+		adapter.Context(),
+		adapter.Workflows(),
+		mcpGatewayProvider,
+		capinfra.JSONSchemaValidator{},
+		invoker,
+		10*time.Second,
+	)
+
 	// Intent service: resolves conversation intents to real workflows (PRD 38, 171).
 	intentSvc := appservices.NewIntentService(adapter.Intents(), adapter.Workflows())
 
@@ -113,7 +134,11 @@ func main() {
 		ContextRepo:               adapter.Context(),
 		CapabilityRegistry:        adapter.Capabilities(),
 		CapabilityEvidence:        adapter.CapabilityEvidence(),
+		ProjectCapabilityBindings: adapter.ProjectMCPBindings(),
+		WorkflowRegistry:          adapter.Workflows(),
 		CapabilityOutputValidator: capinfra.JSONSchemaValidator{},
+		Gateway:                   mcpGateway,
+		GatewayMode:               appservices.MCPGatewayMode(cfg.MCPGatewayMode),
 	}
 
 	srv := mcpapi.NewServer(deps)

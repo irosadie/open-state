@@ -41,6 +41,18 @@ const (
 	AuditActionAPIKeyRevoked AuditAction = "api_key.revoked"
 	AuditActionAPIKeyUsed    AuditAction = "api_key.used"
 	AuditActionAPIKeyDenied  AuditAction = "api_key.denied"
+
+	// Project-owned external MCP connection registry lifecycle and verification.
+	AuditActionMCPConnectionCreated  AuditAction = "mcp_connection.created"
+	AuditActionMCPConnectionUpdated  AuditAction = "mcp_connection.updated"
+	AuditActionMCPConnectionEnabled  AuditAction = "mcp_connection.enabled"
+	AuditActionMCPConnectionDisabled AuditAction = "mcp_connection.disabled"
+	AuditActionMCPConnectionDeleted  AuditAction = "mcp_connection.deleted"
+	AuditActionMCPConnectionTested   AuditAction = "mcp_connection.tested"
+	AuditActionMCPToolCatalogRefreshed AuditAction = "mcp_tool_catalog.refreshed"
+	AuditActionMCPToolDiscoveryFailed  AuditAction = "mcp_tool_catalog.discovery_failed"
+	AuditActionMCPToolEnabled          AuditAction = "mcp_tool.enabled"
+	AuditActionMCPToolDisabled         AuditAction = "mcp_tool.disabled"
 )
 
 // AuditLog is an append-only, tenant-isolated audit entry (PRD 50). It records an

@@ -3,14 +3,17 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
+	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	"github.com/irosadie/open-state/api/internal/domain/engine"
 	"github.com/irosadie/open-state/api/internal/domain/entities"
+	domain "github.com/irosadie/open-state/go-shared/domain"
 )
 
-func requirementsForCapabilities(ctx context.Context, deps Dependencies, tenantID string, names []string, before []string, evidence []entities.CapabilityExecutionEvidence) ([]entities.ProviderRequirement, error) {
+func requirementsForCapabilities(ctx context.Context, deps Dependencies, tenantID, projectID string, names []string, before []string, evidence []entities.CapabilityExecutionEvidence) ([]entities.ProviderRequirement, error) {
 	out := make([]entities.ProviderRequirement, 0, len(names))
 	for _, name := range names {
 		name = strings.TrimSpace(name)
@@ -38,14 +41,43 @@ func requirementsForCapabilities(ctx context.Context, deps Dependencies, tenantI
 			BeforeTransitions: append([]string(nil), before...),
 			Status:            "PENDING",
 		}
+		bindingResolved := false
 		if cap != nil {
 			if cap.Description.Valid && strings.TrimSpace(cap.Description.String) != "" {
 				req.Purpose = cap.Description.String
 			}
-			req.ProviderServer = strings.TrimSpace(cap.ProviderID.String)
-			req.Tool = strings.TrimSpace(cap.ProviderTool.String)
+			if deps.ProjectCapabilityBindings == nil {
+				req.Status = "MISSING_MAPPING"
+			} else {
+				binding, bindingErr := deps.ProjectCapabilityBindings.FindByCapability(ctx, tenantID, projectID, cap.ID)
+				if bindingErr == nil {
+					if binding.Health == entities.ProjectCapabilityMCPBindingActive {
+						bindingResolved = true
+						if deps.GatewayMode != appservices.MCPGatewayModeSecure {
+							req.ProviderServer = binding.ConnectionAlias
+							req.Tool = binding.ToolName
+						}
+						if strings.TrimSpace(binding.ToolDescription) != "" && req.Purpose == name {
+							req.Purpose = binding.ToolDescription
+						}
+					} else {
+						req.Status = "UNAVAILABLE"
+						req.Error = binding.HealthReason
+					}
+				} else {
+					var notFound *domain.DomainError
+					if errors.As(bindingErr, &notFound) && notFound.Code == domain.ErrNotFound {
+						req.Status = "MISSING_MAPPING"
+					} else {
+						return nil, bindingErr
+					}
+				}
+			}
 		}
 		for _, item := range evidence {
+			if req.Status == "UNAVAILABLE" || req.Status == "MISSING_MAPPING" {
+				break
+			}
 			if item.CapabilityID == "" || cap == nil || item.CapabilityID != cap.ID {
 				continue
 			}
@@ -64,7 +96,7 @@ func requirementsForCapabilities(ctx context.Context, deps Dependencies, tenantI
 				}
 			}
 		}
-		if req.ProviderServer == "" || req.Tool == "" {
+		if !bindingResolved && req.Status == "PENDING" {
 			req.Status = "MISSING_MAPPING"
 		}
 		out = append(out, req)
@@ -72,7 +104,7 @@ func requirementsForCapabilities(ctx context.Context, deps Dependencies, tenantI
 	return out, nil
 }
 
-func entryRequirements(ctx context.Context, deps Dependencies, tenantID string, workflow *entities.Workflow) ([]entities.ProviderRequirement, error) {
+func entryRequirements(ctx context.Context, deps Dependencies, tenantID, projectID string, workflow *entities.Workflow) ([]entities.ProviderRequirement, error) {
 	if workflow == nil || len(workflow.DraftDefinition) == 0 {
 		return []entities.ProviderRequirement{}, nil
 	}
@@ -99,7 +131,7 @@ func entryRequirements(ctx context.Context, deps Dependencies, tenantID string, 
 				transitions = append(transitions, transition.Event)
 			}
 		}
-		return requirementsForCapabilities(ctx, deps, tenantID, node.Capabilities, transitions, nil)
+		return requirementsForCapabilities(ctx, deps, tenantID, projectID, node.Capabilities, transitions, nil)
 	}
 	return []entities.ProviderRequirement{}, nil
 }

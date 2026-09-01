@@ -152,6 +152,33 @@ type fakeCapabilityRegistry struct {
 	capability entities.Capability
 }
 
+type fakeMCPBindingRepository struct {
+	binding entities.ProjectCapabilityMCPBinding
+}
+
+func (f *fakeMCPBindingRepository) ListEligibleToolOptions(context.Context, string, string) ([]entities.ProjectMCPToolOption, error) {
+	return nil, nil
+}
+
+func (f *fakeMCPBindingRepository) ListByProject(context.Context, string, string) ([]entities.ProjectCapabilityMCPBinding, error) {
+	return []entities.ProjectCapabilityMCPBinding{f.binding}, nil
+}
+
+func (f *fakeMCPBindingRepository) FindByCapability(_ context.Context, _, _, capabilityID string) (*entities.ProjectCapabilityMCPBinding, error) {
+	if capabilityID != f.binding.CapabilityID {
+		return nil, domain.NewNotFound("binding not found")
+	}
+	return &f.binding, nil
+}
+
+func (f *fakeMCPBindingRepository) Upsert(context.Context, repositories.ProjectCapabilityMCPBindingUpsertInput) error {
+	return nil
+}
+
+func (f *fakeMCPBindingRepository) Delete(context.Context, string, string, string) error {
+	return nil
+}
+
 func (f *fakeCapabilityRegistry) Create(context.Context, string, string, *string, entities.ProviderType, *string, *string, []byte, []byte, int, *string) (*entities.Capability, error) {
 	return &f.capability, nil
 }
@@ -208,6 +235,12 @@ func TestResolveIntentProjectsProviderRequirementWithoutSecrets(t *testing.T) {
 		ProviderID:          sql.NullString{String: "padel-provider-mock", Valid: true},
 		ProviderTool:        sql.NullString{String: "padel.cek_available", Valid: true},
 		CredentialReference: sql.NullString{String: secret, Valid: true},
+	}}
+	deps.ProjectCapabilityBindings = &fakeMCPBindingRepository{binding: entities.ProjectCapabilityMCPBinding{
+		CapabilityID:    "cap-padel",
+		ConnectionAlias: "padel-provider-mock",
+		ToolName:        "padel.cek_available",
+		Health:          entities.ProjectCapabilityMCPBindingActive,
 	}}
 	result, err := handleResolveIntent(context.Background(), deps, "tenant-1", "project-padel", "BOOKING_PADEL")
 	if err != nil {

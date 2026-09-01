@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -69,7 +70,24 @@ type CreateCapabilityParams struct {
 	CredentialReference sql.NullString  `json:"credential_reference"`
 }
 
-func (q *Queries) CreateCapability(ctx context.Context, arg CreateCapabilityParams) (Capability, error) {
+type CreateCapabilityRow struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+func (q *Queries) CreateCapability(ctx context.Context, arg CreateCapabilityParams) (CreateCapabilityRow, error) {
 	row := q.db.QueryRowContext(ctx, createCapability,
 		arg.TenantID,
 		arg.Name,
@@ -83,7 +101,7 @@ func (q *Queries) CreateCapability(ctx context.Context, arg CreateCapabilityPara
 		arg.Version,
 		arg.CredentialReference,
 	)
-	var i Capability
+	var i CreateCapabilityRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,
@@ -142,9 +160,26 @@ type DisableCapabilityParams struct {
 	TenantID uuid.UUID `json:"tenant_id"`
 }
 
-func (q *Queries) DisableCapability(ctx context.Context, arg DisableCapabilityParams) (Capability, error) {
+type DisableCapabilityRow struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+func (q *Queries) DisableCapability(ctx context.Context, arg DisableCapabilityParams) (DisableCapabilityRow, error) {
 	row := q.db.QueryRowContext(ctx, disableCapability, arg.ID, arg.TenantID)
-	var i Capability
+	var i DisableCapabilityRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,
@@ -176,9 +211,26 @@ type FindCapabilityByIDParams struct {
 	TenantID uuid.UUID `json:"tenant_id"`
 }
 
-func (q *Queries) FindCapabilityByID(ctx context.Context, arg FindCapabilityByIDParams) (Capability, error) {
+type FindCapabilityByIDRow struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+func (q *Queries) FindCapabilityByID(ctx context.Context, arg FindCapabilityByIDParams) (FindCapabilityByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, findCapabilityByID, arg.ID, arg.TenantID)
-	var i Capability
+	var i FindCapabilityByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,
@@ -210,9 +262,26 @@ type FindCapabilityByNameParams struct {
 	TenantID uuid.UUID `json:"tenant_id"`
 }
 
-func (q *Queries) FindCapabilityByName(ctx context.Context, arg FindCapabilityByNameParams) (Capability, error) {
+type FindCapabilityByNameRow struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+func (q *Queries) FindCapabilityByName(ctx context.Context, arg FindCapabilityByNameParams) (FindCapabilityByNameRow, error) {
 	row := q.db.QueryRowContext(ctx, findCapabilityByName, arg.Name, arg.TenantID)
-	var i Capability
+	var i FindCapabilityByNameRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,
@@ -363,15 +432,32 @@ WHERE tenant_id = $1
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListCapabilitiesByTenant(ctx context.Context, tenantID uuid.UUID) ([]Capability, error) {
+type ListCapabilitiesByTenantRow struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+func (q *Queries) ListCapabilitiesByTenant(ctx context.Context, tenantID uuid.UUID) ([]ListCapabilitiesByTenantRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCapabilitiesByTenant, tenantID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Capability
+	var items []ListCapabilitiesByTenantRow
 	for rows.Next() {
-		var i Capability
+		var i ListCapabilitiesByTenantRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.TenantID,
@@ -416,15 +502,32 @@ type ListCapabilitiesByTenantFilteredParams struct {
 	Column3  string    `json:"column_3"`
 }
 
-func (q *Queries) ListCapabilitiesByTenantFiltered(ctx context.Context, arg ListCapabilitiesByTenantFilteredParams) ([]Capability, error) {
+type ListCapabilitiesByTenantFilteredRow struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+func (q *Queries) ListCapabilitiesByTenantFiltered(ctx context.Context, arg ListCapabilitiesByTenantFilteredParams) ([]ListCapabilitiesByTenantFilteredRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCapabilitiesByTenantFiltered, arg.TenantID, arg.Column2, arg.Column3)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Capability
+	var items []ListCapabilitiesByTenantFilteredRow
 	for rows.Next() {
-		var i Capability
+		var i ListCapabilitiesByTenantFilteredRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.TenantID,
@@ -529,7 +632,24 @@ type UpdateCapabilityParams struct {
 	CredentialReference sql.NullString  `json:"credential_reference"`
 }
 
-func (q *Queries) UpdateCapability(ctx context.Context, arg UpdateCapabilityParams) (Capability, error) {
+type UpdateCapabilityRow struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+func (q *Queries) UpdateCapability(ctx context.Context, arg UpdateCapabilityParams) (UpdateCapabilityRow, error) {
 	row := q.db.QueryRowContext(ctx, updateCapability,
 		arg.ID,
 		arg.TenantID,
@@ -543,7 +663,7 @@ func (q *Queries) UpdateCapability(ctx context.Context, arg UpdateCapabilityPara
 		arg.Version,
 		arg.CredentialReference,
 	)
-	var i Capability
+	var i UpdateCapabilityRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,
@@ -576,9 +696,26 @@ type UpdateCapabilityStatusParams struct {
 	Status   string    `json:"status"`
 }
 
-func (q *Queries) UpdateCapabilityStatus(ctx context.Context, arg UpdateCapabilityStatusParams) (Capability, error) {
+type UpdateCapabilityStatusRow struct {
+	ID                  uuid.UUID       `json:"id"`
+	TenantID            uuid.UUID       `json:"tenant_id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	ProviderType        string          `json:"provider_type"`
+	ProviderID          sql.NullString  `json:"provider_id"`
+	ProviderTool        sql.NullString  `json:"provider_tool"`
+	InputSchema         json.RawMessage `json:"input_schema"`
+	OutputSchema        json.RawMessage `json:"output_schema"`
+	Status              string          `json:"status"`
+	Version             int32           `json:"version"`
+	CredentialReference sql.NullString  `json:"credential_reference"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+func (q *Queries) UpdateCapabilityStatus(ctx context.Context, arg UpdateCapabilityStatusParams) (UpdateCapabilityStatusRow, error) {
 	row := q.db.QueryRowContext(ctx, updateCapabilityStatus, arg.ID, arg.TenantID, arg.Status)
-	var i Capability
+	var i UpdateCapabilityStatusRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,

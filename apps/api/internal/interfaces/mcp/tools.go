@@ -31,7 +31,7 @@ func handleResolveIntent(ctx context.Context, deps Dependencies, tenantID, proje
 	if err != nil {
 		return toolError(err)
 	}
-	requirements, reqErr := entryRequirements(ctx, deps, tenantID, wf)
+	requirements, reqErr := entryRequirements(ctx, deps, tenantID, projectID, wf)
 	if reqErr != nil {
 		return toolError(reqErr)
 	}
@@ -181,6 +181,43 @@ func handleInvokeCapability(ctx context.Context, deps Dependencies, tenant strin
 	})
 }
 
+// handleGatewayInvokeCapability is the secure State MCP path. It accepts only
+// workflow context and logical capability input; provider routing is resolved
+// by MCPGatewayService from the current state and project binding.
+func handleGatewayInvokeCapability(ctx context.Context, deps Dependencies, tenant string, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if deps.Gateway == nil {
+		return toolUnavailable("enforced MCP gateway is not configured")
+	}
+	args := getArgs(req)
+	payload := map[string]any{}
+	if raw, ok := args["payload"].(map[string]any); ok && raw != nil {
+		payload = raw
+	}
+	result, err := deps.Gateway.Execute(ctx, appservices.GatewayInvocationRequest{
+		TenantID:       tenant,
+		InstanceID:     strings.TrimSpace(str(args, "instance")),
+		CapabilityName: strings.TrimSpace(str(args, "capability")),
+		Payload:        payload,
+		CorrelationID:  strings.TrimSpace(str(args, "correlationId")),
+		IdempotencyKey: strings.TrimSpace(str(args, "idempotencyKey")),
+	})
+	if err != nil {
+		var ce *capability.CapabilityError
+		if errors.As(err, &ce) {
+			return mcp.NewToolResultJSON(map[string]any{
+				"ok": false, "invoked": false, "kind": ce.Kind, "code": ce.Code, "message": ce.Message,
+			})
+		}
+		return mcp.NewToolResultJSON(map[string]any{
+			"ok": false, "invoked": false, "kind": "UNAVAILABLE", "code": "capability.gateway_unavailable", "message": "capability gateway is unavailable",
+		})
+	}
+	return mcp.NewToolResultJSON(map[string]any{
+		"ok": true, "invoked": true, "instanceId": result.InstanceID, "stateId": result.StateID,
+		"capability": result.CapabilityName, "status": result.Status, "reused": result.Reused, "data": result.Data,
+	})
+}
+
 // persistCapabilityContext writes each key in data to context_records scoped
 // to the workflow instance. Keys are prefixed with the capability name to avoid
 // collisions (e.g. "booking.confirm.booking_id"). Internal _-prefixed keys
@@ -247,6 +284,13 @@ func handleGetCurrentState(ctx context.Context, deps Dependencies, tenantID, ins
 	// Purpose/instructions/context of the current node (PRD 12, 14).
 	if info, ierr := deps.Orchestrator.CurrentStateInfo(ctx, tenantID, instanceID); ierr == nil {
 		out["stateId"] = info.StateID
+		projectID := info.ProjectID
+		if projectID == "" && deps.WorkflowRegistry != nil {
+			if version, versionErr := deps.WorkflowRegistry.FindCurrentVersionByWorkflow(ctx, tenantID, inst.WorkflowID); versionErr == nil {
+				projectID = version.ProjectID
+			}
+		}
+		out["projectId"] = projectID
 		out["purpose"] = info.Purpose
 		out["instructions"] = info.Instructions
 		out["requiredContext"] = info.RequiredContext
@@ -257,7 +301,7 @@ func handleGetCurrentState(ctx context.Context, deps Dependencies, tenantID, ins
 				evidence = found
 			}
 		}
-		requirements, rerr := requirementsForCapabilities(ctx, deps, tenantID, info.Capabilities, transitionEvents(out["allowedTransitions"]), evidence)
+		requirements, rerr := requirementsForCapabilities(ctx, deps, tenantID, projectID, info.Capabilities, transitionEvents(out["allowedTransitions"]), evidence)
 		if rerr != nil {
 			return toolError(rerr)
 		}
@@ -266,7 +310,7 @@ func handleGetCurrentState(ctx context.Context, deps Dependencies, tenantID, ins
 	return mcp.NewToolResultJSON(out)
 }
 
-func handleGetAllowedCapabilities(ctx context.Context, deps Dependencies, tenantID, scopeType, scopeID string) (*mcp.CallToolResult, error) {
+func handleGetAllowedCapabilities(ctx context.Context, deps Dependencies, tenantID, projectID, scopeType, scopeID string) (*mcp.CallToolResult, error) {
 	if deps.Orchestrator == nil {
 		return toolUnavailable("orchestrator not configured")
 	}
@@ -276,7 +320,7 @@ func handleGetAllowedCapabilities(ctx context.Context, deps Dependencies, tenant
 	}
 	out := make([]map[string]any, 0, len(caps))
 	for _, c := range caps {
-		requirements, _ := requirementsForCapabilities(ctx, deps, tenantID, []string{c.Name}, nil, nil)
+		requirements, _ := requirementsForCapabilities(ctx, deps, tenantID, projectID, []string{c.Name}, nil, nil)
 		item := map[string]any{
 			"id":     c.ID,
 			"name":   c.Name,
@@ -338,6 +382,18 @@ func handleReportCapabilityResult(ctx context.Context, deps Dependencies, tenant
 	if err != nil {
 		return toolError(err)
 	}
+	currentProjectID := info.ProjectID
+	if currentProjectID == "" && deps.WorkflowRegistry != nil {
+		if version, versionErr := deps.WorkflowRegistry.FindCurrentVersionByWorkflow(ctx, tenantID, inst.WorkflowID); versionErr == nil {
+			currentProjectID = version.ProjectID
+		}
+	}
+	if currentProjectID != "" {
+		if projectID != "" && projectID != currentProjectID {
+			return toolError(errors.New("provider result project does not match the current workflow project"))
+		}
+		projectID = currentProjectID
+	}
 	if stateID != info.StateID && (stateInst == nil || stateID != stateInst.StateKey) && (stateInst == nil || stateID != stateInst.ID) {
 		return toolError(errors.New("provider result state does not match the current state"))
 	}
@@ -355,8 +411,18 @@ func handleReportCapabilityResult(ctx context.Context, deps Dependencies, tenant
 	if err != nil {
 		return toolError(err)
 	}
-	if cap.ProviderID.String != providerServer || cap.ProviderTool.String != providerTool {
-		return toolError(errors.New("provider server or tool does not match the declared capability mapping"))
+	if deps.ProjectCapabilityBindings == nil {
+		return toolError(errors.New("project MCP capability binding resolver is not configured"))
+	}
+	binding, err := deps.ProjectCapabilityBindings.FindByCapability(ctx, tenantID, projectID, cap.ID)
+	if err != nil {
+		return toolError(errors.New("capability has no project MCP tool binding"))
+	}
+	if binding.Health != entities.ProjectCapabilityMCPBindingActive {
+		return toolError(errors.New("capability provider binding is unavailable: " + binding.HealthReason))
+	}
+	if binding.ConnectionAlias != providerServer || binding.ToolName != providerTool {
+		return toolError(errors.New("provider server or tool does not match the active project binding"))
 	}
 	if previous, findErr := deps.CapabilityEvidence.FindByIdempotency(ctx, tenantID, projectID, inst.ID, info.StateID, cap.ID, idempotencyKey); findErr == nil && previous.Status == entities.CapabilityEvidenceSucceeded {
 		return mcp.NewToolResultJSON(map[string]any{

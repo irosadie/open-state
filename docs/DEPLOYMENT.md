@@ -86,6 +86,10 @@ Open:
 | `JWT_SECRET` | — | JWT signing secret (API) |
 | `MCP_API_KEY_PEPPER` | — | Required 32+ character verifier pepper for State MCP API keys |
 | `MCP_PORT` | `8030` | State MCP endpoint port (`/mcp`) |
+| `MCP_GATEWAY_MODE` | `advisory` | `advisory` preserves direct two-MCP compatibility; `secure` enforces provider calls through State MCP project bindings |
+
+For the gateway rollout, secure-mode behavior, and rollback sequence, see
+[`MCP-GATEWAY.md`](MCP-GATEWAY.md).
 | `REDIS_URL` | `redis://127.0.0.1:6381` | Redis URL (worker) |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3020` | Web app base URL |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8020` | Backend base URL |

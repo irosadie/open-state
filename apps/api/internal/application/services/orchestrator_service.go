@@ -22,14 +22,23 @@ import (
 // degrades to the append/merge behavior so non-engine callers and tests keep
 // working.
 type OrchestratorService struct {
-	instances repositories.IInstanceRepository
-	events    repositories.IEventRepository
-	context   repositories.IContextRepository
-	capabs    repositories.ICapabilityRepository
-	workflows repositories.IWorkflowRepository
-	evidence  repositories.ICapabilityEvidenceRepository
-	engine    *engine.Engine
-	now       func() time.Time
+	instances   repositories.IInstanceRepository
+	events      repositories.IEventRepository
+	context     repositories.IContextRepository
+	capabs      repositories.ICapabilityRepository
+	workflows   repositories.IWorkflowRepository
+	evidence    repositories.ICapabilityEvidenceRepository
+	mcpBindings repositories.IProjectCapabilityMCPBindingRepository
+	engine      *engine.Engine
+	now         func() time.Time
+}
+
+// SetProjectCapabilityMCPBindings wires the project-scoped binding repository
+// into the transition gate without changing the compatibility constructors.
+// When configured, active bindings—not legacy capability provider fields—are
+// required for external MCP evidence to satisfy a state.
+func (s *OrchestratorService) SetProjectCapabilityMCPBindings(repo repositories.IProjectCapabilityMCPBindingRepository) {
+	s.mcpBindings = repo
 }
 
 // NewOrchestratorService builds an OrchestratorService without an engine.
@@ -376,7 +385,18 @@ func (s *OrchestratorService) validateCapabilityEvidence(ctx context.Context, te
 		if cap.ProviderType != entities.ProviderTypeMCP {
 			continue
 		}
-		if !cap.ProviderID.Valid || !cap.ProviderTool.Valid || !satisfied[cap.ID] {
+		if s.mcpBindings != nil {
+			projectID := info.ProjectID
+			if projectID == "" && s.workflows != nil {
+				if version, versionErr := s.workflows.FindCurrentVersionByWorkflow(ctx, tenantID, inst.WorkflowID); versionErr == nil {
+					projectID = version.ProjectID
+				}
+			}
+			binding, bindingErr := s.mcpBindings.FindByCapability(ctx, tenantID, projectID, cap.ID)
+			if bindingErr != nil || binding == nil || binding.Health != entities.ProjectCapabilityMCPBindingActive || !satisfied[cap.ID] {
+				return domain.NewConflict("capability requirement not satisfied: " + name)
+			}
+		} else if !cap.ProviderID.Valid || !cap.ProviderTool.Valid || !satisfied[cap.ID] {
 			return domain.NewConflict("capability requirement not satisfied: " + name)
 		}
 	}

@@ -1,0 +1,69 @@
+{
+  "MCPDiscoveryRun": {
+    "type": "object",
+    "required": ["id", "tenantId", "projectId", "connectionId", "status", "toolCount", "startedAt", "completedAt", "createdBy"],
+    "properties": {
+      "id": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string", "format": "uuid" },
+      "projectId": { "type": "string", "format": "uuid" },
+      "connectionId": { "type": "string", "format": "uuid" },
+      "status": { "type": "string", "enum": ["succeeded", "failed"] },
+      "toolCount": { "type": "integer", "minimum": 0 },
+      "catalogFingerprint": { "type": "string", "nullable": true },
+      "errorCode": { "type": "string", "nullable": true },
+      "startedAt": { "type": "string", "format": "date-time" },
+      "completedAt": { "type": "string", "format": "date-time" },
+      "createdBy": { "type": "string" }
+    }
+  },
+  "MCPDiscoveredTool": {
+    "type": "object",
+    "required": ["id", "tenantId", "projectId", "connectionId", "name", "description", "inputSchema", "annotations", "fingerprint", "enabled", "availability", "driftStatus", "firstSeenAt", "lastSeenAt", "createdAt", "updatedAt"],
+    "properties": {
+      "id": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string", "format": "uuid" },
+      "projectId": { "type": "string", "format": "uuid" },
+      "connectionId": { "type": "string", "format": "uuid" },
+      "name": { "type": "string", "maxLength": 255 },
+      "title": { "type": "string", "nullable": true },
+      "description": { "type": "string" },
+      "inputSchema": { "type": "object", "additionalProperties": true },
+      "annotations": { "type": "object", "additionalProperties": true },
+      "fingerprint": { "type": "string", "minLength": 64, "maxLength": 64 },
+      "enabled": { "type": "boolean" },
+      "availability": { "type": "string", "enum": ["present", "removed"] },
+      "driftStatus": { "type": "string", "enum": ["new", "unchanged", "changed", "removed"] },
+      "firstSeenAt": { "type": "string", "format": "date-time" },
+      "lastSeenAt": { "type": "string", "format": "date-time" },
+      "removedAt": { "type": "string", "format": "date-time", "nullable": true },
+      "discoveryRunId": { "type": "string", "format": "uuid", "nullable": true },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "MCPToolCatalog": {
+    "type": "object",
+    "required": ["connectionId", "tools", "latestRun", "lastSuccessfulRun"],
+    "properties": {
+      "connectionId": { "type": "string", "format": "uuid" },
+      "tools": { "type": "array", "items": { "$ref": "#/components/schemas/MCPDiscoveredTool" } },
+      "latestRun": { "$ref": "#/components/schemas/MCPDiscoveryRun", "nullable": true },
+      "lastSuccessfulRun": { "$ref": "#/components/schemas/MCPDiscoveryRun", "nullable": true }
+    }
+  },
+  "MCPToolCatalogResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/MCPToolCatalog" } }
+  },
+  "MCPDiscoveredToolResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/MCPDiscoveredTool" } }
+  },
+  "SetMCPToolEnabledRequest": {
+    "type": "object",
+    "required": ["enabled"],
+    "properties": { "enabled": { "type": "boolean" } }
+  }
+}

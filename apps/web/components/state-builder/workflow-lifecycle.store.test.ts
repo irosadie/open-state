@@ -103,6 +103,7 @@ describe("State Builder workflow persistence", () => {
     expect(publishWorkflowApi).toHaveBeenCalledWith({
       id: "wf-1",
       version: 0,
+      projectId: "project-1",
     })
     expect(vi.mocked(publishWorkflowApi).mock.calls[0]?.[0]).not.toHaveProperty(
       "definition",

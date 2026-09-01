@@ -1,0 +1,54 @@
+{
+  "MCPConnection": {
+    "type": "object",
+    "required": ["id", "tenantId", "projectId", "name", "alias", "transport", "stdioArgs", "authType", "credentialStatus", "status", "lastTestStatus", "createdAt", "updatedAt"],
+    "properties": {
+      "id": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string", "format": "uuid" },
+      "projectId": { "type": "string", "format": "uuid" },
+      "name": { "type": "string", "maxLength": 255 },
+      "alias": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,127}$" },
+      "transport": { "type": "string", "enum": ["streamable_http", "sse", "stdio"] },
+      "endpoint": { "type": "string", "format": "uri", "nullable": true },
+      "stdioProfile": { "type": "string", "nullable": true, "description": "Deployment-approved STDIO profile name." },
+      "stdioArgs": { "type": "array", "items": { "type": "string" } },
+      "authType": { "type": "string", "enum": ["none", "bearer", "oauth"] },
+      "credentialStatus": { "type": "string", "enum": ["configured", "missing", "action_required"] },
+      "status": { "type": "string", "enum": ["enabled", "disabled"] },
+      "lastTestStatus": { "type": "string", "enum": ["never", "ready", "failed", "disabled"] },
+      "lastTestErrorCode": { "type": "string", "nullable": true },
+      "lastTestedAt": { "type": "string", "format": "date-time", "nullable": true },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "MCPConnectionWriteRequest": {
+    "type": "object",
+    "required": ["name", "alias", "transport", "authType"],
+    "properties": {
+      "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+      "alias": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,127}$" },
+      "transport": { "type": "string", "enum": ["streamable_http", "sse", "stdio"] },
+      "endpoint": { "type": "string", "format": "uri", "description": "Required for streamable_http and sse." },
+      "stdioProfile": { "type": "string", "description": "Required for stdio; must be a trusted deployment profile." },
+      "stdioArgs": { "type": "array", "items": { "type": "string" } },
+      "authType": { "type": "string", "enum": ["none", "bearer", "oauth"] },
+      "credentialReference": { "type": "string", "writeOnly": true, "description": "Opaque secret-manager reference. Never a raw token and never returned." }
+    }
+  },
+  "MCPConnectionResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/MCPConnection" } }
+  },
+  "MCPConnectionListResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/MCPConnection" } } }
+  },
+  "MCPConnectionLifecycleResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "$ref": "#/components/schemas/MCPConnection" } }
+  }
+}

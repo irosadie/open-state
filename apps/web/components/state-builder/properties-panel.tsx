@@ -1,8 +1,22 @@
 "use client"
 
+import { useCapabilitiesList } from "$/hooks/transactions/use-capability"
+import {
+  useDeleteProjectMCPBinding,
+  useListProjectMCPBindings,
+  useListProjectMCPToolOptions,
+  useUpsertProjectMCPBinding,
+} from "$/hooks/transactions/use-project-mcp-binding"
+import type {
+  CapabilityResponse,
+  MCPToolOptionResponse,
+  ProjectCapabilityMCPBindingHealth,
+  ProjectCapabilityMCPBindingResponse,
+} from "@openstate/types"
 import { Boxes, GitBranch, MousePointerClick, Plus, Trash2 } from "lucide-react"
+import Link from "next/link"
 import type React from "react"
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useMemo, useState } from "react"
 import { nodeTypeList } from "./nodes/nodes"
 import { useStateBuilderStore } from "./state-builder.store"
 import type {
@@ -293,7 +307,311 @@ function GuardsEditor({
 /* Panel untuk NODE (state)                                            */
 /* ------------------------------------------------------------------ */
 
-function NodePanel({ nodeId }: { nodeId: string }) {
+type NodePanelProps = {
+  nodeId: string
+  projectId?: string
+  capabilities: CapabilityResponse[]
+  toolOptions: MCPToolOptionResponse[]
+  bindings: ProjectCapabilityMCPBindingResponse[]
+  capabilitiesLoading: boolean
+  catalogLoading: boolean
+  catalogError: boolean
+  bindingPending: boolean
+  onBind: (capabilityId: string, connectionId: string, toolId: string) => void
+  onUnbind: (capabilityId: string) => void
+}
+
+function healthLabel(health: ProjectCapabilityMCPBindingHealth) {
+  return health.replaceAll("_", " ")
+}
+
+function healthClass(health: ProjectCapabilityMCPBindingHealth) {
+  if (health === "ACTIVE") return "text-emerald-600"
+  if (health === "MISSING_MAPPING") return "text-amber-600"
+  return "text-danger-600"
+}
+
+function MCPBindingsEditor({
+  projectId,
+  nodeCapabilities,
+  capabilities,
+  toolOptions,
+  bindings,
+  capabilitiesLoading,
+  catalogLoading,
+  catalogError,
+  bindingPending,
+  onChange,
+  onBind,
+  onUnbind,
+}: {
+  projectId?: string
+  nodeCapabilities: string[]
+  capabilities: CapabilityResponse[]
+  toolOptions: MCPToolOptionResponse[]
+  bindings: ProjectCapabilityMCPBindingResponse[]
+  capabilitiesLoading: boolean
+  catalogLoading: boolean
+  catalogError: boolean
+  bindingPending: boolean
+  onChange: (values: string[]) => void
+  onBind: (capabilityId: string, connectionId: string, toolId: string) => void
+  onUnbind: (capabilityId: string) => void
+}) {
+  const [selectedCapability, setSelectedCapability] = useState("")
+  const [connectionSelection, setConnectionSelection] = useState<
+    Record<string, string>
+  >({})
+  const connectionChoices = useMemo(() => {
+    const choices = new Map<string, MCPToolOptionResponse>()
+    for (const option of toolOptions) {
+      if (!choices.has(option.connectionId))
+        choices.set(option.connectionId, option)
+    }
+    for (const binding of bindings) {
+      if (
+        binding.connectionId &&
+        binding.connectionAlias &&
+        !choices.has(binding.connectionId)
+      ) {
+        choices.set(binding.connectionId, {
+          connectionId: binding.connectionId,
+          connectionName: binding.connectionName ?? binding.connectionAlias,
+          connectionAlias: binding.connectionAlias,
+          connectionStatus: binding.connectionStatus ?? "disabled",
+          toolId: binding.toolId ?? "",
+          toolName: binding.toolName ?? "",
+          toolTitle: binding.toolTitle ?? null,
+          toolDescription: binding.toolDescription ?? "",
+          inputSchema: {},
+          toolFingerprint: binding.currentToolFingerprint ?? "",
+        })
+      }
+    }
+    return [...choices.values()]
+  }, [bindings, toolOptions])
+
+  const addCapability = () => {
+    if (!selectedCapability || nodeCapabilities.includes(selectedCapability))
+      return
+    onChange([...nodeCapabilities, selectedCapability])
+    setSelectedCapability("")
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {!projectId ? (
+        <p className="rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-700">
+          Save this workflow in a project before binding MCP tools.
+        </p>
+      ) : null}
+      <div className="flex gap-1.5">
+        <select
+          aria-label="MCP capability"
+          value={selectedCapability}
+          onChange={(event) => setSelectedCapability(event.target.value)}
+          disabled={capabilitiesLoading}
+          className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+        >
+          <option value="">
+            {capabilitiesLoading
+              ? "Loading capabilities…"
+              : "Select capability"}
+          </option>
+          {capabilities
+            .filter((capability) => !nodeCapabilities.includes(capability.name))
+            .map((capability) => (
+              <option key={capability.id} value={capability.name}>
+                {capability.name}
+              </option>
+            ))}
+        </select>
+        <button
+          type="button"
+          onClick={addCapability}
+          disabled={!selectedCapability}
+          className="rounded-md bg-primary-600 px-2.5 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Add
+        </button>
+      </div>
+
+      {!catalogLoading &&
+      !catalogError &&
+      projectId &&
+      toolOptions.length === 0 ? (
+        <p className="rounded-md bg-slate-50 px-2.5 py-2 text-xs leading-relaxed text-slate-500">
+          No enabled MCP tools are available for this project. Configure and
+          test a connection in{" "}
+          <Link className="font-medium text-primary-600" href="/admin/mcp">
+            MCP Connections
+          </Link>
+          .
+        </p>
+      ) : null}
+      {catalogError ? (
+        <p className="rounded-md bg-danger-50 px-2.5 py-2 text-xs text-danger-600">
+          MCP tool catalog could not be loaded. Check MCP Connections.
+        </p>
+      ) : null}
+
+      {nodeCapabilities.length === 0 ? (
+        <p className="text-xs text-slate-400">No MCP capabilities selected.</p>
+      ) : (
+        nodeCapabilities.map((capabilityName) => {
+          const capability = capabilities.find(
+            (item) => item.name === capabilityName,
+          )
+          const binding = capability
+            ? bindings.find((item) => item.capabilityId === capability.id)
+            : undefined
+          const selectedConnectionId =
+            connectionSelection[capabilityName] ?? binding?.connectionId ?? ""
+          const availableTools = toolOptions.filter(
+            (option) => option.connectionId === selectedConnectionId,
+          )
+          const currentTool = binding?.toolId
+            ? {
+                connectionId: binding.connectionId ?? selectedConnectionId,
+                connectionName:
+                  binding.connectionName ?? "Unavailable connection",
+                connectionAlias: binding.connectionAlias ?? "unavailable",
+                connectionStatus: binding.connectionStatus ?? "disabled",
+                toolId: binding.toolId,
+                toolName: binding.toolName ?? "Unavailable tool",
+                toolTitle: binding.toolTitle ?? null,
+                toolDescription: binding.toolDescription ?? "",
+                inputSchema: {},
+                toolFingerprint: binding.currentToolFingerprint ?? "",
+              }
+            : null
+          const toolChoices =
+            currentTool &&
+            !availableTools.some((tool) => tool.toolId === currentTool.toolId)
+              ? [currentTool, ...availableTools]
+              : availableTools
+
+          return (
+            <div
+              key={capabilityName}
+              className="rounded-md border border-slate-200 bg-slate-50 p-2"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="truncate text-xs font-medium text-slate-700">
+                  {capabilityName}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${capabilityName}`}
+                  onClick={() => {
+                    onChange(
+                      nodeCapabilities.filter(
+                        (item) => item !== capabilityName,
+                      ),
+                    )
+                    if (capability) onUnbind(capability.id)
+                  }}
+                  className="text-slate-300 hover:text-danger-500"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {!capability ? (
+                <p className="text-xs text-amber-600">
+                  Capability is not registered. Remove it or select a registered
+                  capability.
+                </p>
+              ) : capability.providerType !== "MCP" ? (
+                <p className="text-xs text-slate-500">
+                  {capability.providerType} capability — managed by OpenState;
+                  no external MCP binding required.
+                </p>
+              ) : (
+                <>
+                  <select
+                    aria-label={`${capabilityName} MCP connection`}
+                    value={selectedConnectionId}
+                    onChange={(event) =>
+                      setConnectionSelection((current) => ({
+                        ...current,
+                        [capabilityName]: event.target.value,
+                      }))
+                    }
+                    disabled={!projectId || bindingPending}
+                    className="mb-1.5 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+                  >
+                    <option value="">Select MCP connection</option>
+                    {connectionChoices.map((option) => (
+                      <option
+                        key={option.connectionId}
+                        value={option.connectionId}
+                      >
+                        {option.connectionAlias} · {option.connectionStatus}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label={`${capabilityName} MCP tool`}
+                    value={binding?.toolId ?? ""}
+                    onChange={(event) => {
+                      const option = toolOptions.find(
+                        (item) => item.toolId === event.target.value,
+                      )
+                      if (option)
+                        onBind(
+                          capability.id,
+                          option.connectionId,
+                          option.toolId,
+                        )
+                    }}
+                    disabled={
+                      !projectId || !selectedConnectionId || bindingPending
+                    }
+                    className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+                  >
+                    <option value="">Select discovered tool</option>
+                    {toolChoices.map((option) => (
+                      <option key={option.toolId} value={option.toolId}>
+                        {option.toolName}
+                        {option === currentTool ? " · current" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {binding ? (
+                    <p
+                      className={`mt-1.5 text-[11px] font-medium ${healthClass(binding.health)}`}
+                    >
+                      {healthLabel(binding.health)}
+                      {binding.healthReason ? ` — ${binding.healthReason}` : ""}
+                    </p>
+                  ) : (
+                    <p className="mt-1.5 text-[11px] font-medium text-amber-600">
+                      MISSING MAPPING — select a discovered tool
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
+function NodePanel({
+  nodeId,
+  projectId,
+  capabilities,
+  toolOptions,
+  bindings,
+  capabilitiesLoading,
+  catalogLoading,
+  catalogError,
+  bindingPending,
+  onBind,
+  onUnbind,
+}: NodePanelProps) {
   const node = useStateBuilderStore((s) =>
     s.workflow.nodes.find((n) => n.id === nodeId),
   )
@@ -399,10 +717,21 @@ function NodePanel({ nodeId }: { nodeId: string }) {
           </Section>
 
           <Section title="Capabilities (allowed)">
-            <TagInput
-              values={node.capabilities}
-              placeholder="cth: payment.create"
-              onChange={(v) => updateNode(node.id, { capabilities: v })}
+            <MCPBindingsEditor
+              projectId={projectId}
+              nodeCapabilities={node.capabilities}
+              capabilities={capabilities}
+              toolOptions={toolOptions}
+              bindings={bindings}
+              capabilitiesLoading={capabilitiesLoading}
+              catalogLoading={catalogLoading}
+              catalogError={catalogError}
+              bindingPending={bindingPending}
+              onChange={(values) =>
+                updateNode(node.id, { capabilities: values })
+              }
+              onBind={onBind}
+              onUnbind={onUnbind}
             />
           </Section>
 
@@ -649,12 +978,47 @@ function EdgePanel({ edgeId }: { edgeId: string }) {
 export function PropertiesPanel({
   selectedNodeId,
   selectedEdgeId,
+  projectId,
 }: {
   selectedNodeId: string | null
   selectedEdgeId: string | null
+  projectId?: string
 }) {
+  const capabilitiesQuery = useCapabilitiesList({
+    status: "ACTIVE",
+  })
+  const optionsQuery = useListProjectMCPToolOptions(projectId)
+  const bindingsQuery = useListProjectMCPBindings(projectId)
+  const upsertBinding = useUpsertProjectMCPBinding()
+  const deleteBinding = useDeleteProjectMCPBinding()
+
   if (selectedNodeId) {
-    return <NodePanel nodeId={selectedNodeId} />
+    return (
+      <NodePanel
+        nodeId={selectedNodeId}
+        projectId={projectId}
+        capabilities={capabilitiesQuery.data ?? []}
+        toolOptions={optionsQuery.data ?? []}
+        bindings={bindingsQuery.data ?? []}
+        capabilitiesLoading={capabilitiesQuery.isLoading}
+        catalogLoading={optionsQuery.isLoading}
+        catalogError={optionsQuery.isError}
+        bindingPending={upsertBinding.isPending || deleteBinding.isPending}
+        onBind={(capabilityId, connectionId, toolId) => {
+          if (!projectId) return
+          void upsertBinding.mutateAsync({
+            projectId,
+            capabilityId,
+            connectionId,
+            toolId,
+          })
+        }}
+        onUnbind={(capabilityId) => {
+          if (!projectId) return
+          void deleteBinding.mutateAsync({ projectId, capabilityId })
+        }}
+      />
+    )
   }
   if (selectedEdgeId) {
     return <EdgePanel edgeId={selectedEdgeId} />

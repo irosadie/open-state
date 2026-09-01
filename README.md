@@ -205,6 +205,7 @@ Open:
 | `JWT_SECRET` | — | JWT signing secret (API) |
 | `MCP_API_KEY_PEPPER` | — | 32+ character server secret used to verify State MCP API keys |
 | `MCP_PORT` | `8030` | State MCP HTTP port (`/mcp`) |
+| `MCP_GATEWAY_MODE` | `advisory` | `advisory` keeps direct two-MCP compatibility; `secure` makes OpenState the only externally exposed gateway and routes registered project bindings internally |
 | `MCP_PROVIDER_MOCK_PORT` | `8031` | Development provider MCP mock port (`/mcp`) |
 | `REDIS_URL` | `redis://127.0.0.1:6381` | Redis URL (worker) |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3020` | Web app base URL |

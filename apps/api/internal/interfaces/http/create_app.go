@@ -33,6 +33,9 @@ func CreateApp(
 	adminRuntimeCtrl *controllers.AdminRuntimeController,
 	apiKeyCtrl *controllers.APIKeyController,
 	projectCtrl *controllers.ProjectController,
+	mcpConnectionCtrl *controllers.MCPConnectionController,
+	mcpToolCatalogCtrl *controllers.MCPToolCatalogController,
+	projectMCPBindingCtrl *controllers.ProjectCapabilityMCPBindingController,
 	runtimeCtrls ...*controllers.RuntimeInspectorController,
 ) *echo.Echo {
 	e := echo.New()
@@ -57,6 +60,15 @@ func CreateApp(
 	}
 	if projectCtrl != nil {
 		routes.RegisterProjectRoutes(e, projectCtrl, repo, tokenSvc, authz, audit)
+	}
+	if mcpConnectionCtrl != nil {
+		routes.RegisterMCPConnectionRoutes(e, mcpConnectionCtrl, repo, tokenSvc, authz, audit)
+	}
+	if mcpToolCatalogCtrl != nil {
+		routes.RegisterMCPToolCatalogRoutes(e, mcpToolCatalogCtrl, repo, tokenSvc, authz, audit)
+	}
+	if projectMCPBindingCtrl != nil {
+		routes.RegisterProjectCapabilityMCPBindingRoutes(e, projectMCPBindingCtrl, repo, tokenSvc, authz, audit)
 	}
 	routes.RegisterAuditRoutes(e, auditCtrl, repo, tokenSvc, authz, audit)
 	if adminIdentityCtrl != nil && adminRuntimeCtrl != nil {

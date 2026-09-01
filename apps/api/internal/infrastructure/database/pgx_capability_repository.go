@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"time"
 
 	"github.com/irosadie/open-state/api/internal/domain/entities"
 	"github.com/irosadie/open-state/api/internal/domain/repositories"
@@ -242,23 +244,33 @@ func (r *PgxCapabilityRepository) ListPoliciesByScope(ctx context.Context, tenan
 
 // ---- mappers ----
 
-func mapCapability(row db.Capability) *entities.Capability {
-	return &entities.Capability{
-		ID:                  row.ID.String(),
-		TenantID:            row.TenantID.String(),
-		Name:                row.Name,
-		Description:         row.Description,
-		ProviderType:        entities.ProviderType(row.ProviderType),
-		ProviderID:          row.ProviderID,
-		ProviderTool:        row.ProviderTool,
-		InputSchema:         row.InputSchema,
-		OutputSchema:        row.OutputSchema,
-		Status:              entities.CapabilityStatus(row.Status),
-		Version:             int(row.Version),
-		CredentialReference: row.CredentialReference,
-		CreatedAt:           row.CreatedAt,
-		UpdatedAt:           row.UpdatedAt,
+func mapCapability(row any) *entities.Capability {
+	switch value := row.(type) {
+	case db.Capability:
+		return mapCapabilityValues(value.ID.String(), value.TenantID.String(), value.Name, value.Description, value.ProviderType, value.ProviderID, value.ProviderTool, value.InputSchema, value.OutputSchema, value.Status, value.Version, value.CredentialReference, value.CreatedAt, value.UpdatedAt)
+	case db.CreateCapabilityRow:
+		return mapCapabilityValues(value.ID.String(), value.TenantID.String(), value.Name, value.Description, value.ProviderType, value.ProviderID, value.ProviderTool, value.InputSchema, value.OutputSchema, value.Status, value.Version, value.CredentialReference, value.CreatedAt, value.UpdatedAt)
+	case db.FindCapabilityByIDRow:
+		return mapCapabilityValues(value.ID.String(), value.TenantID.String(), value.Name, value.Description, value.ProviderType, value.ProviderID, value.ProviderTool, value.InputSchema, value.OutputSchema, value.Status, value.Version, value.CredentialReference, value.CreatedAt, value.UpdatedAt)
+	case db.FindCapabilityByNameRow:
+		return mapCapabilityValues(value.ID.String(), value.TenantID.String(), value.Name, value.Description, value.ProviderType, value.ProviderID, value.ProviderTool, value.InputSchema, value.OutputSchema, value.Status, value.Version, value.CredentialReference, value.CreatedAt, value.UpdatedAt)
+	case db.ListCapabilitiesByTenantRow:
+		return mapCapabilityValues(value.ID.String(), value.TenantID.String(), value.Name, value.Description, value.ProviderType, value.ProviderID, value.ProviderTool, value.InputSchema, value.OutputSchema, value.Status, value.Version, value.CredentialReference, value.CreatedAt, value.UpdatedAt)
+	case db.ListCapabilitiesByTenantFilteredRow:
+		return mapCapabilityValues(value.ID.String(), value.TenantID.String(), value.Name, value.Description, value.ProviderType, value.ProviderID, value.ProviderTool, value.InputSchema, value.OutputSchema, value.Status, value.Version, value.CredentialReference, value.CreatedAt, value.UpdatedAt)
+	case db.UpdateCapabilityRow:
+		return mapCapabilityValues(value.ID.String(), value.TenantID.String(), value.Name, value.Description, value.ProviderType, value.ProviderID, value.ProviderTool, value.InputSchema, value.OutputSchema, value.Status, value.Version, value.CredentialReference, value.CreatedAt, value.UpdatedAt)
+	case db.DisableCapabilityRow:
+		return mapCapabilityValues(value.ID.String(), value.TenantID.String(), value.Name, value.Description, value.ProviderType, value.ProviderID, value.ProviderTool, value.InputSchema, value.OutputSchema, value.Status, value.Version, value.CredentialReference, value.CreatedAt, value.UpdatedAt)
+	case db.UpdateCapabilityStatusRow:
+		return mapCapabilityValues(value.ID.String(), value.TenantID.String(), value.Name, value.Description, value.ProviderType, value.ProviderID, value.ProviderTool, value.InputSchema, value.OutputSchema, value.Status, value.Version, value.CredentialReference, value.CreatedAt, value.UpdatedAt)
+	default:
+		panic("unsupported sqlc capability row")
 	}
+}
+
+func mapCapabilityValues(id, tenantID, name string, description sql.NullString, providerType string, providerID, providerTool sql.NullString, inputSchema, outputSchema []byte, status string, version int32, credentialReference sql.NullString, createdAt, updatedAt time.Time) *entities.Capability {
+	return &entities.Capability{ID: id, TenantID: tenantID, Name: name, Description: description, ProviderType: entities.ProviderType(providerType), ProviderID: providerID, ProviderTool: providerTool, InputSchema: inputSchema, OutputSchema: outputSchema, Status: entities.CapabilityStatus(status), Version: int(version), CredentialReference: credentialReference, CreatedAt: createdAt, UpdatedAt: updatedAt}
 }
 
 func mapCapabilityBinding(row db.CapabilityBinding) *entities.CapabilityBinding {

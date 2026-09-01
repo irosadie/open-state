@@ -12,6 +12,7 @@ import {
   LayoutDashboardIcon,
   ListTreeIcon,
   MessageSquareIcon,
+  PlugIcon,
   UsersIcon,
 } from "lucide-react"
 import Link from "next/link"
@@ -67,6 +68,12 @@ const navItems: readonly AdminNavItem[] = [
     label: "Intents",
     permission: "workflow:read",
     icon: MessageSquareIcon,
+  },
+  {
+    href: "/admin/mcp",
+    label: "MCP Connections",
+    permission: "mcp_connection:read",
+    icon: PlugIcon,
   },
   {
     href: "/admin/instances",

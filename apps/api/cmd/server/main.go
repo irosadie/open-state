@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -109,13 +110,17 @@ func main() {
 	// Capability admin service (tenant-scoped registry + bindings + sandbox test)
 	capSvc := services.NewCapabilityService(adapter.Capabilities(), infracap.MockProviderResolver{}, infracap.JSONSchemaValidator{}, auditWriter, capabilityLimiter)
 
-	// Builder API service (workflow-definition drafts + publish + versions, PRD 146)
-	builderSvc := services.NewBuilderService(adapter.Workflows(), adapter.Projects(), auditWriter)
 	intentSvc := services.NewIntentService(adapter.Intents(), adapter.Workflows())
 	intentCatalogSvc := services.NewIntentCatalogService(intentSvc, adapter.Projects())
 	projectSvc := services.NewProjectService(adapter.Projects())
 	simulationSvc := services.NewSimulationService()
 	apiKeySvc := services.NewAPIKeyService(adapter.APIKeys(), adapter.Projects(), auditWriter, cfg.MCPAPIKeyPepper)
+	mcpConnectionTester := infracap.NewMCPConnectionTester(nil, infracap.EnvCredentialResolver{Prefix: "CRED_"}, 10*time.Second)
+	mcpConnectionSvc := services.NewMCPConnectionService(adapter.MCPConnections(), adapter.Projects(), mcpConnectionTester, auditWriter)
+	mcpToolCatalogSvc := services.NewMCPToolCatalogService(adapter.MCPConnections(), adapter.MCPToolCatalog(), mcpConnectionTester, auditWriter)
+	projectMCPBindingSvc := services.NewProjectCapabilityMCPBindingService(adapter.ProjectMCPBindings(), adapter.Capabilities(), adapter.MCPConnections(), adapter.MCPToolCatalog(), adapter.Projects(), auditWriter)
+	// Builder API service (workflow-definition drafts + publish + versions, PRD 146)
+	builderSvc := services.NewBuilderService(adapter.Workflows(), adapter.Projects(), auditWriter, projectMCPBindingSvc)
 
 	// Services
 	authSvc := services.NewAuthService(registerUC, loginUC, logoutUC, getMeUC, authzSvc)
@@ -159,9 +164,12 @@ func main() {
 	adminRuntimeCtrl := controllers.NewAdminRuntimeController(adminRuntimeSvc)
 	runtimeInspectorCtrl := controllers.NewRuntimeInspectorController(runtimeInspectorSvc)
 	apiKeyCtrl := controllers.NewAPIKeyController(apiKeySvc)
+	mcpConnectionCtrl := controllers.NewMCPConnectionController(mcpConnectionSvc)
+	mcpToolCatalogCtrl := controllers.NewMCPToolCatalogController(mcpToolCatalogSvc)
+	projectMCPBindingCtrl := controllers.NewProjectCapabilityMCPBindingController(projectMCPBindingSvc)
 
 	// Echo app
-	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, workflowCtrl, intentCtrl, auditCtrl, ssoCtrl, authRepo, tokenSvc, authzSvc, auditWriter, loginLimiter, registerLimiter, logger, metricsRecorder, adminIdentityCtrl, adminRuntimeCtrl, apiKeyCtrl, projectCtrl, runtimeInspectorCtrl)
+	e := http.CreateApp(authCtrl, systemCtrl, capCtrl, workflowCtrl, intentCtrl, auditCtrl, ssoCtrl, authRepo, tokenSvc, authzSvc, auditWriter, loginLimiter, registerLimiter, logger, metricsRecorder, adminIdentityCtrl, adminRuntimeCtrl, apiKeyCtrl, projectCtrl, mcpConnectionCtrl, mcpToolCatalogCtrl, projectMCPBindingCtrl, runtimeInspectorCtrl)
 
 	// Distributed tracing middleware (PRD §84): server span per request + traceparent
 	// extraction. Applied after CreateApp to keep the interfaces layer free of

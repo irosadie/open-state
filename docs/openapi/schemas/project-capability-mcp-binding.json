@@ -1,0 +1,65 @@
+{
+  "MCPToolOption": {
+    "type": "object",
+    "required": ["connectionId", "connectionName", "connectionAlias", "connectionStatus", "toolId", "toolName", "toolDescription", "inputSchema", "toolFingerprint"],
+    "properties": {
+      "connectionId": { "type": "string", "format": "uuid" },
+      "connectionName": { "type": "string" },
+      "connectionAlias": { "type": "string" },
+      "connectionStatus": { "type": "string", "enum": ["enabled", "disabled"] },
+      "toolId": { "type": "string", "format": "uuid" },
+      "toolName": { "type": "string" },
+      "toolTitle": { "type": "string", "nullable": true },
+      "toolDescription": { "type": "string" },
+      "inputSchema": { "type": "object", "additionalProperties": true },
+      "toolFingerprint": { "type": "string", "minLength": 64, "maxLength": 64 }
+    }
+  },
+  "MCPToolOptionListResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/MCPToolOption" } } }
+  },
+  "ProjectCapabilityMCPBinding": {
+    "type": "object",
+    "required": ["tenantId", "projectId", "capabilityId", "capabilityName", "health", "healthReason"],
+    "properties": {
+      "id": { "type": "string", "format": "uuid" },
+      "tenantId": { "type": "string", "format": "uuid" },
+      "projectId": { "type": "string", "format": "uuid" },
+      "capabilityId": { "type": "string", "format": "uuid" },
+      "capabilityName": { "type": "string" },
+      "capabilityDescription": { "type": "string", "nullable": true },
+      "connectionId": { "type": "string", "format": "uuid" },
+      "connectionName": { "type": "string" },
+      "connectionAlias": { "type": "string" },
+      "connectionStatus": { "type": "string", "enum": ["enabled", "disabled"] },
+      "toolId": { "type": "string", "format": "uuid" },
+      "toolName": { "type": "string" },
+      "toolTitle": { "type": "string", "nullable": true },
+      "toolDescription": { "type": "string" },
+      "boundToolFingerprint": { "type": "string" },
+      "currentToolFingerprint": { "type": "string" },
+      "toolEnabled": { "type": "boolean" },
+      "toolAvailability": { "type": "string", "enum": ["present", "removed"] },
+      "toolDriftStatus": { "type": "string", "enum": ["new", "unchanged", "changed", "removed"] },
+      "health": { "type": "string", "enum": ["ACTIVE", "MISSING_MAPPING", "CONNECTION_DISABLED", "TOOL_DISABLED", "TOOL_REMOVED", "STALE"] },
+      "healthReason": { "type": "string" },
+      "createdAt": { "type": "string", "format": "date-time" },
+      "updatedAt": { "type": "string", "format": "date-time" }
+    }
+  },
+  "ProjectCapabilityMCPBindingListResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/ProjectCapabilityMCPBinding" } } }
+  },
+  "UpsertProjectCapabilityMCPBindingRequest": {
+    "type": "object",
+    "required": ["connectionId", "toolId"],
+    "properties": {
+      "connectionId": { "type": "string", "format": "uuid" },
+      "toolId": { "type": "string", "format": "uuid" }
+    }
+  }
+}

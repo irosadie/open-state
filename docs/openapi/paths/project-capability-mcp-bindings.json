@@ -1,0 +1,70 @@
+{
+  "/api/projects/{projectId}/mcp-tool-options": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "List eligible project MCP tool options",
+      "description": "Returns only enabled connections and present, enabled discovered tools. Endpoints, credentials, and arbitrary tool names are never returned.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": {
+        "200": { "description": "Eligible catalog options", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPToolOptionListResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" }
+      }
+    }
+  },
+  "/api/projects/{projectId}/mcp-capability-bindings": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "List project MCP capability bindings",
+      "description": "Returns active, unavailable, and explicit MISSING_MAPPING health for logical MCP capabilities in the project.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": {
+        "200": { "description": "Project MCP bindings", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectCapabilityMCPBindingListResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" }
+      }
+    }
+  },
+  "/api/projects/{projectId}/capabilities/{capabilityId}/mcp-binding": {
+    "put": {
+      "tags": ["Admin Console"],
+      "summary": "Bind a logical capability to a discovered MCP tool",
+      "description": "Accepts only project-scoped connection and discovered-tool IDs. The target must be enabled, present, and owned by the same project.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "capabilityId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpsertProjectCapabilityMCPBindingRequest" } } } },
+      "responses": {
+        "200": { "description": "Binding saved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectCapabilityMCPBinding" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" },
+        "409": { "$ref": "#/components/schemas/ConflictError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    },
+    "delete": {
+      "tags": ["Admin Console"],
+      "summary": "Remove a project MCP capability binding",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "capabilityId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": {
+        "200": { "description": "Binding removed" },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    }
+  }
+}

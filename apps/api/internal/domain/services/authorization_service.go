@@ -15,21 +15,21 @@ type Permission string
 // concrete "workflow:<verb>" permission.
 var RolePermissionMatrix = map[entities.UserRole][]Permission{
 	entities.UserRoleOwner: {
-		"workflow:*", "capability:*", "binding:*", "user:*", "audit:*", "tenant:*", "instance:*", "debug:*", "api_key:*",
+		"workflow:*", "capability:*", "binding:*", "user:*", "audit:*", "tenant:*", "instance:*", "debug:*", "api_key:*", "mcp_connection:*",
 	},
 	entities.UserRoleAdmin: {
-		"workflow:*", "capability:*", "binding:*", "audit:*", "instance:*", "debug:*", "api_key:*",
+		"workflow:*", "capability:*", "binding:*", "audit:*", "instance:*", "debug:*", "api_key:*", "mcp_connection:*",
 	},
 	entities.UserRoleEditor: {
 		"workflow:read", "workflow:create", "workflow:update", "workflow:publish", "workflow:simulate",
-		"capability:read", "binding:read",
+		"capability:read", "binding:read", "mcp_connection:read",
 	},
 	entities.UserRoleOperator: {
 		"instance:read", "instance:retry", "instance:suspend", "instance:resume", "debug:read",
-		"workflow:read", "capability:read", "binding:read",
+		"workflow:read", "capability:read", "binding:read", "mcp_connection:read",
 	},
 	entities.UserRoleViewer: {
-		"workflow:read", "capability:read", "binding:read", "instance:read", "audit:read",
+		"workflow:read", "capability:read", "binding:read", "instance:read", "audit:read", "mcp_connection:read",
 	},
 }
 

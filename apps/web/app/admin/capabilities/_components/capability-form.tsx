@@ -170,21 +170,13 @@ export function CapabilityFormDialog({
             error={fieldErrors.providerType}
           />
 
-          <Input
-            label="Provider MCP server alias"
-            placeholder="padel-provider-mock"
-            required={form.providerType === "MCP"}
-            value={form.providerId}
-            onChange={(e) => update("providerId", e.target.value)}
-          />
-
-          <Input
-            label="Provider MCP tool"
-            placeholder="padel.check_available"
-            required={form.providerType === "MCP"}
-            value={form.providerTool}
-            onChange={(e) => update("providerTool", e.target.value)}
-          />
+          {form.providerType === "MCP" ? (
+            <p className="rounded-md bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
+              MCP capabilities are logical registry entries. Choose the project
+              connection and discovered tool in State Builder after registering
+              this capability.
+            </p>
+          ) : null}
 
           <Textarea
             label="Input schema (JSON)"

@@ -22,15 +22,26 @@ const defaultProjectSlug = "default"
 // composes the workflow repository and, for default-project resolution, the
 // project repository.
 type BuilderService struct {
-	workflows repositories.IWorkflowRepository
-	projects  repositories.IProjectRepository
-	audit     *AuditWriter
-	now       func() time.Time
+	workflows           repositories.IWorkflowRepository
+	projects            repositories.IProjectRepository
+	audit               *AuditWriter
+	mcpBindingValidator MCPBindingWorkflowValidator
+	now                 func() time.Time
+}
+
+// MCPBindingWorkflowValidator is the narrow authoring contract used by the
+// builder to reject workflows whose required MCP bindings are unavailable.
+type MCPBindingWorkflowValidator interface {
+	ValidateWorkflow(ctx context.Context, tenantID, projectID string, definition []byte) (*domain.DomainError, error)
 }
 
 // NewBuilderService builds a BuilderService.
-func NewBuilderService(workflows repositories.IWorkflowRepository, projects repositories.IProjectRepository, audit *AuditWriter) *BuilderService {
-	return &BuilderService{workflows: workflows, projects: projects, audit: audit, now: time.Now}
+func NewBuilderService(workflows repositories.IWorkflowRepository, projects repositories.IProjectRepository, audit *AuditWriter, validators ...MCPBindingWorkflowValidator) *BuilderService {
+	var validator MCPBindingWorkflowValidator
+	if len(validators) > 0 {
+		validator = validators[0]
+	}
+	return &BuilderService{workflows: workflows, projects: projects, audit: audit, mcpBindingValidator: validator, now: time.Now}
 }
 
 // CreateDraft persists a new workflow definition draft for the tenant within a
@@ -49,6 +60,11 @@ func (s *BuilderService) CreateDraft(ctx context.Context, tenantID string, req d
 	projectID, err := s.resolveProject(ctx, tenantID, req.ProjectID)
 	if err != nil {
 		return nil, err
+	}
+	if validationErr, validationErrCause := s.validateMCPBindings(ctx, tenantID, projectID, req.Definition); validationErrCause != nil {
+		return nil, validationErrCause
+	} else if validationErr != nil {
+		return nil, validationErr
 	}
 
 	wf, err := s.workflows.Create(ctx, tenantID, projectID, req.Slug, req.Name, optional(req.Description), req.Definition)
@@ -105,6 +121,11 @@ func (s *BuilderService) UpdateDraft(ctx context.Context, tenantID, projectID, i
 	if validationErr := ensureWorkflowDefinitionJSON(req.Definition); validationErr != nil {
 		return nil, validationErr
 	}
+	if validationErr, validationErrCause := s.validateMCPBindings(ctx, tenantID, pid, req.Definition); validationErrCause != nil {
+		return nil, validationErrCause
+	} else if validationErr != nil {
+		return nil, validationErr
+	}
 
 	description := req.Description
 	if description == nil && existing.Description.Valid {
@@ -132,6 +153,11 @@ func (s *BuilderService) Publish(ctx context.Context, tenantID, projectID, id, a
 		return nil, domain.NewConflict("optimistic lock conflict: resource changed")
 	}
 	if validationErr := validateWorkflowDefinition(existing.DraftDefinition); validationErr != nil {
+		return nil, validationErr
+	}
+	if validationErr, validationErrCause := s.validateMCPBindings(ctx, tenantID, pid, existing.DraftDefinition); validationErrCause != nil {
+		return nil, validationErrCause
+	} else if validationErr != nil {
 		return nil, validationErr
 	}
 
@@ -220,6 +246,13 @@ func (s *BuilderService) resolveProject(ctx context.Context, tenantID, projectID
 		return "", cerr
 	}
 	return created.ID, nil
+}
+
+func (s *BuilderService) validateMCPBindings(ctx context.Context, tenantID, projectID string, definition []byte) (*domain.DomainError, error) {
+	if s.mcpBindingValidator == nil {
+		return nil, nil
+	}
+	return s.mcpBindingValidator.ValidateWorkflow(ctx, tenantID, projectID, definition)
 }
 
 // ---- mapping & helpers ----

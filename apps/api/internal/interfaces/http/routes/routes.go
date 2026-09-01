@@ -77,6 +77,38 @@ func RegisterProjectRoutes(e *echo.Echo, ctrl *controllers.ProjectController, re
 	g.GET("", ctrl.List, middleware.RequirePermission(authz, "workflow:read", audit))
 }
 
+// RegisterMCPConnectionRoutes exposes project-owned external MCP connections.
+func RegisterMCPConnectionRoutes(e *echo.Echo, ctrl *controllers.MCPConnectionController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {
+	g := e.Group("/api/projects/:projectId/mcp-connections", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+	g.GET("", ctrl.List, middleware.RequirePermission(authz, "mcp_connection:read", audit))
+	g.POST("", ctrl.Create, middleware.RequirePermission(authz, "mcp_connection:create", audit))
+	g.GET("/:id", ctrl.Get, middleware.RequirePermission(authz, "mcp_connection:read", audit))
+	g.PATCH("/:id", ctrl.Update, middleware.RequirePermission(authz, "mcp_connection:update", audit))
+	g.DELETE("/:id", ctrl.Delete, middleware.RequirePermission(authz, "mcp_connection:delete", audit))
+	g.POST("/:id/enable", ctrl.Enable, middleware.RequirePermission(authz, "mcp_connection:enable", audit))
+	g.POST("/:id/disable", ctrl.Disable, middleware.RequirePermission(authz, "mcp_connection:disable", audit))
+	g.POST("/:id/test", ctrl.Test, middleware.RequirePermission(authz, "mcp_connection:test", audit))
+}
+
+// RegisterMCPToolCatalogRoutes exposes explicit tools/list discovery and
+// project-scoped tool enablement. There is intentionally no tools/call route.
+func RegisterMCPToolCatalogRoutes(e *echo.Echo, ctrl *controllers.MCPToolCatalogController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {
+	g := e.Group("/api/projects/:projectId/mcp-connections/:id/tools", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+	g.GET("", ctrl.List, middleware.RequirePermission(authz, "mcp_connection:read", audit))
+	g.POST("/refresh", ctrl.Refresh, middleware.RequirePermission(authz, "mcp_connection:discover", audit))
+	g.PATCH("/:toolName", ctrl.SetEnabled, middleware.RequirePermission(authz, "mcp_connection:tool:update", audit))
+}
+
+// RegisterProjectCapabilityMCPBindingRoutes exposes safe project catalog
+// options and explicit logical capability bindings for State Builder.
+func RegisterProjectCapabilityMCPBindingRoutes(e *echo.Echo, ctrl *controllers.ProjectCapabilityMCPBindingController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {
+	g := e.Group("/api/projects/:projectId", middleware.JWT(tokenSvc), middleware.AuthSession(repo, tokenSvc))
+	g.GET("/mcp-tool-options", ctrl.ListOptions, middleware.RequirePermission(authz, "mcp_connection:read", audit))
+	g.GET("/mcp-capability-bindings", ctrl.List, middleware.RequirePermission(authz, "mcp_connection:read", audit))
+	g.PUT("/capabilities/:capabilityId/mcp-binding", ctrl.Upsert, middleware.RequirePermission(authz, "workflow:update", audit))
+	g.DELETE("/capabilities/:capabilityId/mcp-binding", ctrl.Delete, middleware.RequirePermission(authz, "workflow:update", audit))
+}
+
 // RegisterAPIKeyRoutes exposes the tenant-admin lifecycle for State MCP
 // machine credentials. Human JWT/RBAC remains the authority for these routes.
 func RegisterAPIKeyRoutes(e *echo.Echo, ctrl *controllers.APIKeyController, repo repositories.IAuthRepository, tokenSvc domainsvc.TokenService, authz *appservices.AuthorizationService, audit *appservices.AuditWriter) {

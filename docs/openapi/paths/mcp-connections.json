@@ -1,0 +1,156 @@
+{
+  "/api/projects/{projectId}/mcp-connections": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "List project MCP connections",
+      "description": "Lists external MCP connections owned by the selected project. Credentials and protected references are never returned.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": {
+        "200": { "description": "Project MCP connections", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionListResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" }
+      }
+    },
+    "post": {
+      "tags": ["Admin Console"],
+      "summary": "Register a project MCP connection",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionWriteRequest" } } } },
+      "responses": {
+        "201": { "description": "Connection created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "409": { "$ref": "#/components/schemas/ConflictError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}": {
+    "get": {
+      "tags": ["Admin Console"], "summary": "Get a project MCP connection",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "Connection", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    },
+    "patch": {
+      "tags": ["Admin Console"], "summary": "Update a project MCP connection",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionWriteRequest" } } } },
+      "responses": { "200": { "description": "Connection updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" }, "409": { "$ref": "#/components/schemas/ConflictError" }, "422": { "$ref": "#/components/schemas/ValidationError" } }
+    },
+    "delete": {
+      "tags": ["Admin Console"], "summary": "Delete a project MCP connection",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "Connection deleted" }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/test": {
+    "post": {
+      "tags": ["Admin Console"], "summary": "Test an MCP connection handshake", "description": "Establishes an MCP session only. It does not call tools/list or provider business tools.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "Safe test result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/enable": {
+    "post": {
+      "tags": ["Admin Console"], "summary": "Enable an MCP connection",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "Connection enabled", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/disable": {
+    "post": {
+      "tags": ["Admin Console"], "summary": "Disable an MCP connection",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "Connection disabled", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/tools": {
+    "get": {
+      "tags": ["Admin Console"],
+      "summary": "List the stored MCP tool catalog",
+      "description": "Returns the latest sanitized tools/list catalog and discovery-run status. This endpoint reads stored metadata and never contacts or invokes the provider.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": {
+        "200": { "description": "Stored tool catalog", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPToolCatalogResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" }
+      }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/tools/refresh": {
+    "post": {
+      "tags": ["Admin Console"],
+      "summary": "Refresh an MCP tool catalog",
+      "description": "Explicitly initializes the registered MCP connection and requests tools/list. It never calls a provider business tool. A failed refresh preserves the previous successful catalog.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": {
+        "200": { "description": "Refreshed tool catalog", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPToolCatalogResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" },
+        "409": { "$ref": "#/components/schemas/ConflictError" },
+        "500": { "$ref": "#/components/schemas/ApiError" }
+      }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/tools/{toolName}": {
+    "patch": {
+      "tags": ["Admin Console"],
+      "summary": "Enable or disable a discovered MCP tool",
+      "description": "Updates local eligibility only. It does not call the provider and does not rewrite workflow bindings.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "toolName", "in": "path", "required": true, "schema": { "type": "string" } }
+      ],
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetMCPToolEnabledRequest" } } } },
+      "responses": {
+        "200": { "description": "Tool enablement updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPDiscoveredToolResponse" } } } },
+        "401": { "$ref": "#/components/schemas/UnauthorizedError" },
+        "403": { "$ref": "#/components/schemas/ForbiddenError" },
+        "404": { "$ref": "#/components/schemas/NotFoundError" },
+        "422": { "$ref": "#/components/schemas/ValidationError" }
+      }
+    }
+  }
+}

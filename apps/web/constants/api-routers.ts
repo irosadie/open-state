@@ -36,6 +36,25 @@ export const apiRouters = {
   projects: {
     index: "/projects",
   },
+  mcpConnections: {
+    index: "/projects/:projectId/mcp-connections",
+    show: "/projects/:projectId/mcp-connections/:id",
+    create: "/projects/:projectId/mcp-connections",
+    update: "/projects/:projectId/mcp-connections/:id",
+    delete: "/projects/:projectId/mcp-connections/:id",
+    enable: "/projects/:projectId/mcp-connections/:id/enable",
+    disable: "/projects/:projectId/mcp-connections/:id/disable",
+    test: "/projects/:projectId/mcp-connections/:id/test",
+    tools: "/projects/:projectId/mcp-connections/:id/tools",
+    refreshTools: "/projects/:projectId/mcp-connections/:id/tools/refresh",
+    updateTool: "/projects/:projectId/mcp-connections/:id/tools/:toolName",
+  },
+  projectMCPBindings: {
+    options: "/projects/:projectId/mcp-tool-options",
+    list: "/projects/:projectId/mcp-capability-bindings",
+    upsert: "/projects/:projectId/capabilities/:capabilityId/mcp-binding",
+    delete: "/projects/:projectId/capabilities/:capabilityId/mcp-binding",
+  },
   audit: {
     index: "/audit",
   },
