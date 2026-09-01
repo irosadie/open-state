@@ -1,6 +1,6 @@
 // @ts-nocheck — for example files only. DO NOT use in production code.
 import { QueryFunctionContext, useQuery } from '@tanstack/react-query'
-import type { ExampleResponseProps as DataTypeProps } from '@vibecoding-starter/types/example-response'
+import type { ExampleResponseProps as DataTypeProps } from '@openstate/types/example-response'
 import { axios } from '$/services/axios'
 import { apiRouters, queryKeys } from '$/constants'
 import { DataTableResponse, ErrorResponse } from '$/types/generals'

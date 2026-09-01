@@ -58,7 +58,7 @@ Not a TanStack Table wrapper.
 ```typescript
 // hooks/transactions/use-payment-methods/use-data-table.ts
 import { QueryFunctionContext, useQuery } from '@tanstack/react-query'
-import type { PaymentMethodResponseProps as DataTypeProps } from '@vibecoding-starter/types/payment-method-response'
+import type { PaymentMethodResponseProps as DataTypeProps } from '@openstate/types/payment-method-response'
 import { axios } from '$/services/axios'
 import { apiRouters, queryKeys } from '$/constants'
 import { DataTableResponse, ErrorResponse } from '$/types/generals'
@@ -156,7 +156,7 @@ import { axios } from '$/services/axios'
 import { apiRouters, queryKeys } from '$/constants'
 import { ErrorResponse } from '$/types/generals'
 import { AxiosError } from 'axios'
-import type { PaymentMethodResponseProps as ResponseProps } from '@vibecoding-starter/types/payment-method-response'
+import type { PaymentMethodResponseProps as ResponseProps } from '@openstate/types/payment-method-response'
 import { pathVariable } from '$/utils/path-variable'
 
 type UseGetOneProps = { id: string }
@@ -192,7 +192,7 @@ import { apiRouters, queryKeys } from '$/constants'
 import { ErrorResponse } from '$/types/generals'
 import { AxiosError } from 'axios'
 import type { PaymentMethodSchemaProps as PayloadProps } from '$/schemas/payment-method'
-import type { PaymentMethodResponseProps as ResponseProps } from '@vibecoding-starter/types/payment-method-response'
+import type { PaymentMethodResponseProps as ResponseProps } from '@openstate/types/payment-method-response'
 
 const insertOne = async (payload: PayloadProps) => {
   return axios<ResponseProps>({
@@ -225,7 +225,7 @@ import { apiRouters, queryKeys } from '$/constants'
 import { ErrorResponse } from '$/types/generals'
 import { AxiosError } from 'axios'
 import type { PaymentMethodSchemaProps as PayloadProps } from '$/schemas/payment-method'
-import type { PaymentMethodResponseProps as ResponseProps } from '@vibecoding-starter/types/payment-method-response'
+import type { PaymentMethodResponseProps as ResponseProps } from '@openstate/types/payment-method-response'
 import { pathVariable } from '$/utils/path-variable'
 
 type UpdateParamsProps = { id: string; payload: PayloadProps }

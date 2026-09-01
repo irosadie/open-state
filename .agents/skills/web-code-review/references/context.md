@@ -23,6 +23,6 @@ packages/types/                        → shared response types
 
 ## Active Surface Examples
 
-- Starter homepage: `apps/web/app/page.tsx`, `apps/web/app/home-content.tsx`
+- OpenState homepage: `apps/web/app/page.tsx`, `apps/web/app/home-content.tsx`
 - Hook integration: `apps/web/hooks/transactions/`
 - Shared contract: `packages/types/error-response.ts`, `packages/types/success-response.ts`

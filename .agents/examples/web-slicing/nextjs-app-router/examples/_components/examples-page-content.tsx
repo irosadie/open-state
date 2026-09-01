@@ -19,8 +19,8 @@ import {
 	exampleSchema,
 	getExampleLabel,
 } from "$/schemas/example"
-import type { ExampleResponseProps } from "@vibecoding-starter/types/example-response"
-import { debounce } from "@vibecoding-starter/utils"
+import type { ExampleResponseProps } from "@openstate/types/example-response"
+import { debounce } from "@openstate/utils"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"

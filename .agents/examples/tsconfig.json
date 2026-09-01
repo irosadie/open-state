@@ -11,12 +11,12 @@
     "baseUrl": ".",
     "paths": {
       "$/*": ["../../apps/web/*"],
-      "@vibecoding-starter/schemas": ["../../packages/schemas/index.ts"],
-      "@vibecoding-starter/schemas/*": ["../../packages/schemas/*"],
-      "@vibecoding-starter/types": ["../../packages/types/index.ts"],
-      "@vibecoding-starter/types/*": ["../../packages/types/*"],
-      "@vibecoding-starter/utils": ["../../packages/utils/index.ts"],
-      "@vibecoding-starter/utils/*": ["../../packages/utils/*"]
+      "@openstate/schemas": ["../../packages/schemas/index.ts"],
+      "@openstate/schemas/*": ["../../packages/schemas/*"],
+      "@openstate/types": ["../../packages/types/index.ts"],
+      "@openstate/types/*": ["../../packages/types/*"],
+      "@openstate/utils": ["../../packages/utils/index.ts"],
+      "@openstate/utils/*": ["../../packages/utils/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

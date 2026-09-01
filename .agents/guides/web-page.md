@@ -171,7 +171,7 @@ const handleOnSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
 import { Table, type ColumnDef } from '$/components/table'
 import { ActionsDropdown } from '$/components/actions-dropdown'
 import { StatusBadge } from '$/components/status-badge'
-import type { UserResponseProps } from '@vibecoding-starter/types/user-response'
+import type { UserResponseProps } from '@openstate/types/user-response'
 
 const columns: ColumnDef<UserResponseProps>[] = [
   {

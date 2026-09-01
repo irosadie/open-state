@@ -49,7 +49,7 @@ package repositories
 
 import (
   "context"
-  "github.com/vibecoding-starter/api/internal/domain/entities"
+  "github.com/irosadie/open-state/api/internal/domain/entities"
 )
 
 type IUserRepository interface {
@@ -63,8 +63,8 @@ type IUserRepository interface {
 package usecases
 
 import (
-  domain "github.com/vibecoding-starter/go-shared/domain"
-  "github.com/vibecoding-starter/api/internal/domain/repositories"
+  domain "github.com/irosadie/open-state/go-shared/domain"
+  "github.com/irosadie/open-state/api/internal/domain/repositories"
 )
 
 type CreateUserUseCase struct {

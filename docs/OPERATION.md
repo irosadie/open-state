@@ -1,6 +1,6 @@
 # Operations Guide
 
-This document explains how to run, verify, and maintain this starter in conditions that are truly supported by the current codebase.
+This document explains how to run, verify, and maintain OpenState in conditions that are truly supported by the current codebase.
 
 ## Scope
 
@@ -21,13 +21,13 @@ Structure conventions:
 
 | Component | URL / Port | Purpose |
 | --- | --- | --- |
-| Web | `http://localhost:3020` | UI starter with login, panel, and BFF proxy |
+| Web | `http://localhost:3020` | OpenState UI with login, panel, and BFF proxy |
 | Web Auth | `http://localhost:3020/api/auth/*` | NextAuth route handler for session and credentials flow |
 | Web Proxy | `http://localhost:3020/api/proxy/*` | Internal proxy for all browser requests to backend |
 | API | `http://localhost:8020` | HTTP API for root and health check |
 | Worker | n/a | Idle worker scaffold for background runtime |
-| PostgreSQL | `postgresql://postgres:postgres@127.0.0.1:5432/openstate?schema=public` | Local database for next Prisma features |
-| Redis | `redis://127.0.0.1:6379` | Ready-to-use broker for next queue features |
+| PostgreSQL | `postgresql://postgres:postgres@127.0.0.1:5437/openstate?schema=public` | Local OpenState database |
+| Redis | `redis://127.0.0.1:6381` | Local OpenState broker |
 | Prisma Studio | `http://localhost:5555` | Browser UI for local database when schema is in use |
 
 ## Supported Baseline
@@ -37,7 +37,7 @@ Local baseline considered healthy for this repo:
 2. Local PostgreSQL and Redis are active.
 3. `bun run dev` runs web, api, and worker.
 4. `bun run check` passes.
-5. Starter login page can be opened at `http://localhost:3020/login`.
+5. OpenState login page can be opened at `http://localhost:3020/login`.
 6. Default protected route `/panel` redirects to `/login` when no session exists.
 
 ## Environment Matrix
@@ -65,7 +65,7 @@ Repo does not use root `.env` as source of truth. Env is managed per app.
 | Variable | Required | Default | Notes |
 | --- | --- | --- | --- |
 | `API_PORT` | no | `8020` | HTTP API port |
-| `DATABASE_URL` | no | `postgresql://postgres:postgres@127.0.0.1:5432/openstate?schema=public` | Default local PostgreSQL for Prisma |
+| `DATABASE_URL` | no | `postgresql://postgres:postgres@127.0.0.1:5437/openstate?schema=public` | Default local PostgreSQL for OpenState |
 
 ### `apps/worker/.env.example`
 

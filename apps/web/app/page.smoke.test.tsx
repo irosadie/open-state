@@ -3,15 +3,15 @@ import { describe, expect, it } from "vitest"
 import HomePage from "./page"
 
 describe("HomePage smoke", () => {
-  it("renders the starter landing page", () => {
+  it("renders the OpenState landing page", () => {
     render(<HomePage />)
 
     expect(
-      screen.getByText("Starter kosong untuk mulai vibe coding dari nol"),
+      screen.getByText("Enterprise conversation state orchestration"),
     ).toBeTruthy()
-    expect(screen.getByText("Homepage starter sudah siap dipakai")).toBeTruthy()
+    expect(screen.getByText("OpenState web console siap dipakai")).toBeTruthy()
     expect(
-      screen.getByText("Tidak ada route demo yang dikunci di starter ini."),
+      screen.getByText("Semua route utama OpenState siap digunakan."),
     ).toBeTruthy()
   })
 })

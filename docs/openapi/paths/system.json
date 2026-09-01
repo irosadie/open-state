@@ -2,8 +2,8 @@
   "/": {
     "get": {
       "tags": ["System"],
-      "summary": "Get starter app info",
-      "description": "Returns baseline information about the API scaffold.",
+      "summary": "Get OpenState app info",
+      "description": "Returns baseline information about the OpenState API.",
       "responses": {
         "200": {
           "description": "Application info loaded",
@@ -22,7 +22,7 @@
     "get": {
       "tags": ["System"],
       "summary": "Get API health status",
-      "description": "Returns a simple health check payload for the API scaffold.",
+      "description": "Returns a simple health check payload for the OpenState API.",
       "responses": {
         "200": {
           "description": "Health status loaded",

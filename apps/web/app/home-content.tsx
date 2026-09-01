@@ -6,15 +6,14 @@ export default function HomeContent() {
       <PanelCard className="rounded-3xl p-2" noPadding>
         <div className="p-8">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-dark">
-            openstate
+            OpenState
           </p>
           <h1 className="mt-3 text-3xl font-bold text-slate-900">
-            Starter kosong untuk mulai vibe coding dari nol
+            Enterprise conversation state orchestration
           </h1>
           <p className="mt-3 max-w-3xl text-slate-600">
-            Repo ini sengaja dimulai tanpa feature aktif. Yang disediakan adalah
-            scaffold web, API, worker, dokumentasi, dan sistem agent supaya
-            fitur pertama bisa dibangun dengan flow yang rapi.
+            OpenState membantu tim mendefinisikan, menjalankan, dan mengamati
+            workflow percakapan dengan state engine yang deterministik.
           </p>
         </div>
       </PanelCard>
@@ -26,7 +25,7 @@ export default function HomeContent() {
           description="Next.js App Router"
         >
           <p className="text-xl font-semibold text-slate-900">
-            Homepage starter sudah siap dipakai
+            OpenState web console siap dipakai
           </p>
         </PanelCard>
 
@@ -72,7 +71,7 @@ export default function HomeContent() {
             </ul>
           </div>
           <div className="rounded-2xl bg-white/10 px-5 py-4 text-sm text-slate-200">
-            Tidak ada route demo yang dikunci di starter ini.
+            Semua route utama OpenState siap digunakan.
           </div>
         </div>
       </PanelCard>

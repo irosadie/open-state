@@ -24,8 +24,8 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
     router.refresh()
   }
 
-  const userName = session?.user?.name || "Starter User"
-  const userEmail = session?.user?.email || "starter@local.dev"
+  const userName = session?.user?.name || "OpenState User"
+  const userEmail = session?.user?.email || "openstate@local.dev"
 
   // Close menu when clicking outside
   useEffect(() => {

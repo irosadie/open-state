@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Vibecoding Starter API",
+    "title": "OpenState API",
     "version": "0.1.0",
     "description": "OpenState — Enterprise Conversation State Orchestration Platform API."
   },
@@ -14,7 +14,7 @@
   "tags": [
     {
       "name": "System",
-      "description": "Baseline system endpoints for starter health and app info."
+      "description": "Baseline system endpoints for OpenState health and app info."
     },
     {
       "name": "Admin Console",
@@ -2560,8 +2560,8 @@
         "tags": [
           "System"
         ],
-        "summary": "Get starter app info",
-        "description": "Returns baseline information about the API scaffold.",
+        "summary": "Get OpenState app info",
+        "description": "Returns baseline information about the OpenState API.",
         "responses": {
           "200": {
             "description": "Application info loaded",
@@ -2582,7 +2582,7 @@
           "System"
         ],
         "summary": "Get API health status",
-        "description": "Returns a simple health check payload for the API scaffold.",
+        "description": "Returns a simple health check payload for the OpenState API.",
         "responses": {
           "200": {
             "description": "Health status loaded",

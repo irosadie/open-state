@@ -23,7 +23,7 @@ Integrate APIs into the frontend with a consistent architecture.
 
 ### 2. Create Response Types (`packages/types/`)
 - One file per response type, e.g. `packages/types/payment-method-response.ts`
-- Import from frontend via `@vibecoding-starter/types/payment-method-response`
+- Import from frontend via `@openstate/types/payment-method-response`
 - Re-export from `packages/types/index.ts` if needed from the root package
 
 ### 3. Register Constants

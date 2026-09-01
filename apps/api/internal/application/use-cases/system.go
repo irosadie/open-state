@@ -29,7 +29,7 @@ func (uc *GetAppInfoUseCase) Execute(_ context.Context) *dtos.AppInfoDTO {
 		env = "development"
 	}
 	return &dtos.AppInfoDTO{
-		Name:    "openstate",
+		Name:    "OpenState",
 		Version: "0.1.0",
 		Env:     env,
 	}

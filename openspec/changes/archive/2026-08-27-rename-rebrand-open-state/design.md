@@ -1,21 +1,19 @@
 ## Overview
 
-Mechanical rename of the repository identity from `vibecoding-starter` to
-`openstate` / `OpenState`, with module path `github.com/irosadie/open-state/*`.
+Mechanical rename of the repository identity to `openstate` / `OpenState`, with
+module path `github.com/irosadie/open-state/*`.
 
 ## Decisions
 
 ### D1. Go module path
-`github.com/vibecoding-starter/{api,worker,go-shared}` →
 `github.com/irosadie/open-state/{api,worker,go-shared}`
 
 - `go.work` updated to reference new module paths.
-- All `import "github.com/vibecoding-starter/..."` rewritten with
-  `go mod edit -module` + sed for imports, or full `goimports` pass.
+- All internal imports use the canonical module path after the module rename.
 - Verification: `go build ./...`, `go vet ./...`, `go test ./...` in each app.
 
 ### D2. Node package scope
-`@vibecoding-starter/{types,utils,schemas}` → `@openstate/{types,utils,schemas}`
+`@openstate/{types,utils,schemas}`
 
 - Root workspaces, each `packages/*/package.json`, `apps/web/package.json`.
 - `tsconfig.base.json` / `apps/web/tsconfig.json` path aliases updated.
@@ -27,9 +25,8 @@ Mechanical rename of the repository identity from `vibecoding-starter` to
 - `apps/api` system info (name/version) → OpenState.
 
 ### D4. Infrastructure naming
-- `docker-compose.yml` container names `vibecoding-starter-*` →
-  `openstate-*`.
-- Database name `vibecoding_starter` → `openstate` (compose + `.env.example`
+- `docker-compose.yml` container names use the `openstate-*` prefix.
+- Database name is `openstate` (compose + `.env.example`
   + `DATABASE_URL` defaults).
 - `.env.example` files updated.
 

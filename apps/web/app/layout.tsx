@@ -6,9 +6,9 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "openstate",
+  title: "OpenState",
   description:
-    "Monorepo boilerplate with Next.js, Hono, worker, and agent flow",
+    "OpenState — Enterprise Conversation State Orchestration Platform",
 }
 
 export default function RootLayout({

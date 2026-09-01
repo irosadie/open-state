@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "vibecoding-starter",
+      "name": "openstate",
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
         "turbo": "^2.6.3",

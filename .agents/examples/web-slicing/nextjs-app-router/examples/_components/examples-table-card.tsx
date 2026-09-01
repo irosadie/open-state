@@ -1,6 +1,6 @@
 import { PanelCard } from "$/components/panel-card"
 import { type ColumnDef, Table } from "$/components/table"
-import type { ExampleResponseProps } from "@vibecoding-starter/types/example-response"
+import type { ExampleResponseProps } from "@openstate/types/example-response"
 
 type ExamplesTableCardProps = {
   data: ExampleResponseProps[]

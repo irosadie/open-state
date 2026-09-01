@@ -4,7 +4,7 @@ import { axios } from '$/services/axios'
 import { apiRouters, queryKeys } from '$/constants'
 import { ErrorResponse } from '$/types/generals'
 import { AxiosError } from 'axios'
-import type { ExampleResponseProps as ResponseProps } from '@vibecoding-starter/types/example-response'
+import type { ExampleResponseProps as ResponseProps } from '@openstate/types/example-response'
 import { pathVariable } from '$/utils/path-variable'
 
 type UseGetOneProps = {

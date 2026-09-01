@@ -60,7 +60,7 @@ Minimum verification:
 - typecheck/lint on touched surfaces
 - confirm no new contract drift
 
-If the bug lives in an active starter surface, prioritize keeping the homepage, shared contract, and transaction hooks consistent.
+If the bug lives in an active OpenState surface, prioritize keeping the homepage, shared contract, and transaction hooks consistent.
 
 ## Prohibitions
 

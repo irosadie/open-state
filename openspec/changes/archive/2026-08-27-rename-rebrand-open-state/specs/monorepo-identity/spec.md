@@ -9,27 +9,27 @@ naming conventions used across the monorepo.
 
 ### Requirement: Consistent product name
 
-The product and repository are branded **OpenState** end-to-end instead of `vibecoding-starter`.
+The product and repository SHALL be branded **OpenState** end-to-end.
 
 #### Scenario: Display identity
 
 - GIVEN a user views the repository or runs the application
 - THEN the product name is "OpenState"
-- AND no `vibecoding-starter` branding remains in display metadata
+- AND no legacy starter branding remains in display metadata
 
 ### Requirement: Go module paths
 
-Go modules use the `github.com/irosadie/open-state/*` path instead of `github.com/vibecoding-starter/*`.
+The repository SHALL use the canonical `github.com/irosadie/open-state/*` path for Go modules.
 
 #### Scenario: Imports
 
 - GIVEN a Go file imports an internal package
 - THEN it uses `github.com/irosadie/open-state/...`
-- AND `go build ./...` succeeds without `vibecoding-starter` references
+- AND `go build ./...` succeeds without legacy module references
 
 ### Requirement: Frontend package scope
 
-Frontend packages use the `@openstate/*` scope instead of `@vibecoding-starter/*`.
+The repository SHALL use the `@openstate/*` scope for frontend packages.
 
 #### Scenario: TypeScript imports
 
@@ -39,7 +39,7 @@ Frontend packages use the `@openstate/*` scope instead of `@vibecoding-starter/*
 
 ### Requirement: Infrastructure naming
 
-Containers and the database use the `openstate` prefix instead of `vibecoding-starter`.
+Containers and the database SHALL use the `openstate` prefix.
 
 #### Scenario: Docker compose
 

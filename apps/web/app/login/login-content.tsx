@@ -113,7 +113,7 @@ export default function LoginContent() {
       <PanelCard
         className="w-full rounded-3xl"
         title="Sign In"
-        description="Starter credentials flow via NextAuth and proxy BFF"
+        description="OpenState credentials flow via NextAuth and proxy BFF"
       >
         <form className="space-y-4" onSubmit={handleSubmit}>
           <Input

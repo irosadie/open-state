@@ -7,7 +7,7 @@ Read this file at the start of each implementation session. Contains complete la
 ## Monorepo Overview
 
 ```
-vibecoding-starter/
+open-state/
 ├── apps/
 │   ├── web/      → Next.js 16 App Router (frontend)
 │   ├── api/      → Hono (backend, Clean Architecture)

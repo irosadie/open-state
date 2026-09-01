@@ -2,6 +2,7 @@
   "name": "openstate",
   "private": true,
   "version": "0.1.0",
+  "description": "OpenState — Enterprise Conversation State Orchestration Platform",
   "license": "MIT",
   "packageManager": "bun@1.3.5",
   "workspaces": ["apps/*", "packages/*"],

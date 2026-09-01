@@ -5,7 +5,7 @@ import { apiRouters, queryKeys } from '$/constants'
 import { ErrorResponse } from '$/types/generals'
 import { AxiosError } from 'axios'
 import type { ExampleSchemaProps as PayloadProps } from '$/schemas/example'
-import type { ExampleResponseProps as ResponseProps } from '@vibecoding-starter/types/example-response'
+import type { ExampleResponseProps as ResponseProps } from '@openstate/types/example-response'
 
 const insertOne = async (payload: PayloadProps) => {
 	const result = await axios<ResponseProps>({
