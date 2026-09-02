@@ -9,4 +9,13 @@ export {
   useDisableMCPConnection,
   useEnableMCPConnection,
   useTestMCPConnection,
+  useDiagnoseMCPConnection,
+  useResetMCPConnectionHealth,
 } from "./use-mcp-connection-action"
+export {
+  useDisconnectMCPOAuth,
+  useMCPOAuthStatus,
+  useRevokeMCPCredential,
+  useRotateMCPCredential,
+  useStartMCPOAuth,
+} from "./use-mcp-connection-security"

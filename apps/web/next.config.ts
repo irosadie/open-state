@@ -6,6 +6,7 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url))
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   outputFileTracingRoot: join(currentDirectory, "../../"),
   images: {
     remotePatterns: [

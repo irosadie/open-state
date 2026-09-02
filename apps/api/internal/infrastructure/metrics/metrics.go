@@ -19,6 +19,8 @@ type Registry struct {
 	auditEntriesTotal     *prometheus.CounterVec
 	capabilityInvocations *prometheus.CounterVec
 	authFailuresTotal     *prometheus.CounterVec
+	mcpGatewayInvocations *prometheus.CounterVec
+	mcpGatewayDuration    *prometheus.HistogramVec
 }
 
 // New builds the metrics registry, registering runtime/process collectors and
@@ -51,9 +53,18 @@ func New() *Registry {
 			Name: "auth_failures_total",
 			Help: "Total authentication failures (login/register).",
 		}, []string{"reason"}),
+		mcpGatewayInvocations: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "mcp_gateway_invocations_total",
+			Help: "MCP gateway invocations by safe outcome class.",
+		}, []string{"outcome"}),
+		mcpGatewayDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name: "mcp_gateway_duration_seconds",
+			Help: "MCP gateway provider duration by safe outcome class.",
+			Buckets: prometheus.DefBuckets,
+		}, []string{"outcome"}),
 	}
 
-	reg.MustRegister(r.httpRequestsTotal, r.httpRequestDuration, r.auditEntriesTotal, r.capabilityInvocations, r.authFailuresTotal)
+	reg.MustRegister(r.httpRequestsTotal, r.httpRequestDuration, r.auditEntriesTotal, r.capabilityInvocations, r.authFailuresTotal, r.mcpGatewayInvocations, r.mcpGatewayDuration)
 	return r
 }
 
@@ -79,4 +90,12 @@ func (r *Registry) IncCapabilityInvocation(result string) {
 // IncAuthFailure increments the auth failure metric by reason.
 func (r *Registry) IncAuthFailure(reason string) {
 	r.authFailuresTotal.WithLabelValues(reason).Inc()
+}
+
+func (r *Registry) IncMCPGatewayInvocation(outcome string) {
+	r.mcpGatewayInvocations.WithLabelValues(outcome).Inc()
+}
+
+func (r *Registry) ObserveMCPGatewayDuration(outcome string, seconds float64) {
+	r.mcpGatewayDuration.WithLabelValues(outcome).Observe(seconds)
 }

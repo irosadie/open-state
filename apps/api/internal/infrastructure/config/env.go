@@ -20,6 +20,7 @@ type Config struct {
 	RateLimit       RateLimitConfig
 	SSO             SSOConfig
 	Security        SecurityConfig
+	MCP             MCPConfig
 }
 
 // OTelConfig controls OpenTelemetry tracing (PRD §84). When the OTLP endpoint is
@@ -55,6 +56,13 @@ func Load() (*Config, error) {
 	if mcpGatewayMode != "advisory" && mcpGatewayMode != "secure" {
 		return nil, fmt.Errorf("MCP_GATEWAY_MODE must be advisory or secure")
 	}
+	mcp := loadMCP()
+	if mcp.Egress.Mode != "production" && mcp.Egress.Mode != "development" {
+		return nil, fmt.Errorf("MCP_EGRESS_MODE must be production or development")
+	}
+	if mcp.SecretStore != "composite" && mcp.SecretStore != "environment" && mcp.SecretStore != "production" {
+		return nil, fmt.Errorf("MCP_SECRET_STORE must be composite, environment, or production")
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -77,6 +85,7 @@ func Load() (*Config, error) {
 		RateLimit: loadRateLimits(),
 		SSO:       loadSSO(),
 		Security:  loadSecurity(),
+		MCP:       mcp,
 	}, nil
 }
 

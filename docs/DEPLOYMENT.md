@@ -8,7 +8,8 @@ PostgreSQL and Redis.
 
 | Component | Tech | Purpose |
 | --- | --- | --- |
-| `apps/api` | Go (Echo, Clean Architecture) | HTTP API + MCP server, port `8020` |
+| `apps/api` | Go (Echo, Clean Architecture) | HTTP API, port `8020` |
+| `apps/api/cmd/mcp-server` | Go (MCP Streamable HTTP) | State MCP gateway, port `8030` |
 | `apps/web` | Next.js (App Router) | State Builder + admin console, port `3020` |
 | `apps/worker` | Go (asynq) | Background jobs (timeouts, outbox, delayed events) |
 | `packages/go-shared` | Go module | Shared DomainError / types |
@@ -69,6 +70,9 @@ cd apps/web && bun run dev
 
 # State MCP (8030; required API key authentication)
 cd apps/api && go run ./cmd/mcp-server/main.go
+
+# Optional external provider mock (local development only)
+bun run dev:provider-mock
 ```
 
 Open:
@@ -87,6 +91,15 @@ Open:
 | `MCP_API_KEY_PEPPER` | — | Required 32+ character verifier pepper for State MCP API keys |
 | `MCP_PORT` | `8030` | State MCP endpoint port (`/mcp`) |
 | `MCP_GATEWAY_MODE` | `advisory` | `advisory` preserves direct two-MCP compatibility; `secure` enforces provider calls through State MCP project bindings |
+| `MCP_SECRET_STORE` | `composite` | `composite` supports local memory secrets plus legacy `CRED_*` references; production should use `production` with a Vault/KMS adapter |
+| `MCP_EGRESS_MODE` | `production` | `production` blocks local/private destinations; `development` still requires `MCP_EGRESS_ALLOW_LOCAL_DEV=true` for loopback |
+| `MCP_EGRESS_SCHEMES` | `https` | Comma-separated allowed outbound URL schemes |
+| `MCP_EGRESS_PORTS` | `443` | Comma-separated allowed outbound ports; configure `8031` for the local provider mock |
+| `MCP_EGRESS_ALLOWED_HOSTS` | empty | Optional exact or `*.example.com` host allowlist |
+| `MCP_EGRESS_ALLOWED_CIDRS` | empty | Optional explicitly permitted network CIDRs |
+| `MCP_EGRESS_ALLOW_LOCAL_DEV` | `false` | Allows loopback only when mode is `development` |
+| `MCP_EGRESS_ALLOW_PRIVATE` | `false` | Allows private non-loopback networks when explicitly enabled |
+| `MCP_STDIO_PROFILES_JSON` | empty | Deployment-reviewed STDIO runner profiles; arbitrary commands are never accepted |
 
 For the gateway rollout, secure-mode behavior, and rollback sequence, see
 [`MCP-GATEWAY.md`](MCP-GATEWAY.md).
@@ -198,3 +211,21 @@ includes `BOOKING_PADEL` with examples such as `saya mau order lapangan` and
 All additions in this repo (seed data, tests, docs, CI) are additive and
 idempotent. Removing them restores prior behavior; the seed can be dropped
 without a data migration because it only upserts demo-scoped rows.
+
+## Incident response for MCP connections
+
+1. Disable the affected project connection from the Admin Console; secure-mode
+   gateway calls then fail closed for that binding.
+2. If a credential may have leaked, revoke it at the provider first, then use
+   **Revoke credential** or **Disconnect OAuth** and configure a replacement.
+3. Use **Diagnose** to collect only classified handshake/health status. Do not
+   paste tokens, authorization codes, headers, or provider response bodies into
+   tickets or logs.
+4. For blocked egress, review the deployment allowlist and DNS resolution. Add
+   the narrowest approved host/port/CIDR and rerun the diagnostic; never disable
+   SSRF protections globally to restore a single provider.
+5. Reset health only after the provider and network path are known to be safe.
+
+OAuth state and PKCE transactions expire after ten minutes and are one-time use.
+Refresh occurs server-side; refresh failure becomes `action_required` and never
+returns token material to the browser or State MCP.

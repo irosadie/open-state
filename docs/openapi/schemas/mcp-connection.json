@@ -1,7 +1,7 @@
 {
   "MCPConnection": {
     "type": "object",
-    "required": ["id", "tenantId", "projectId", "name", "alias", "transport", "stdioArgs", "authType", "credentialStatus", "status", "lastTestStatus", "createdAt", "updatedAt"],
+    "required": ["id", "tenantId", "projectId", "name", "alias", "transport", "stdioArgs", "authType", "credentialStatus", "oauthScopes", "oauthStatus", "status", "lastTestStatus", "healthStatus", "consecutiveFailures", "timeoutMs", "maxConcurrency", "rateLimitPerSecond", "rateLimitBurst", "retryMax", "circuitFailureThreshold", "circuitRecoverySeconds", "createdAt", "updatedAt"],
     "properties": {
       "id": { "type": "string", "format": "uuid" },
       "tenantId": { "type": "string", "format": "uuid" },
@@ -14,10 +14,28 @@
       "stdioArgs": { "type": "array", "items": { "type": "string" } },
       "authType": { "type": "string", "enum": ["none", "bearer", "oauth"] },
       "credentialStatus": { "type": "string", "enum": ["configured", "missing", "action_required"] },
+      "oauthAuthorizationEndpoint": { "type": "string", "format": "uri", "nullable": true },
+      "oauthTokenEndpoint": { "type": "string", "format": "uri", "nullable": true },
+      "oauthClientId": { "type": "string", "nullable": true },
+      "oauthScopes": { "type": "array", "items": { "type": "string" } },
+      "oauthRedirectUri": { "type": "string", "format": "uri", "nullable": true },
+      "oauthStatus": { "type": "string", "enum": ["connected", "expired", "disconnected", "action_required"] },
       "status": { "type": "string", "enum": ["enabled", "disabled"] },
       "lastTestStatus": { "type": "string", "enum": ["never", "ready", "failed", "disabled"] },
       "lastTestErrorCode": { "type": "string", "nullable": true },
       "lastTestedAt": { "type": "string", "format": "date-time", "nullable": true },
+      "healthStatus": { "type": "string", "enum": ["unknown", "healthy", "degraded", "unavailable", "action_required", "circuit_open"] },
+      "healthReason": { "type": "string", "nullable": true, "maxLength": 128 },
+      "lastSuccessAt": { "type": "string", "format": "date-time", "nullable": true },
+      "consecutiveFailures": { "type": "integer", "minimum": 0 },
+      "circuitOpenedAt": { "type": "string", "format": "date-time", "nullable": true },
+      "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 300000 },
+      "maxConcurrency": { "type": "integer", "minimum": 1, "maximum": 256 },
+      "rateLimitPerSecond": { "type": "number", "exclusiveMinimum": 0, "maximum": 10000 },
+      "rateLimitBurst": { "type": "integer", "minimum": 1, "maximum": 10000 },
+      "retryMax": { "type": "integer", "minimum": 0, "maximum": 5 },
+      "circuitFailureThreshold": { "type": "integer", "minimum": 1, "maximum": 100 },
+      "circuitRecoverySeconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
       "createdAt": { "type": "string", "format": "date-time" },
       "updatedAt": { "type": "string", "format": "date-time" }
     }
@@ -33,7 +51,21 @@
       "stdioProfile": { "type": "string", "description": "Required for stdio; must be a trusted deployment profile." },
       "stdioArgs": { "type": "array", "items": { "type": "string" } },
       "authType": { "type": "string", "enum": ["none", "bearer", "oauth"] },
-      "credentialReference": { "type": "string", "writeOnly": true, "description": "Opaque secret-manager reference. Never a raw token and never returned." }
+      "credentialReference": { "type": "string", "writeOnly": true, "description": "Legacy opaque secret-manager reference. Never a raw token and never returned." },
+      "credentialValue": { "type": "string", "writeOnly": true, "description": "Bearer credential value. Stored immediately in the configured secret store and never returned." },
+      "oauthAuthorizationEndpoint": { "type": "string", "format": "uri", "description": "HTTPS authorization endpoint for OAuth connections." },
+      "oauthTokenEndpoint": { "type": "string", "format": "uri", "description": "HTTPS token endpoint for OAuth connections." },
+      "oauthClientId": { "type": "string" },
+      "oauthClientSecretValue": { "type": "string", "writeOnly": true },
+      "oauthScopes": { "type": "array", "items": { "type": "string" }, "maxItems": 32 },
+      "oauthRedirectUri": { "type": "string", "format": "uri" },
+      "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 300000 },
+      "maxConcurrency": { "type": "integer", "minimum": 1, "maximum": 256 },
+      "rateLimitPerSecond": { "type": "number", "exclusiveMinimum": 0, "maximum": 10000 },
+      "rateLimitBurst": { "type": "integer", "minimum": 1, "maximum": 10000 },
+      "retryMax": { "type": "integer", "minimum": 0, "maximum": 5 },
+      "circuitFailureThreshold": { "type": "integer", "minimum": 1, "maximum": 100 },
+      "circuitRecoverySeconds": { "type": "integer", "minimum": 1, "maximum": 86400 }
     }
   },
   "MCPConnectionResponse": {
@@ -50,5 +82,15 @@
     "type": "object",
     "required": ["data"],
     "properties": { "data": { "$ref": "#/components/schemas/MCPConnection" } }
+  },
+  "MCPOAuthStartResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "type": "object", "required": ["authorizationUrl", "status", "expiresAt"], "properties": { "authorizationUrl": { "type": "string", "format": "uri" }, "status": { "type": "string", "enum": ["action_required"] }, "expiresAt": { "type": "string", "format": "date-time" } } } }
+  },
+  "MCPOAuthStatusResponse": {
+    "type": "object",
+    "required": ["data"],
+    "properties": { "data": { "type": "object", "required": ["status", "credentialStatus"], "properties": { "status": { "type": "string", "enum": ["connected", "expired", "disconnected", "action_required"] }, "expiresAt": { "type": "string", "format": "date-time", "nullable": true }, "credentialStatus": { "type": "string", "enum": ["configured", "missing", "action_required"] } } } }
   }
 }

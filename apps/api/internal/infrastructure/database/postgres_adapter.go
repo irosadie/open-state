@@ -20,28 +20,29 @@ import (
 // getters and a WithTx helper so multi-repository operations run atomically
 // (PRD 65, 69). It contains no business logic.
 type PostgresAdapter struct {
-	pool           *pgxpool.Pool
-	sqlDB          *sql.DB
-	queries        *db.Queries
-	projects       repositories.IProjectRepository
-	workflows      repositories.IWorkflowRepository
-	instances      repositories.IInstanceRepository
-	events         repositories.IEventRepository
-	context        repositories.IContextRepository
-	capabilities   repositories.ICapabilityRepository
-	evidence       repositories.ICapabilityEvidenceRepository
-	audit          repositories.IAuditRepository
-	roles          repositories.IRoleAssignmentRepository
-	identities     repositories.IUserIdentityRepository
-	admin          repositories.IAdminRepository
-	eventBrowser   repositories.IEventBrowserRepository
-	runtimeRead    repositories.IRuntimeReadRepository
-	traces         repositories.IRuntimeTraceRepository
-	intents        repositories.IIntentRepository
-	apiKeys        repositories.IAPIKeyRepository
-	mcpConnections repositories.IMCPConnectionRepository
-	mcpToolCatalog repositories.IMCPToolCatalogRepository
-	mcpBindings   repositories.IProjectCapabilityMCPBindingRepository
+	pool                 *pgxpool.Pool
+	sqlDB                *sql.DB
+	queries              *db.Queries
+	projects             repositories.IProjectRepository
+	workflows            repositories.IWorkflowRepository
+	instances            repositories.IInstanceRepository
+	events               repositories.IEventRepository
+	context              repositories.IContextRepository
+	capabilities         repositories.ICapabilityRepository
+	evidence             repositories.ICapabilityEvidenceRepository
+	audit                repositories.IAuditRepository
+	roles                repositories.IRoleAssignmentRepository
+	identities           repositories.IUserIdentityRepository
+	admin                repositories.IAdminRepository
+	eventBrowser         repositories.IEventBrowserRepository
+	runtimeRead          repositories.IRuntimeReadRepository
+	traces               repositories.IRuntimeTraceRepository
+	intents              repositories.IIntentRepository
+	apiKeys              repositories.IAPIKeyRepository
+	mcpConnections       repositories.IMCPConnectionRepository
+	mcpToolCatalog       repositories.IMCPToolCatalogRepository
+	mcpBindings          repositories.IProjectCapabilityMCPBindingRepository
+	mcpOAuthTransactions repositories.IMCPOAuthTransactionRepository
 }
 
 // NewPostgresAdapter returns a PostgresAdapter composing all six pgx repositories.
@@ -49,28 +50,29 @@ func NewPostgresAdapter(pool *pgxpool.Pool) *PostgresAdapter {
 	sqlDB := stdlib.OpenDBFromPool(pool)
 	eventRepo := NewPgxEventRepository(pool)
 	return &PostgresAdapter{
-		pool:           pool,
-		sqlDB:          sqlDB,
-		queries:        db.New(sqlDB),
-		projects:       NewPgxProjectRepository(pool),
-		workflows:      NewPgxWorkflowRepository(pool),
-		instances:      NewPgxInstanceRepository(pool),
-		events:         eventRepo,
-		context:        NewPgxContextRepository(pool),
-		capabilities:   NewPgxCapabilityRepository(pool),
-		evidence:       NewPgxCapabilityEvidenceRepository(pool),
-		audit:          NewPgxAuditRepository(pool),
-		roles:          NewPgxRoleAssignmentRepository(pool),
-		identities:     NewPgxUserIdentityRepository(pool),
-		admin:          NewPgxAdminRepository(pool),
-		eventBrowser:   eventRepo,
-		runtimeRead:    NewPgxRuntimeReadRepository(pool),
-		traces:         NewPgxRuntimeTraceRepository(pool),
-		intents:        NewPgxIntentRepository(pool),
-		apiKeys:        NewPgxAPIKeyRepository(pool),
-		mcpConnections: NewPgxMCPConnectionRepository(pool),
-		mcpToolCatalog: NewPgxMCPToolCatalogRepository(pool),
-		mcpBindings:    NewPgxProjectCapabilityMCPBindingRepository(pool),
+		pool:                 pool,
+		sqlDB:                sqlDB,
+		queries:              db.New(sqlDB),
+		projects:             NewPgxProjectRepository(pool),
+		workflows:            NewPgxWorkflowRepository(pool),
+		instances:            NewPgxInstanceRepository(pool),
+		events:               eventRepo,
+		context:              NewPgxContextRepository(pool),
+		capabilities:         NewPgxCapabilityRepository(pool),
+		evidence:             NewPgxCapabilityEvidenceRepository(pool),
+		audit:                NewPgxAuditRepository(pool),
+		roles:                NewPgxRoleAssignmentRepository(pool),
+		identities:           NewPgxUserIdentityRepository(pool),
+		admin:                NewPgxAdminRepository(pool),
+		eventBrowser:         eventRepo,
+		runtimeRead:          NewPgxRuntimeReadRepository(pool),
+		traces:               NewPgxRuntimeTraceRepository(pool),
+		intents:              NewPgxIntentRepository(pool),
+		apiKeys:              NewPgxAPIKeyRepository(pool),
+		mcpConnections:       NewPgxMCPConnectionRepository(pool),
+		mcpToolCatalog:       NewPgxMCPToolCatalogRepository(pool),
+		mcpBindings:          NewPgxProjectCapabilityMCPBindingRepository(pool),
+		mcpOAuthTransactions: NewPgxMCPAuthorizationTransactionRepository(pool),
 	}
 }
 
@@ -140,6 +142,11 @@ func (a *PostgresAdapter) ProjectMCPBindings() repositories.IProjectCapabilityMC
 	return a.mcpBindings
 }
 
+// MCPOAuthTransactions returns the short-lived OAuth state/PKCE transaction repository.
+func (a *PostgresAdapter) MCPOAuthTransactions() repositories.IMCPOAuthTransactionRepository {
+	return a.mcpOAuthTransactions
+}
+
 // WithTx runs fn within a single DB transaction, binding all six repositories to
 // that transaction so multi-repository operations (e.g. append an audit entry and
 // emit an outbox event, or a state transition) commit or roll back together
@@ -159,25 +166,26 @@ func (a *PostgresAdapter) WithTx(ctx context.Context, fn func(adapter *PostgresA
 
 	q := a.queries.WithTx(tx)
 	txAdapter := &PostgresAdapter{
-		queries:        q,
-		workflows:      newPgxWorkflowRepository(q, a.sqlDB),
-		instances:      newPgxInstanceRepository(q, a.sqlDB),
-		events:         newPgxEventRepository(q),
-		context:        newPgxContextRepository(q),
-		capabilities:   newPgxCapabilityRepository(q),
-		evidence:       newPgxCapabilityEvidenceRepository(q),
-		audit:          newPgxAuditRepository(q),
-		roles:          newPgxRoleAssignmentRepository(q),
-		identities:     newPgxUserIdentityRepository(q),
-		admin:          newPgxAdminRepository(q, a.sqlDB),
-		eventBrowser:   newPgxEventRepository(q),
-		runtimeRead:    newPgxRuntimeReadRepository(q),
-		traces:         newPgxRuntimeTraceRepository(q),
-		intents:        newPgxIntentRepository(q),
-		apiKeys:        newPgxAPIKeyRepository(q),
-		mcpConnections: newPgxMCPConnectionRepository(q),
-		mcpToolCatalog: newPgxMCPToolCatalogRepository(q, a.sqlDB),
-		mcpBindings:    newPgxProjectCapabilityMCPBindingRepository(q),
+		queries:              q,
+		workflows:            newPgxWorkflowRepository(q, a.sqlDB),
+		instances:            newPgxInstanceRepository(q, a.sqlDB),
+		events:               newPgxEventRepository(q),
+		context:              newPgxContextRepository(q),
+		capabilities:         newPgxCapabilityRepository(q),
+		evidence:             newPgxCapabilityEvidenceRepository(q),
+		audit:                newPgxAuditRepository(q),
+		roles:                newPgxRoleAssignmentRepository(q),
+		identities:           newPgxUserIdentityRepository(q),
+		admin:                newPgxAdminRepository(q, a.sqlDB),
+		eventBrowser:         newPgxEventRepository(q),
+		runtimeRead:          newPgxRuntimeReadRepository(q),
+		traces:               newPgxRuntimeTraceRepository(q),
+		intents:              newPgxIntentRepository(q),
+		apiKeys:              newPgxAPIKeyRepository(q),
+		mcpConnections:       newPgxMCPConnectionRepository(q),
+		mcpToolCatalog:       newPgxMCPToolCatalogRepository(q, a.sqlDB),
+		mcpBindings:          newPgxProjectCapabilityMCPBindingRepository(q),
+		mcpOAuthTransactions: newPgxMCPAuthorizationTransactionRepository(q),
 	}
 
 	if err := fn(txAdapter); err != nil {

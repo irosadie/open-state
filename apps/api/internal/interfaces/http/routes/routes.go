@@ -88,6 +88,15 @@ func RegisterMCPConnectionRoutes(e *echo.Echo, ctrl *controllers.MCPConnectionCo
 	g.POST("/:id/enable", ctrl.Enable, middleware.RequirePermission(authz, "mcp_connection:enable", audit))
 	g.POST("/:id/disable", ctrl.Disable, middleware.RequirePermission(authz, "mcp_connection:disable", audit))
 	g.POST("/:id/test", ctrl.Test, middleware.RequirePermission(authz, "mcp_connection:test", audit))
+	g.POST("/:id/diagnose", ctrl.Diagnose, middleware.RequirePermission(authz, "mcp_connection:test", audit))
+	g.POST("/:id/reset-health", ctrl.ResetHealth, middleware.RequirePermission(authz, "mcp_connection:update", audit))
+	g.POST("/:id/credentials/rotate", ctrl.CredentialRotate, middleware.RequirePermission(authz, "mcp_connection:update", audit))
+	g.POST("/:id/credentials/revoke", ctrl.CredentialRevoke, middleware.RequirePermission(authz, "mcp_connection:update", audit))
+	g.GET("/:id/credentials/status", ctrl.CredentialStatus, middleware.RequirePermission(authz, "mcp_connection:read", audit))
+	g.POST("/:id/oauth/start", ctrl.OAuthStart, middleware.RequirePermission(authz, "mcp_connection:update", audit))
+	g.GET("/:id/oauth/callback", ctrl.OAuthCallback, middleware.RequirePermission(authz, "mcp_connection:update", audit))
+	g.POST("/:id/oauth/disconnect", ctrl.OAuthDisconnect, middleware.RequirePermission(authz, "mcp_connection:update", audit))
+	g.GET("/:id/oauth/status", ctrl.OAuthStatus, middleware.RequirePermission(authz, "mcp_connection:read", audit))
 }
 
 // RegisterMCPToolCatalogRoutes exposes explicit tools/list discovery and

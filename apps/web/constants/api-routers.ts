@@ -45,6 +45,18 @@ export const apiRouters = {
     enable: "/projects/:projectId/mcp-connections/:id/enable",
     disable: "/projects/:projectId/mcp-connections/:id/disable",
     test: "/projects/:projectId/mcp-connections/:id/test",
+    diagnose: "/projects/:projectId/mcp-connections/:id/diagnose",
+    resetHealth: "/projects/:projectId/mcp-connections/:id/reset-health",
+    rotateCredential:
+      "/projects/:projectId/mcp-connections/:id/credentials/rotate",
+    revokeCredential:
+      "/projects/:projectId/mcp-connections/:id/credentials/revoke",
+    credentialStatus:
+      "/projects/:projectId/mcp-connections/:id/credentials/status",
+    oauthStart: "/projects/:projectId/mcp-connections/:id/oauth/start",
+    oauthDisconnect:
+      "/projects/:projectId/mcp-connections/:id/oauth/disconnect",
+    oauthStatus: "/projects/:projectId/mcp-connections/:id/oauth/status",
     tools: "/projects/:projectId/mcp-connections/:id/tools",
     refreshTools: "/projects/:projectId/mcp-connections/:id/tools/refresh",
     updateTool: "/projects/:projectId/mcp-connections/:id/tools/:toolName",

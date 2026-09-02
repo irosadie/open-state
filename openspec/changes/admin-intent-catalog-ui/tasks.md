@@ -33,6 +33,6 @@
 
 ## 6. Verification and handoff
 
-- [ ] 6.1 Run formatting, `go test ./...`, `go vet ./...`, and `go build ./...` for the backend.
-- [ ] 6.2 Run frontend tests, typecheck, lint, and production build; verify no direct API calls or `any` types are introduced in components.
-- [ ] 6.3 Run OpenAPI generation/validation and perform a local authenticated smoke test showing `BOOKING_PADEL` with `saya mau order lapangan` and its Builder destination.
+- [x] 6.1 Run formatting, `go test ./...`, `go vet ./...`, and `go build ./...` for the backend.
+- [x] 6.2 Run frontend tests, typecheck, lint, and production build; verify no direct API calls or `any` types are introduced in components.
+- [x] 6.3 Run OpenAPI generation/validation and perform a local authenticated smoke test showing `BOOKING_PADEL` with `saya mau order lapangan` and its Builder destination.

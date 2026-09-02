@@ -285,26 +285,48 @@ type Intent struct {
 }
 
 type McpConnection struct {
-	ID                  uuid.UUID       `json:"id"`
-	TenantID            uuid.UUID       `json:"tenant_id"`
-	ProjectID           uuid.UUID       `json:"project_id"`
-	Name                string          `json:"name"`
-	Alias               string          `json:"alias"`
-	Transport           string          `json:"transport"`
-	Endpoint            sql.NullString  `json:"endpoint"`
-	StdioProfile        sql.NullString  `json:"stdio_profile"`
-	StdioArgs           json.RawMessage `json:"stdio_args"`
-	AuthType            string          `json:"auth_type"`
-	CredentialReference sql.NullString  `json:"credential_reference"`
-	CredentialStatus    string          `json:"credential_status"`
-	Status              string          `json:"status"`
-	LastTestStatus      string          `json:"last_test_status"`
-	LastTestErrorCode   sql.NullString  `json:"last_test_error_code"`
-	LastTestedAt        sql.NullTime    `json:"last_tested_at"`
-	CreatedBy           string          `json:"created_by"`
-	UpdatedBy           string          `json:"updated_by"`
-	CreatedAt           time.Time       `json:"created_at"`
-	UpdatedAt           time.Time       `json:"updated_at"`
+	ID                         uuid.UUID       `json:"id"`
+	TenantID                   uuid.UUID       `json:"tenant_id"`
+	ProjectID                  uuid.UUID       `json:"project_id"`
+	Name                       string          `json:"name"`
+	Alias                      string          `json:"alias"`
+	Transport                  string          `json:"transport"`
+	Endpoint                   sql.NullString  `json:"endpoint"`
+	StdioProfile               sql.NullString  `json:"stdio_profile"`
+	StdioArgs                  json.RawMessage `json:"stdio_args"`
+	AuthType                   string          `json:"auth_type"`
+	CredentialReference        sql.NullString  `json:"credential_reference"`
+	CredentialStatus           string          `json:"credential_status"`
+	Status                     string          `json:"status"`
+	LastTestStatus             string          `json:"last_test_status"`
+	LastTestErrorCode          sql.NullString  `json:"last_test_error_code"`
+	LastTestedAt               sql.NullTime    `json:"last_tested_at"`
+	CreatedBy                  string          `json:"created_by"`
+	UpdatedBy                  string          `json:"updated_by"`
+	CreatedAt                  time.Time       `json:"created_at"`
+	UpdatedAt                  time.Time       `json:"updated_at"`
+	OauthAuthorizationEndpoint sql.NullString  `json:"oauth_authorization_endpoint"`
+	OauthTokenEndpoint         sql.NullString  `json:"oauth_token_endpoint"`
+	OauthClientID              sql.NullString  `json:"oauth_client_id"`
+	OauthClientSecretReference sql.NullString  `json:"oauth_client_secret_reference"`
+	OauthScopes                json.RawMessage `json:"oauth_scopes"`
+	OauthRedirectUri           sql.NullString  `json:"oauth_redirect_uri"`
+	OauthAccessTokenReference  sql.NullString  `json:"oauth_access_token_reference"`
+	OauthRefreshTokenReference sql.NullString  `json:"oauth_refresh_token_reference"`
+	OauthExpiresAt             sql.NullTime    `json:"oauth_expires_at"`
+	OauthStatus                string          `json:"oauth_status"`
+	HealthStatus               string          `json:"health_status"`
+	HealthReason               sql.NullString  `json:"health_reason"`
+	LastSuccessAt              sql.NullTime    `json:"last_success_at"`
+	ConsecutiveFailures        int32           `json:"consecutive_failures"`
+	CircuitOpenedAt            sql.NullTime    `json:"circuit_opened_at"`
+	TimeoutMs                  int32           `json:"timeout_ms"`
+	MaxConcurrency             int32           `json:"max_concurrency"`
+	RateLimitPerSecond         float64         `json:"rate_limit_per_second"`
+	RateLimitBurst             int32           `json:"rate_limit_burst"`
+	RetryMax                   int32           `json:"retry_max"`
+	CircuitFailureThreshold    int32           `json:"circuit_failure_threshold"`
+	CircuitRecoverySeconds     int32           `json:"circuit_recovery_seconds"`
 }
 
 type McpDiscoveredTool struct {
@@ -341,6 +363,20 @@ type McpDiscoveryRun struct {
 	StartedAt          time.Time      `json:"started_at"`
 	CompletedAt        time.Time      `json:"completed_at"`
 	CreatedBy          string         `json:"created_by"`
+}
+
+type McpOauthTransaction struct {
+	ID                uuid.UUID `json:"id"`
+	TenantID          uuid.UUID `json:"tenant_id"`
+	ProjectID         uuid.UUID `json:"project_id"`
+	ConnectionID      uuid.UUID `json:"connection_id"`
+	StateHash         []byte    `json:"state_hash"`
+	VerifierReference string    `json:"verifier_reference"`
+	RedirectUri       string    `json:"redirect_uri"`
+	ExpiresAt         time.Time `json:"expires_at"`
+	Status            string    `json:"status"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type MemoryReference struct {

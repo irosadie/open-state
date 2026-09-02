@@ -14,12 +14,16 @@ import { Textarea } from "$/components/textarea"
 import {
   useCreateMCPConnection,
   useDeleteMCPConnection,
+  useDiagnoseMCPConnection,
   useDisableMCPConnection,
+  useDisconnectMCPOAuth,
   useEnableMCPConnection,
   useListMCPConnections,
   useListMCPTools,
   useRefreshMCPTools,
+  useResetMCPConnectionHealth,
   useSetMCPToolEnabled,
+  useStartMCPOAuth,
   useTestMCPConnection,
   useUpdateMCPConnection,
 } from "$/hooks/transactions/use-mcp-connection"
@@ -46,6 +50,13 @@ type FormState = {
   stdioArgs: string
   authType: MCPConnectionAuthType
   credentialReference: string
+  credentialValue: string
+  oauthAuthorizationEndpoint: string
+  oauthTokenEndpoint: string
+  oauthClientId: string
+  oauthClientSecretValue: string
+  oauthScopes: string
+  oauthRedirectUri: string
 }
 
 const emptyForm: FormState = {
@@ -57,6 +68,13 @@ const emptyForm: FormState = {
   stdioArgs: "",
   authType: "none",
   credentialReference: "",
+  credentialValue: "",
+  oauthAuthorizationEndpoint: "",
+  oauthTokenEndpoint: "",
+  oauthClientId: "",
+  oauthClientSecretValue: "",
+  oauthScopes: "",
+  oauthRedirectUri: "",
 }
 
 const transportOptions = mcpConnectionTransports.map((value) => ({
@@ -104,6 +122,10 @@ export default function MCPConnectionsPageContent() {
   const enable = useEnableMCPConnection()
   const disable = useDisableMCPConnection()
   const test = useTestMCPConnection()
+  const diagnose = useDiagnoseMCPConnection()
+  const resetHealth = useResetMCPConnectionHealth()
+  const startOAuth = useStartMCPOAuth()
+  const disconnectOAuth = useDisconnectMCPOAuth()
   const remove = useDeleteMCPConnection()
   const refreshTools = useRefreshMCPTools()
   const setToolEnabled = useSetMCPToolEnabled()
@@ -153,6 +175,13 @@ export default function MCPConnectionsPageContent() {
       stdioArgs: connection.stdioArgs.join(", "),
       authType: connection.authType,
       credentialReference: "",
+      credentialValue: "",
+      oauthAuthorizationEndpoint: connection.oauthAuthorizationEndpoint ?? "",
+      oauthTokenEndpoint: connection.oauthTokenEndpoint ?? "",
+      oauthClientId: connection.oauthClientId ?? "",
+      oauthClientSecretValue: "",
+      oauthScopes: connection.oauthScopes.join(", "),
+      oauthRedirectUri: connection.oauthRedirectUri ?? "",
     })
     setFormErrors({})
   }
@@ -171,6 +200,35 @@ export default function MCPConnectionsPageContent() {
         .filter(Boolean),
       authType: form.authType,
       credentialReference: form.credentialReference || undefined,
+      credentialValue:
+        form.authType === "bearer"
+          ? form.credentialValue || undefined
+          : undefined,
+      oauthAuthorizationEndpoint:
+        form.authType === "oauth"
+          ? form.oauthAuthorizationEndpoint || undefined
+          : undefined,
+      oauthTokenEndpoint:
+        form.authType === "oauth"
+          ? form.oauthTokenEndpoint || undefined
+          : undefined,
+      oauthClientId:
+        form.authType === "oauth" ? form.oauthClientId || undefined : undefined,
+      oauthClientSecretValue:
+        form.authType === "oauth"
+          ? form.oauthClientSecretValue || undefined
+          : undefined,
+      oauthScopes:
+        form.authType === "oauth"
+          ? form.oauthScopes
+              .split(",")
+              .map((scope) => scope.trim())
+              .filter(Boolean)
+          : undefined,
+      oauthRedirectUri:
+        form.authType === "oauth"
+          ? form.oauthRedirectUri || undefined
+          : undefined,
     }
     const parsed = createMCPConnectionSchema.safeParse(payload)
     if (!parsed.success) {
@@ -209,7 +267,13 @@ export default function MCPConnectionsPageContent() {
   }
 
   const runAction = async (
-    action: "enable" | "disable" | "test" | "delete",
+    action:
+      | "enable"
+      | "disable"
+      | "test"
+      | "diagnose"
+      | "resetHealth"
+      | "delete",
     connection: MCPConnectionResponse,
   ) => {
     if (!selectedProjectId) return
@@ -225,13 +289,19 @@ export default function MCPConnectionsPageContent() {
       if (action === "enable") await enable.mutateAsync(variables)
       if (action === "disable") await disable.mutateAsync(variables)
       if (action === "test") await test.mutateAsync(variables)
+      if (action === "diagnose") await diagnose.mutateAsync(variables)
+      if (action === "resetHealth") await resetHealth.mutateAsync(variables)
       if (action === "delete") await remove.mutateAsync(variables)
       setNotice({
         type: "success",
         text:
           action === "test"
             ? "Handshake test completed."
-            : `MCP connection ${action}d.`,
+            : action === "diagnose"
+              ? "Connection diagnostics completed."
+              : action === "resetHealth"
+                ? "Health state reset."
+                : `MCP connection ${action}d.`,
       })
     } catch (error) {
       setNotice({
@@ -239,6 +309,45 @@ export default function MCPConnectionsPageContent() {
         text:
           extractErrorMessage(error) ||
           `Could not ${action} the MCP connection.`,
+      })
+    }
+  }
+
+  const connectOAuth = async (connection: MCPConnectionResponse) => {
+    if (!selectedProjectId) return
+    try {
+      const result = await startOAuth.mutateAsync({
+        projectId: selectedProjectId,
+        id: connection.id,
+      })
+      window.location.assign(result.authorizationUrl)
+    } catch (error) {
+      setNotice({
+        type: "error",
+        text:
+          extractErrorMessage(error) || "Could not start OAuth authorization.",
+      })
+    }
+  }
+
+  const disconnectConnectionOAuth = async (
+    connection: MCPConnectionResponse,
+  ) => {
+    if (
+      !selectedProjectId ||
+      !window.confirm(`Disconnect OAuth for ${connection.name}?`)
+    )
+      return
+    try {
+      await disconnectOAuth.mutateAsync({
+        projectId: selectedProjectId,
+        id: connection.id,
+      })
+      setNotice({ type: "success", text: "OAuth disconnected." })
+    } catch (error) {
+      setNotice({
+        type: "error",
+        text: extractErrorMessage(error) || "Could not disconnect OAuth.",
       })
     }
   }
@@ -471,25 +580,93 @@ export default function MCPConnectionsPageContent() {
                   )
                 }
               />
-              {form.authType !== "none" && (
+              {form.authType === "bearer" && (
                 <Input
-                  label="Credential reference"
+                  label="Bearer credential (write-only)"
                   type="password"
                   disabled={!canManage}
-                  value={form.credentialReference}
-                  error={formErrors.credentialReference}
+                  value={form.credentialValue}
+                  error={formErrors.credentialValue}
                   onChange={(event) =>
-                    setField("credentialReference", event.target.value)
+                    setField("credentialValue", event.target.value)
                   }
                   placeholder={
                     editing
                       ? "Leave empty to keep current credential"
-                      : "ref:vault/padel-token"
+                      : "Paste provider bearer token"
                   }
-                  hint="Write-only opaque reference resolved by server secret infrastructure."
+                  hint="The secret is stored server-side and is never returned to this page."
                 />
               )}
             </div>
+            {form.authType === "oauth" && (
+              <div className="mt-4 grid gap-4 border-t border-slate-200 pt-4 md:grid-cols-2">
+                <Input
+                  label="Authorization endpoint"
+                  required
+                  disabled={!canManage}
+                  value={form.oauthAuthorizationEndpoint}
+                  onChange={(event) =>
+                    setField("oauthAuthorizationEndpoint", event.target.value)
+                  }
+                  placeholder="https://provider.example.com/oauth/authorize"
+                />
+                <Input
+                  label="Token endpoint"
+                  required
+                  disabled={!canManage}
+                  value={form.oauthTokenEndpoint}
+                  onChange={(event) =>
+                    setField("oauthTokenEndpoint", event.target.value)
+                  }
+                  placeholder="https://provider.example.com/oauth/token"
+                />
+                <Input
+                  label="Client ID"
+                  required
+                  disabled={!canManage}
+                  value={form.oauthClientId}
+                  onChange={(event) =>
+                    setField("oauthClientId", event.target.value)
+                  }
+                  placeholder="provider-client-id"
+                />
+                <Input
+                  label="Client secret (write-only)"
+                  type="password"
+                  disabled={!canManage}
+                  value={form.oauthClientSecretValue}
+                  onChange={(event) =>
+                    setField("oauthClientSecretValue", event.target.value)
+                  }
+                  placeholder={
+                    editing
+                      ? "Leave empty to keep current secret"
+                      : "Paste client secret"
+                  }
+                />
+                <Input
+                  label="Redirect URI"
+                  required
+                  disabled={!canManage}
+                  value={form.oauthRedirectUri}
+                  onChange={(event) =>
+                    setField("oauthRedirectUri", event.target.value)
+                  }
+                  placeholder="https://app.example.com/oauth/callback"
+                />
+                <Input
+                  label="Scopes"
+                  disabled={!canManage}
+                  value={form.oauthScopes}
+                  onChange={(event) =>
+                    setField("oauthScopes", event.target.value)
+                  }
+                  placeholder="calendar.read, booking.write"
+                  hint="Comma-separated scopes."
+                />
+              </div>
+            )}
             {canManage && (
               <div className="mt-5 flex gap-2">
                 <Button
@@ -551,6 +728,18 @@ export default function MCPConnectionsPageContent() {
                           >
                             credential: {connection.credentialStatus}
                           </span>
+                          {connection.authType === "oauth" && (
+                            <span
+                              className={`rounded-full px-2 py-1 ${connection.oauthStatus === "connected" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}
+                            >
+                              OAuth: {connection.oauthStatus}
+                            </span>
+                          )}
+                          <span
+                            className={`rounded-full px-2 py-1 ${connection.healthStatus === "healthy" ? "bg-green-50 text-green-700" : connection.healthStatus === "unknown" ? "bg-slate-100 text-slate-600" : "bg-amber-50 text-amber-700"}`}
+                          >
+                            health: {connection.healthStatus}
+                          </span>
                           <span
                             className={`rounded-full px-2 py-1 ${connection.lastTestStatus === "ready" ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-600"}`}
                           >
@@ -578,6 +767,42 @@ export default function MCPConnectionsPageContent() {
                         >
                           Test
                         </Button>
+                        <Button
+                          intent="clean"
+                          onClick={() => void runAction("diagnose", connection)}
+                          disabled={!canManage || diagnose.isPending}
+                        >
+                          Diagnose
+                        </Button>
+                        <Button
+                          intent="clean"
+                          onClick={() =>
+                            void runAction("resetHealth", connection)
+                          }
+                          disabled={!canManage || resetHealth.isPending}
+                        >
+                          Reset health
+                        </Button>
+                        {connection.authType === "oauth" &&
+                          (connection.oauthStatus === "connected" ? (
+                            <Button
+                              intent="clean"
+                              onClick={() =>
+                                void disconnectConnectionOAuth(connection)
+                              }
+                              disabled={!canManage || disconnectOAuth.isPending}
+                            >
+                              Disconnect OAuth
+                            </Button>
+                          ) : (
+                            <Button
+                              intent="clean"
+                              onClick={() => void connectOAuth(connection)}
+                              disabled={!canManage || startOAuth.isPending}
+                            >
+                              Connect OAuth
+                            </Button>
+                          ))}
                         {connection.status === "enabled" ? (
                           <Button
                             intent="clean"

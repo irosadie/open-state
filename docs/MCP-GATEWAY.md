@@ -43,5 +43,47 @@ process, not by the LLM client.
 5. If rollback is needed, change the State MCP mode back to `advisory` and
    restart it. Bindings and evidence are retained.
 
-OAuth refresh, egress restrictions, connection pooling, and circuit controls
-remain part of the connection-hardening phase.
+## Connection hardening defaults
+
+External MCP connections are registered per project. The API stores only opaque
+credential references; bearer values and OAuth access/refresh tokens are handled
+by the configured secret store. Use the Admin Console connection page for
+credential rotation/revocation, OAuth connect/disconnect, safe handshake tests,
+diagnostics, and health reset.
+
+Production defaults are HTTPS-only, port 443, no private or loopback targets,
+and no arbitrary STDIO commands. Configure an explicit development policy for
+the local provider mock:
+
+```bash
+MCP_EGRESS_MODE=development
+MCP_EGRESS_SCHEMES=http,https
+MCP_EGRESS_PORTS=8031,443
+MCP_EGRESS_ALLOW_LOCAL_DEV=true
+```
+
+For hosted STDIO, configure `MCP_STDIO_PROFILES_JSON` with deployment-reviewed
+profiles. A project selects only the profile name and reviewed argument prefixes;
+it cannot submit a shell command or environment overrides.
+
+Example (the command and environment belong to deployment configuration):
+
+```json
+{
+  "trusted-padel": {
+    "command": "/opt/openstate/bin/padel-mcp",
+    "args": ["--stdio"],
+    "allowedArgPrefixes": ["--region=", "--venue="],
+    "env": ["PATH=/usr/bin"],
+    "maxArgs": 16,
+    "maxRuntimeMs": 30000,
+    "maxOutputBytes": 8388608
+  }
+}
+```
+
+Gateway execution applies per-connection timeout, concurrency, token-bucket
+rate limiting, idempotency-aware retries, and a circuit breaker. Provider
+failures are stored as classified health/audit outcomes with tenant, project,
+connection, tool, and correlation identifiers; raw payloads, headers, tokens,
+and provider response bodies are not captured.

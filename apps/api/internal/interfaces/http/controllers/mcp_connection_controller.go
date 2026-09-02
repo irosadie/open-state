@@ -13,11 +13,16 @@ import (
 
 // MCPConnectionController exposes the project MCP connection registry.
 type MCPConnectionController struct {
-	svc *appservices.MCPConnectionService
+	svc   *appservices.MCPConnectionService
+	oauth *appservices.MCPOAuthService
 }
 
-func NewMCPConnectionController(svc *appservices.MCPConnectionService) *MCPConnectionController {
-	return &MCPConnectionController{svc: svc}
+func NewMCPConnectionController(svc *appservices.MCPConnectionService, oauth ...*appservices.MCPOAuthService) *MCPConnectionController {
+	var oauthSvc *appservices.MCPOAuthService
+	if len(oauth) > 0 {
+		oauthSvc = oauth[0]
+	}
+	return &MCPConnectionController{svc: svc, oauth: oauthSvc}
 }
 
 func (ctrl *MCPConnectionController) List(c echo.Context) error {
@@ -117,6 +122,139 @@ func (ctrl *MCPConnectionController) Test(c echo.Context) error {
 	}
 	actor, _ := c.Get(middleware.UserIDKey).(string)
 	result, err := ctrl.svc.Test(c.Request().Context(), tenantID, projectID, c.Param("id"), actor)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": result})
+}
+
+func (ctrl *MCPConnectionController) Diagnose(c echo.Context) error {
+	tenantID, projectID, err := mcpScope(c)
+	if err != nil {
+		return err
+	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
+	result, err := ctrl.svc.Diagnose(c.Request().Context(), tenantID, projectID, c.Param("id"), actor)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": result})
+}
+
+func (ctrl *MCPConnectionController) ResetHealth(c echo.Context) error {
+	tenantID, projectID, err := mcpScope(c)
+	if err != nil {
+		return err
+	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
+	result, err := ctrl.svc.ResetHealth(c.Request().Context(), tenantID, projectID, c.Param("id"), actor)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": result})
+}
+
+func (ctrl *MCPConnectionController) CredentialRotate(c echo.Context) error {
+	tenantID, projectID, err := mcpScope(c)
+	if err != nil {
+		return err
+	}
+	var req struct {
+		CredentialValue string `json:"credentialValue"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return domain.NewValidation("invalid request body")
+	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
+	result, err := ctrl.svc.RotateCredential(c.Request().Context(), tenantID, projectID, c.Param("id"), actor, req.CredentialValue)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": result})
+}
+
+func (ctrl *MCPConnectionController) CredentialRevoke(c echo.Context) error {
+	tenantID, projectID, err := mcpScope(c)
+	if err != nil {
+		return err
+	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
+	result, err := ctrl.svc.RevokeCredential(c.Request().Context(), tenantID, projectID, c.Param("id"), actor)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": result})
+}
+
+func (ctrl *MCPConnectionController) CredentialStatus(c echo.Context) error {
+	tenantID, projectID, err := mcpScope(c)
+	if err != nil {
+		return err
+	}
+	result, err := ctrl.svc.CredentialStatus(c.Request().Context(), tenantID, projectID, c.Param("id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": result})
+}
+
+func (ctrl *MCPConnectionController) OAuthStart(c echo.Context) error {
+	if ctrl.oauth == nil {
+		return domain.NewInternal("OAuth lifecycle is not configured")
+	}
+	tenantID, projectID, err := mcpScope(c)
+	if err != nil {
+		return err
+	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
+	result, err := ctrl.oauth.Start(c.Request().Context(), tenantID, projectID, c.Param("id"), actor)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": result})
+}
+
+func (ctrl *MCPConnectionController) OAuthCallback(c echo.Context) error {
+	if ctrl.oauth == nil {
+		return domain.NewInternal("OAuth lifecycle is not configured")
+	}
+	tenantID, projectID, err := mcpScope(c)
+	if err != nil {
+		return err
+	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
+	result, err := ctrl.oauth.Callback(c.Request().Context(), tenantID, projectID, c.Param("id"), actor, c.QueryParam("state"), c.QueryParam("code"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": result})
+}
+
+func (ctrl *MCPConnectionController) OAuthDisconnect(c echo.Context) error {
+	if ctrl.oauth == nil {
+		return domain.NewInternal("OAuth lifecycle is not configured")
+	}
+	tenantID, projectID, err := mcpScope(c)
+	if err != nil {
+		return err
+	}
+	actor, _ := c.Get(middleware.UserIDKey).(string)
+	result, err := ctrl.oauth.Disconnect(c.Request().Context(), tenantID, projectID, c.Param("id"), actor)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": result})
+}
+
+func (ctrl *MCPConnectionController) OAuthStatus(c echo.Context) error {
+	if ctrl.oauth == nil {
+		return domain.NewInternal("OAuth lifecycle is not configured")
+	}
+	tenantID, projectID, err := mcpScope(c)
+	if err != nil {
+		return err
+	}
+	result, err := ctrl.oauth.Status(c.Request().Context(), tenantID, projectID, c.Param("id"))
 	if err != nil {
 		return err
 	}

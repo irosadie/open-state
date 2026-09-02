@@ -8,17 +8,21 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	appservices "github.com/irosadie/open-state/api/internal/application/services"
 	"github.com/irosadie/open-state/api/internal/domain/capability"
 	domaincap "github.com/irosadie/open-state/api/internal/domain/capability"
 	"github.com/irosadie/open-state/api/internal/domain/engine"
+	domainsvc "github.com/irosadie/open-state/api/internal/domain/services"
 	capinfra "github.com/irosadie/open-state/api/internal/infrastructure/capability"
 	"github.com/irosadie/open-state/api/internal/infrastructure/config"
 	infradb "github.com/irosadie/open-state/api/internal/infrastructure/database"
 	engineadapter "github.com/irosadie/open-state/api/internal/infrastructure/engineadapter"
 	infralog "github.com/irosadie/open-state/api/internal/infrastructure/logging"
+	inframetrics "github.com/irosadie/open-state/api/internal/infrastructure/metrics"
 	raginfra "github.com/irosadie/open-state/api/internal/infrastructure/rag"
+	infratrace "github.com/irosadie/open-state/api/internal/infrastructure/tracing"
 	mcpapi "github.com/irosadie/open-state/api/internal/interfaces/mcp"
 )
 
@@ -36,6 +40,16 @@ func main() {
 
 	logger := infralog.New(infralog.Config{Format: cfg.LogFormat, Level: cfg.LogLevel})
 	slog.SetDefault(logger)
+	traceShutdown := infratrace.Setup(context.Background(), infratrace.Config{OTLPEndpoint: cfg.OTel.OTLPEndpoint, ServiceName: cfg.OTel.ServiceName}, logger)
+	defer func() { _ = traceShutdown(context.Background()) }()
+	var metricsRegistry *inframetrics.Registry
+	if cfg.MetricsEnabled {
+		metricsRegistry = inframetrics.New()
+	}
+	var auditMetrics appservices.AuditMetrics
+	if metricsRegistry != nil {
+		auditMetrics = metricsRegistry
+	}
 
 	ctx := context.Background()
 	pool, err := config.NewPool(ctx, cfg.DatabaseURL)
@@ -48,6 +62,7 @@ func main() {
 	// Composed persistence adapter (ADR-001): provides the repository interfaces
 	// the orchestrator and context compiler depend on.
 	adapter := infradb.NewPostgresAdapter(pool)
+	auditWriter := appservices.NewAuditWriter(adapter.Audit(), logger, auditMetrics)
 
 	// Engine adapter + runtime engine: wires the domain state machine into the
 	// MCP propose/current-state path (PRD 170).
@@ -105,7 +120,21 @@ func main() {
 	// The secure gateway uses the same trusted transport adapter as the MCP
 	// connection admin service. It resolves the connection and exact discovered
 	// tool from project bindings before this adapter can call a provider.
-	mcpGatewayProvider := capinfra.NewMCPConnectionTester(nil, capinfra.EnvCredentialResolver{Prefix: "CRED_"}, 10*time.Second)
+	secretStore := mcpSecretStore(cfg)
+	egressPolicy, err := capinfra.NewEgressPolicy(cfg.MCP.Egress.Mode, cfg.MCP.Egress.Schemes, cfg.MCP.Egress.Ports, cfg.MCP.Egress.AllowedHosts, cfg.MCP.Egress.AllowedCIDRs, cfg.MCP.Egress.AllowLocalDev, cfg.MCP.Egress.AllowPrivate)
+	if err != nil {
+		logger.Error("MCP egress policy error", "error", err.Error())
+		return
+	}
+	stdioProfiles, err := capinfra.ParseTrustedStdioProfiles(cfg.MCP.STDIOProfilesJSON)
+	if err != nil {
+		logger.Error("MCP STDIO profile error", "error", err.Error())
+		return
+	}
+	mcpGatewayProvider := capinfra.NewMCPConnectionTester(stdioProfiles, capinfra.EnvCredentialResolver{Prefix: "CRED_"}, 10*time.Second, capinfra.WithSecretStore(secretStore), capinfra.WithEgressPolicy(egressPolicy))
+	oauthSvc := appservices.NewMCPOAuthService(adapter.MCPConnections(), adapter.MCPOAuthTransactions(), secretStore, capinfra.NewHTTPMCPOAuthClient(egressPolicy), auditWriter)
+	mcpGatewayProvider.SetOAuthAccessTokenProvider(oauthSvc)
+	mcpGatewayProviderResilient := appservices.NewMCPResilientProvider(mcpGatewayProvider, adapter.MCPConnections(), auditWriter, metricsRegistry)
 	mcpGateway := appservices.NewMCPGatewayService(
 		orchestrator,
 		adapter.Capabilities(),
@@ -115,7 +144,7 @@ func main() {
 		adapter.CapabilityEvidence(),
 		adapter.Context(),
 		adapter.Workflows(),
-		mcpGatewayProvider,
+		mcpGatewayProviderResilient,
 		capinfra.JSONSchemaValidator{},
 		invoker,
 		10*time.Second,
@@ -154,10 +183,24 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ready","server":"openstate"}`))
 	})
+	if metricsRegistry != nil {
+		mux.Handle("/metrics", promhttp.HandlerFor(metricsRegistry.Prometheus(), promhttp.HandlerOpts{}))
+	}
 
 	addr := ":" + port
 	logger.Info("MCP server listening", "addr", addr, "endpoint", "/mcp")
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		logger.Error("MCP server error", "error", err.Error())
+	}
+}
+
+func mcpSecretStore(cfg *config.Config) domainsvc.SecretStore {
+	switch cfg.MCP.SecretStore {
+	case "environment":
+		return capinfra.EnvironmentSecretStore{Resolver: capinfra.EnvCredentialResolver{Prefix: "CRED_"}}
+	case "production":
+		return capinfra.ProductionSecretStore{}
+	default:
+		return capinfra.NewCompositeSecretStore("CRED_")
 	}
 }

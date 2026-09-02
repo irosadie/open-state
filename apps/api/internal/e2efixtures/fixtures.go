@@ -25,6 +25,7 @@ const (
 
 	ProjectID          = "20000000-0000-0000-0000-000000000001"
 	BuilderWorkflowID  = "30000000-0000-0000-0000-000000000001"
+	BuilderIntentID    = "60000000-0000-0000-0000-000000000001"
 	InvalidWorkflowID  = "30000000-0000-0000-0000-000000000002"
 	StaleWorkflowID    = "30000000-0000-0000-0000-000000000003"
 	RuntimeWorkflowID  = "30000000-0000-0000-0000-000000000004"
@@ -146,6 +147,9 @@ func Seed(ctx context.Context, pool *pgxpool.Pool, password string) error {
 	if err := insertBuilderVersions(ctx, tx); err != nil {
 		return err
 	}
+	if err := insertIntentFixtures(ctx, tx); err != nil {
+		return err
+	}
 	if err := insertRuntimeFixtures(ctx, tx); err != nil {
 		return err
 	}
@@ -155,6 +159,22 @@ func Seed(ctx context.Context, pool *pgxpool.Pool, password string) error {
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit fixture seed: %w", err)
+	}
+	return nil
+}
+
+func insertIntentFixtures(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO intents
+			(id, tenant_id, project_id, workflow_id, intent_key, name, description, examples)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'BOOKING_PADEL',
+			'Booking Padel', 'Routes a padel court booking request to the Builder workflow.',
+			$5::jsonb)
+	`, BuilderIntentID, TenantA, ProjectID, BuilderWorkflowID, `[
+		"saya mau order lapangan",
+		"saya mau booking lapangan padel"
+	]`); err != nil {
+		return fmt.Errorf("insert fixture intent: %w", err)
 	}
 	return nil
 }

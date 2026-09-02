@@ -25,6 +25,8 @@ Structure conventions:
 | Web Auth | `http://localhost:3020/api/auth/*` | NextAuth route handler for session and credentials flow |
 | Web Proxy | `http://localhost:3020/api/proxy/*` | Internal proxy for all browser requests to backend |
 | API | `http://localhost:8020` | HTTP API for root and health check |
+| State MCP | `http://localhost:8030/mcp` | API-key protected state gate and secure MCP gateway |
+| Provider mock | `http://localhost:8031/mcp` | Optional local third-party MCP used only by OpenState in secure mode |
 | Worker | n/a | Idle worker scaffold for background runtime |
 | PostgreSQL | `postgresql://postgres:postgres@127.0.0.1:5437/openstate?schema=public` | Local OpenState database |
 | Redis | `redis://127.0.0.1:6381` | Local OpenState broker |
@@ -66,6 +68,11 @@ Repo does not use root `.env` as source of truth. Env is managed per app.
 | --- | --- | --- | --- |
 | `API_PORT` | no | `8020` | HTTP API port |
 | `DATABASE_URL` | no | `postgresql://postgres:postgres@127.0.0.1:5437/openstate?schema=public` | Default local PostgreSQL for OpenState |
+| `MCP_SECRET_STORE` | no | `composite` | Protected reference adapter; use a production Vault/KMS adapter in hosted deployments |
+| `MCP_EGRESS_MODE` | no | `production` | Use `development` with explicit local-dev allowance for the provider mock |
+| `MCP_EGRESS_PORTS` | no | `443` | Allowed outbound ports, e.g. `8031,443` locally |
+| `MCP_EGRESS_ALLOW_LOCAL_DEV` | no | `false` | Enables loopback only in development mode |
+| `MCP_STDIO_PROFILES_JSON` | no | empty | Reviewed deployment-owned STDIO profiles |
 
 ### `apps/worker/.env.example`
 
@@ -213,6 +220,17 @@ injects events.
 
 The backend Admin Console routes are documented in `docs/openapi/paths/admin.json`
 and are merged into `docs/openapi.json` with `bun run openapi:generate`.
+
+### MCP connection operations
+
+The Admin Console MCP page is project-scoped. Operators can register remote
+HTTP/SSE or reviewed STDIO profiles, refresh a sanitized tool catalog, bind tools
+to state capabilities, run a handshake diagnostic, inspect health, reset a
+circuit, rotate/revoke bearer credentials, and connect/disconnect OAuth.
+
+The browser receives lifecycle status only. Credential values, secret references,
+authorization codes, OAuth state/verifiers, tokens, provider headers, and raw
+provider payloads are not returned or persisted in frontend state.
 
 ## Prisma Workflow
 

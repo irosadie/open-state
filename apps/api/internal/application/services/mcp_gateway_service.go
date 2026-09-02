@@ -210,7 +210,8 @@ func (s *MCPGatewayService) Execute(ctx context.Context, req GatewayInvocationRe
 		return nil, gatewayUnavailable("capability idempotency state is unavailable")
 	}
 
-	call, err := s.provider.InvokeTool(ctx, connection, tool, req.Payload, s.timeout)
+	callCtx := domainservices.WithMCPCallOptions(ctx, domainservices.MCPCallOptions{CorrelationID: req.CorrelationID, IdempotencyKey: req.IdempotencyKey, Idempotent: req.IdempotencyKey != ""})
+	call, err := s.provider.InvokeTool(callCtx, connection, tool, req.Payload, s.timeout)
 	if err != nil {
 		s.recordFailedEvidence(ctx, req, projectID, stateID, resolved, binding, err)
 		return nil, safeGatewayError(err)

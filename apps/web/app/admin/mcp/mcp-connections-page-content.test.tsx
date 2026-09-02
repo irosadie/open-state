@@ -4,12 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   useCreateMCPConnection,
   useDeleteMCPConnection,
+  useDiagnoseMCPConnection,
   useDisableMCPConnection,
+  useDisconnectMCPOAuth,
   useEnableMCPConnection,
   useListMCPConnections,
   useListMCPTools,
   useRefreshMCPTools,
+  useResetMCPConnectionHealth,
   useSetMCPToolEnabled,
+  useStartMCPOAuth,
   useTestMCPConnection,
   useUpdateMCPConnection,
 } from "$/hooks/transactions/use-mcp-connection"
@@ -32,12 +36,16 @@ vi.mock("$/hooks/transactions/use-project", () => ({
 vi.mock("$/hooks/transactions/use-mcp-connection", () => ({
   useCreateMCPConnection: vi.fn(),
   useDeleteMCPConnection: vi.fn(),
+  useDiagnoseMCPConnection: vi.fn(),
+  useDisconnectMCPOAuth: vi.fn(),
   useDisableMCPConnection: vi.fn(),
   useEnableMCPConnection: vi.fn(),
   useListMCPConnections: vi.fn(),
   useListMCPTools: vi.fn(),
   useRefreshMCPTools: vi.fn(),
+  useResetMCPConnectionHealth: vi.fn(),
   useSetMCPToolEnabled: vi.fn(),
+  useStartMCPOAuth: vi.fn(),
   useTestMCPConnection: vi.fn(),
   useUpdateMCPConnection: vi.fn(),
 }))
@@ -77,6 +85,10 @@ beforeEach(() => {
   vi.mocked(useDisableMCPConnection).mockReturnValue(mutation as never)
   vi.mocked(useEnableMCPConnection).mockReturnValue(mutation as never)
   vi.mocked(useTestMCPConnection).mockReturnValue(mutation as never)
+  vi.mocked(useDiagnoseMCPConnection).mockReturnValue(mutation as never)
+  vi.mocked(useResetMCPConnectionHealth).mockReturnValue(mutation as never)
+  vi.mocked(useStartMCPOAuth).mockReturnValue(mutation as never)
+  vi.mocked(useDisconnectMCPOAuth).mockReturnValue(mutation as never)
   vi.mocked(useRefreshMCPTools).mockReturnValue(mutation as never)
   vi.mocked(useSetMCPToolEnabled).mockReturnValue(mutation as never)
 })

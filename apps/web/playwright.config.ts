@@ -17,12 +17,14 @@ const serverEnv = {
   NODE_ENV: "test",
   DATABASE_URL: databaseURL,
   JWT_SECRET: testSecret,
+  MCP_API_KEY_PEPPER: testSecret,
   NEXTAUTH_SECRET: testSecret,
   NEXTAUTH_URL: baseURL,
   NEXT_PUBLIC_APP_URL: baseURL,
   NEXT_PUBLIC_API_URL: apiURL,
   NEXT_PUBLIC_TENANT_ID:
     process.env.NEXT_PUBLIC_TENANT_ID ?? "00000000-0000-0000-0000-0000000000a1",
+  NEXT_DIST_DIR: ".next-e2e",
   API_URL: apiURL,
   PORT: String(apiPort),
   METRICS_ENABLED: "false",
@@ -61,7 +63,7 @@ export default defineConfig({
       env: serverEnv,
     },
     {
-      command: "exec bun run dev",
+      command: `exec bunx next dev --port ${webPort}`,
       cwd: resolve(repoRoot, "apps/web"),
       url: baseURL,
       timeout: 120_000,

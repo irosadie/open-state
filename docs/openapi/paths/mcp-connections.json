@@ -94,6 +94,108 @@
       "responses": { "200": { "description": "Connection disabled", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
     }
   },
+  "/api/projects/{projectId}/mcp-connections/{id}/diagnose": {
+    "post": {
+      "tags": ["Admin Console"], "summary": "Run a safe MCP connection diagnostic", "description": "Runs the bounded handshake test and updates safe health metadata. It never returns credentials or provider payloads.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "Safe diagnostic result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/reset-health": {
+    "post": {
+      "tags": ["Admin Console"], "summary": "Reset MCP connection health", "description": "Clears circuit and failure counters without changing credentials or connection configuration.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "Health reset", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/credentials/rotate": {
+    "post": {
+      "tags": ["Admin Console"], "summary": "Rotate a bearer credential", "description": "Stores a replacement bearer credential in the configured secret store and revokes the previous reference. The value is write-only.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["credentialValue"], "properties": { "credentialValue": { "type": "string", "writeOnly": true } } } } } },
+      "responses": { "200": { "description": "Credential rotated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" }, "409": { "$ref": "#/components/schemas/ConflictError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/credentials/revoke": {
+    "post": {
+      "tags": ["Admin Console"], "summary": "Revoke a bearer credential", "description": "Revokes the protected secret and removes its connection reference. Subsequent gateway calls fail closed until a new credential is configured.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "Credential revoked", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" }, "409": { "$ref": "#/components/schemas/ConflictError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/credentials/status": {
+    "get": {
+      "tags": ["Admin Console"], "summary": "Get safe credential status", "description": "Returns lifecycle status only. Secret values and protected references are never returned.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "Credential status", "content": { "application/json": { "schema": { "type": "object", "properties": { "data": { "type": "object", "required": ["status", "credentialStatus", "canRotate", "canRevoke"], "properties": { "status": { "type": "string", "enum": ["configured", "missing", "revoked"] }, "credentialStatus": { "type": "string" }, "canRotate": { "type": "boolean" }, "canRevoke": { "type": "boolean" } } } } } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/oauth/start": {
+    "post": {
+      "tags": ["Admin Console"], "summary": "Start MCP OAuth authorization", "description": "Creates a short-lived state and PKCE transaction. Only the authorization URL and safe lifecycle metadata are returned.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "OAuth authorization URL", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPOAuthStartResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "409": { "$ref": "#/components/schemas/ConflictError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/oauth/callback": {
+    "get": {
+      "tags": ["Admin Console"], "summary": "Complete MCP OAuth authorization", "description": "Validates one-time state and PKCE, exchanges the authorization code server-side, and persists protected token references.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "state", "in": "query", "required": true, "schema": { "type": "string" } },
+        { "name": "code", "in": "query", "required": true, "schema": { "type": "string" } }
+      ],
+      "responses": { "200": { "description": "OAuth connection", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/oauth/disconnect": {
+    "post": {
+      "tags": ["Admin Console"], "summary": "Disconnect MCP OAuth", "description": "Revokes locally stored token artifacts and clears their references without returning token material.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "OAuth disconnected", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPConnectionResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
+  "/api/projects/{projectId}/mcp-connections/{id}/oauth/status": {
+    "get": {
+      "tags": ["Admin Console"], "summary": "Get safe MCP OAuth status", "description": "Returns OAuth lifecycle status and expiry only; token artifacts and references are never returned.",
+      "parameters": [
+        { "name": "X-Tenant-ID", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "responses": { "200": { "description": "OAuth status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MCPOAuthStatusResponse" } } } }, "401": { "$ref": "#/components/schemas/UnauthorizedError" }, "403": { "$ref": "#/components/schemas/ForbiddenError" }, "404": { "$ref": "#/components/schemas/NotFoundError" } }
+    }
+  },
   "/api/projects/{projectId}/mcp-connections/{id}/tools": {
     "get": {
       "tags": ["Admin Console"],

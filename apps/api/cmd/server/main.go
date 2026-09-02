@@ -115,8 +115,21 @@ func main() {
 	projectSvc := services.NewProjectService(adapter.Projects())
 	simulationSvc := services.NewSimulationService()
 	apiKeySvc := services.NewAPIKeyService(adapter.APIKeys(), adapter.Projects(), auditWriter, cfg.MCPAPIKeyPepper)
-	mcpConnectionTester := infracap.NewMCPConnectionTester(nil, infracap.EnvCredentialResolver{Prefix: "CRED_"}, 10*time.Second)
-	mcpConnectionSvc := services.NewMCPConnectionService(adapter.MCPConnections(), adapter.Projects(), mcpConnectionTester, auditWriter)
+	secretStore := mcpSecretStore(cfg)
+	egressPolicy, err := infracap.NewEgressPolicy(cfg.MCP.Egress.Mode, cfg.MCP.Egress.Schemes, cfg.MCP.Egress.Ports, cfg.MCP.Egress.AllowedHosts, cfg.MCP.Egress.AllowedCIDRs, cfg.MCP.Egress.AllowLocalDev, cfg.MCP.Egress.AllowPrivate)
+	if err != nil {
+		logger.Error("MCP egress policy error", "error", err.Error())
+		return
+	}
+	stdioProfiles, err := infracap.ParseTrustedStdioProfiles(cfg.MCP.STDIOProfilesJSON)
+	if err != nil {
+		logger.Error("MCP STDIO profile error", "error", err.Error())
+		return
+	}
+	mcpConnectionTester := infracap.NewMCPConnectionTester(stdioProfiles, infracap.EnvCredentialResolver{Prefix: "CRED_"}, 10*time.Second, infracap.WithSecretStore(secretStore), infracap.WithEgressPolicy(egressPolicy))
+	oauthSvc := services.NewMCPOAuthService(adapter.MCPConnections(), adapter.MCPOAuthTransactions(), secretStore, infracap.NewHTTPMCPOAuthClient(egressPolicy), auditWriter)
+	mcpConnectionTester.SetOAuthAccessTokenProvider(oauthSvc)
+	mcpConnectionSvc := services.NewMCPConnectionService(adapter.MCPConnections(), adapter.Projects(), mcpConnectionTester, auditWriter, secretStore)
 	mcpToolCatalogSvc := services.NewMCPToolCatalogService(adapter.MCPConnections(), adapter.MCPToolCatalog(), mcpConnectionTester, auditWriter)
 	projectMCPBindingSvc := services.NewProjectCapabilityMCPBindingService(adapter.ProjectMCPBindings(), adapter.Capabilities(), adapter.MCPConnections(), adapter.MCPToolCatalog(), adapter.Projects(), auditWriter)
 	// Builder API service (workflow-definition drafts + publish + versions, PRD 146)
@@ -164,7 +177,7 @@ func main() {
 	adminRuntimeCtrl := controllers.NewAdminRuntimeController(adminRuntimeSvc)
 	runtimeInspectorCtrl := controllers.NewRuntimeInspectorController(runtimeInspectorSvc)
 	apiKeyCtrl := controllers.NewAPIKeyController(apiKeySvc)
-	mcpConnectionCtrl := controllers.NewMCPConnectionController(mcpConnectionSvc)
+	mcpConnectionCtrl := controllers.NewMCPConnectionController(mcpConnectionSvc, oauthSvc)
 	mcpToolCatalogCtrl := controllers.NewMCPToolCatalogController(mcpToolCatalogSvc)
 	projectMCPBindingCtrl := controllers.NewProjectCapabilityMCPBindingController(projectMCPBindingSvc)
 
@@ -193,5 +206,16 @@ func main() {
 	logger.Info("starting server", "port", cfg.Port)
 	if err := e.Start(":" + cfg.Port); err != nil {
 		logger.Error("server error", "error", err.Error())
+	}
+}
+
+func mcpSecretStore(cfg *config.Config) domainsvc.SecretStore {
+	switch cfg.MCP.SecretStore {
+	case "environment":
+		return infracap.EnvironmentSecretStore{Resolver: infracap.EnvCredentialResolver{Prefix: "CRED_"}}
+	case "production":
+		return infracap.ProductionSecretStore{}
+	default:
+		return infracap.NewCompositeSecretStore("CRED_")
 	}
 }

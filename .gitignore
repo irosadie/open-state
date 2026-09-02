@@ -4,6 +4,7 @@ node_modules
 # outputs
 dist
 .next
+.next-e2e
 .turbo
 coverage
 *.tsbuildinfo

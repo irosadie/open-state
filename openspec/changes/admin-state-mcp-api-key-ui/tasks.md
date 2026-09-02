@@ -32,5 +32,5 @@
 
 - [x] 3.1 Add schema, hook, and page tests for successful and denied flows.
 - [x] 3.2 Run frontend tests, typecheck, lint, and production build.
-- [ ] 3.3 Validate the OpenSpec change and perform an authenticated local smoke
+- [x] 3.3 Validate the OpenSpec change and perform an authenticated local smoke
   test against `/api/api-keys`.

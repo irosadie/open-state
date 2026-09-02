@@ -8,7 +8,13 @@ import { pathVariable } from "@openstate/utils"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { AxiosError } from "axios"
 
-type Action = "enable" | "disable" | "test" | "delete"
+type Action =
+  | "enable"
+  | "disable"
+  | "test"
+  | "diagnose"
+  | "resetHealth"
+  | "delete"
 type Variables = { projectId: string; id: string }
 
 const useMCPConnectionAction = (action: Action) => {
@@ -40,4 +46,7 @@ const useMCPConnectionAction = (action: Action) => {
 export const useEnableMCPConnection = () => useMCPConnectionAction("enable")
 export const useDisableMCPConnection = () => useMCPConnectionAction("disable")
 export const useTestMCPConnection = () => useMCPConnectionAction("test")
+export const useDiagnoseMCPConnection = () => useMCPConnectionAction("diagnose")
+export const useResetMCPConnectionHealth = () =>
+  useMCPConnectionAction("resetHealth")
 export const useDeleteMCPConnection = () => useMCPConnectionAction("delete")
