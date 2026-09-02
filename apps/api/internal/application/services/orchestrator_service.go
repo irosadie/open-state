@@ -3,6 +3,9 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,15 +25,26 @@ import (
 // degrades to the append/merge behavior so non-engine callers and tests keep
 // working.
 type OrchestratorService struct {
-	instances   repositories.IInstanceRepository
-	events      repositories.IEventRepository
-	context     repositories.IContextRepository
-	capabs      repositories.ICapabilityRepository
-	workflows   repositories.IWorkflowRepository
-	evidence    repositories.ICapabilityEvidenceRepository
-	mcpBindings repositories.IProjectCapabilityMCPBindingRepository
-	engine      *engine.Engine
-	now         func() time.Time
+	instances     repositories.IInstanceRepository
+	events        repositories.IEventRepository
+	context       repositories.IContextRepository
+	capabs        repositories.ICapabilityRepository
+	workflows     repositories.IWorkflowRepository
+	evidence      repositories.ICapabilityEvidenceRepository
+	mcpBindings   repositories.IProjectCapabilityMCPBindingRepository
+	engine        *engine.Engine
+	now           func() time.Time
+	idempotencyMu sync.Mutex
+}
+
+const (
+	mcpWorkflowStartScope = "mcp.workflow.start"
+	mcpEventProposalScope = "mcp.event.proposal"
+)
+
+type mcpIdempotencyOutcome struct {
+	InstanceID string `json:"instanceId,omitempty"`
+	EventID    string `json:"eventId,omitempty"`
 }
 
 // SetProjectCapabilityMCPBindings wires the project-scoped binding repository
@@ -94,6 +108,9 @@ func NewEngineOrchestratorService(
 // If workflowVersionID is empty, the current published version is resolved automatically.
 func (s *OrchestratorService) StartWorkflow(ctx context.Context, tenantID, workflowID, workflowVersionID, correlationKey string) (*entities.WorkflowInstance, error) {
 	if workflowVersionID == "" {
+		if _, err := uuid.Parse(workflowID); err != nil {
+			return nil, domain.NewValidation("workflow_id must be a valid UUID returned by resolve_intent")
+		}
 		if s.workflows == nil {
 			return nil, domain.NewValidation("workflow_version_id is required (no workflow repository configured)")
 		}
@@ -126,6 +143,54 @@ func (s *OrchestratorService) StartWorkflow(ctx context.Context, tenantID, workf
 		return nil, err
 	}
 	return s.instances.UpdateStatus(ctx, tenantID, created.ID, entities.WorkflowInstanceRunning, started.Version)
+}
+
+// StartWorkflowWithIdempotency is the durable retry-safe entry point used by
+// secure MCP clients. The legacy StartWorkflow method remains unchanged for
+// callers that do not provide an idempotency key.
+func (s *OrchestratorService) StartWorkflowWithIdempotency(ctx context.Context, tenantID, workflowID, workflowVersionID, correlationKey, idempotencyKey string) (*entities.WorkflowInstance, bool, error) {
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if idempotencyKey == "" {
+		instance, err := s.StartWorkflow(ctx, tenantID, workflowID, workflowVersionID, correlationKey)
+		return instance, false, err
+	}
+	if s.events == nil {
+		return nil, false, domain.NewInternal("workflow start idempotency is unavailable")
+	}
+
+	s.idempotencyMu.Lock()
+	defer s.idempotencyMu.Unlock()
+
+	record, found, err := s.findMCPIdempotency(ctx, tenantID, idempotencyKey, mcpWorkflowStartScope)
+	if err != nil {
+		return nil, false, err
+	}
+	if found {
+		var outcome mcpIdempotencyOutcome
+		if err := json.Unmarshal(record.Payload, &outcome); err != nil || outcome.InstanceID == "" {
+			return nil, false, domain.NewInternal("workflow start idempotency result is invalid")
+		}
+		instance, err := s.instances.FindByID(ctx, tenantID, outcome.InstanceID)
+		return instance, true, err
+	}
+
+	instance, err := s.StartWorkflow(ctx, tenantID, workflowID, workflowVersionID, correlationKey)
+	if err != nil {
+		return nil, false, err
+	}
+	payload, err := json.Marshal(mcpIdempotencyOutcome{InstanceID: instance.ID})
+	if err != nil {
+		return nil, false, domain.NewInternal("workflow start idempotency result is invalid")
+	}
+	if _, err := s.events.UpsertIdempotency(ctx, tenantID, repositories.UpsertIdempotencyInput{
+		IdempotencyKey: idempotencyKey,
+		Scope:          mcpWorkflowStartScope,
+		ResultStatus:   entities.IdempotencyResultProcessed,
+		Payload:        payload,
+	}); err != nil {
+		return nil, false, domain.NewInternal("workflow started but retry protection could not be persisted")
+	}
+	return instance, false, nil
 }
 
 // SuspendWorkflow pauses a running instance (PRD 42-43).
@@ -281,6 +346,63 @@ func (s *OrchestratorService) ReplayState(ctx context.Context, tenantID, instanc
 // state (PRD 38, §34). Without an engine, it falls back to appending the event to
 // history and marking the instance active.
 func (s *OrchestratorService) ProposeEvent(ctx context.Context, tenantID, instanceID, eventType string, payload map[string]any, correlationID string) (*entities.Event, error) {
+	return s.proposeEvent(ctx, tenantID, instanceID, eventType, payload, correlationID, "")
+}
+
+// ProposeEventWithIdempotency is the durable retry-safe entry point used by
+// secure MCP clients. A repeated key returns the original event instead of
+// running the state transition again.
+func (s *OrchestratorService) ProposeEventWithIdempotency(ctx context.Context, tenantID, instanceID, eventType string, payload map[string]any, correlationID, idempotencyKey string) (*entities.Event, bool, error) {
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if idempotencyKey == "" {
+		event, err := s.ProposeEvent(ctx, tenantID, instanceID, eventType, payload, correlationID)
+		return event, false, err
+	}
+	if s.events == nil {
+		return nil, false, domain.NewInternal("event proposal idempotency is unavailable")
+	}
+
+	s.idempotencyMu.Lock()
+	defer s.idempotencyMu.Unlock()
+
+	record, found, err := s.findMCPIdempotency(ctx, tenantID, idempotencyKey, mcpEventProposalScope)
+	if err != nil {
+		return nil, false, err
+	}
+	if found {
+		var outcome mcpIdempotencyOutcome
+		if err := json.Unmarshal(record.Payload, &outcome); err != nil || outcome.EventID == "" {
+			return nil, false, domain.NewInternal("event proposal idempotency result is invalid")
+		}
+		if outcome.InstanceID != "" {
+			if event, findErr := s.findEventByIdempotency(ctx, tenantID, outcome.InstanceID, idempotencyKey); findErr == nil {
+				return event, true, nil
+			}
+		}
+		event, err := s.events.FindEventByID(ctx, tenantID, outcome.EventID)
+		return event, true, err
+	}
+
+	event, err := s.proposeEvent(ctx, tenantID, instanceID, eventType, payload, correlationID, idempotencyKey)
+	if err != nil {
+		return nil, false, err
+	}
+	payloadBytes, err := json.Marshal(mcpIdempotencyOutcome{InstanceID: instanceID, EventID: event.EventID})
+	if err != nil {
+		return nil, false, domain.NewInternal("event proposal idempotency result is invalid")
+	}
+	if _, err := s.events.UpsertIdempotency(ctx, tenantID, repositories.UpsertIdempotencyInput{
+		IdempotencyKey: idempotencyKey,
+		Scope:          mcpEventProposalScope,
+		ResultStatus:   entities.IdempotencyResultProcessed,
+		Payload:        payloadBytes,
+	}); err != nil {
+		return nil, false, domain.NewInternal("event applied but retry protection could not be persisted")
+	}
+	return event, false, nil
+}
+
+func (s *OrchestratorService) proposeEvent(ctx context.Context, tenantID, instanceID, eventType string, payload map[string]any, correlationID, idempotencyKey string) (*entities.Event, error) {
 	if eventType == "" {
 		return nil, domain.NewValidation("event type is required")
 	}
@@ -304,13 +426,26 @@ func (s *OrchestratorService) ProposeEvent(ctx context.Context, tenantID, instan
 			WorkflowInstanceID: instanceID,
 			Payload:            payload,
 			Timestamp:          time.Now().UTC(),
+			IdempotencyKey:     idempotencyKey,
 		}
 		// The engine loads the instance, evaluates guards, transitions, and persists.
 		next, _, err := s.engine.ProcessEvent(ctx, tenantID, instanceID, evt)
 		if err != nil {
 			return nil, err
 		}
-		_ = next
+		if next == nil {
+			if idempotencyKey != "" {
+				if existing, findErr := s.findEventByIdempotency(ctx, tenantID, instanceID, idempotencyKey); findErr == nil {
+					return existing, nil
+				}
+			}
+			return nil, domain.NewConflict("event was already processed")
+		}
+		if next.Status == engine.InstanceCompleted {
+			if _, err := s.instances.UpdateStatus(ctx, tenantID, instanceID, entities.WorkflowInstanceCompleted, next.Version); err != nil {
+				return nil, err
+			}
+		}
 		return &entities.Event{
 			ID:                 evt.ID,
 			EventID:            evt.ID,
@@ -348,7 +483,44 @@ func (s *OrchestratorService) ProposeEvent(ctx context.Context, tenantID, instan
 		CausationID:        nil,
 		IdempotencyKey:     nil,
 	}
+	if idempotencyKey != "" {
+		evt.IdempotencyKey = &idempotencyKey
+	}
 	return s.events.Append(ctx, tenantID, evt)
+}
+
+func (s *OrchestratorService) findMCPIdempotency(ctx context.Context, tenantID, key, expectedScope string) (*entities.IdempotencyRecord, bool, error) {
+	record, err := s.events.FindIdempotency(ctx, tenantID, key)
+	if err != nil {
+		var domainErr *domain.DomainError
+		if errors.As(err, &domainErr) && domainErr.Code == domain.ErrNotFound {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if record == nil {
+		return nil, false, nil
+	}
+	if record.Scope != expectedScope {
+		return nil, false, domain.NewConflict("idempotency key is already used by another operation")
+	}
+	if record.ResultStatus != entities.IdempotencyResultProcessed {
+		return nil, false, domain.NewConflict("idempotency key has no successful outcome")
+	}
+	return record, true, nil
+}
+
+func (s *OrchestratorService) findEventByIdempotency(ctx context.Context, tenantID, instanceID, key string) (*entities.Event, error) {
+	events, err := s.events.ListEventsByInstance(ctx, tenantID, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range events {
+		if events[i].IdempotencyKey.Valid && events[i].IdempotencyKey.String == key {
+			return &events[i], nil
+		}
+	}
+	return nil, domain.NewNotFound("event not found")
 }
 
 // validateCapabilityEvidence enforces the State MCP gate for external MCP

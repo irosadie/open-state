@@ -155,7 +155,11 @@ func (e *Engine) ProcessEvent(ctx context.Context, tenantID, instanceID string, 
 
 	now := e.now()
 	instance.CurrentStateID = target.ID
-	instance.Status = InstanceRunning
+	if target.IsTerminal || target.Kind == NodeKindEnd {
+		instance.Status = InstanceCompleted
+	} else {
+		instance.Status = InstanceRunning
+	}
 	instance.Version++
 
 	if err := e.repos.Instances.UpdateWithVersion(ctx, instance, instance.Version-1); err != nil {

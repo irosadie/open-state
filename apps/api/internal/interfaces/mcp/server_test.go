@@ -29,6 +29,21 @@ func testDeps() Dependencies {
 
 type fakeOrchestrator struct{}
 
+type fakeIdempotentOrchestrator struct{ fakeOrchestrator }
+
+func (fakeIdempotentOrchestrator) StartWorkflowWithIdempotency(context.Context, string, string, string, string, string) (*entities.WorkflowInstance, bool, error) {
+	return &entities.WorkflowInstance{ID: "instance-1", Status: entities.WorkflowInstanceRunning}, true, nil
+}
+
+func (fakeIdempotentOrchestrator) ProposeEventWithIdempotency(context.Context, string, string, string, map[string]any, string, string) (*entities.Event, bool, error) {
+	return &entities.Event{
+		ID:       "db-event-id",
+		EventID:  "stable-event-id",
+		Type:     "consultation.requested",
+		Sequence: 4,
+	}, true, nil
+}
+
 type mcpTraceRepo struct {
 	entries []entities.RuntimeTraceEntry
 }
@@ -510,5 +525,35 @@ func TestMCPRuntimeBoundaryRecordsOnlyApplicationMetadata(t *testing.T) {
 	}
 	if _, ok := entry.Attributes["raw_response"]; ok {
 		t.Fatal("raw provider data should not be part of an application boundary")
+	}
+}
+
+func TestSecureProposeEventReturnsStableEventIDOnReplay(t *testing.T) {
+	deps := testDeps()
+	deps.GatewayMode = appservices.MCPGatewayModeSecure
+	deps.Orchestrator = fakeIdempotentOrchestrator{}
+	result, err := handleProposeEvent(context.Background(), deps, "tenant-1", mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]any{
+				"instance":       "instance-1",
+				"type":           "consultation.requested",
+				"correlationId":  "conversation-1",
+				"idempotencyKey": "event-retry-1",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("propose event: %v", err)
+	}
+	content, ok := result.Content[0].(mcp.TextContent)
+	if !ok {
+		t.Fatalf("expected text content, got %T", result.Content[0])
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(content.Text), &payload); err != nil {
+		t.Fatalf("decode event response: %v", err)
+	}
+	if payload["eventId"] != "stable-event-id" || payload["reused"] != true {
+		t.Fatalf("unexpected replay response: %#v", payload)
 	}
 }

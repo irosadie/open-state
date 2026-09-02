@@ -1,0 +1,10 @@
+{
+  "extends": "doctor.json",
+  "provider": { "name": "doctor-provider-mock-error" },
+  "tools": [
+    {
+      "name": "doctor.lookup",
+      "error": { "code": "doctor_catalog_unavailable", "message": "The mock doctor catalog is temporarily unavailable." }
+    }
+  ]
+}

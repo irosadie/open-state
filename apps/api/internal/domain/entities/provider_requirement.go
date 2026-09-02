@@ -18,6 +18,8 @@ type ProviderRequirement struct {
 	OutputMapping     map[string]string `json:"outputMapping,omitempty"`
 	Status            string            `json:"status,omitempty"`
 	Error             string            `json:"error,omitempty"`
+	HardStop          bool              `json:"hardStop,omitempty"`
+	NextAction        string            `json:"nextAction,omitempty"`
 }
 
 // Validate checks the metadata that is required to safely direct an LLM to a

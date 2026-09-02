@@ -232,6 +232,34 @@ function resultText(result: ToolData | { code: string; message: string }) {
     : textResult(result)
 }
 
+function inputSchemaFor(tool: ProviderToolScenario): Record<string, unknown> {
+  // Static fixture tools intentionally return a canned catalog response. Keep
+  // them permissive so callers can pass the search context they collected
+  // without the mock rejecting it before the scenario handler runs.
+  const properties = tool.inputSchema.properties
+  const required = tool.inputSchema.required
+  const hasNoProperties =
+    properties === undefined ||
+    (typeof properties === "object" &&
+      properties !== null &&
+      !Array.isArray(properties) &&
+      Object.keys(properties).length === 0)
+  const hasNoRequiredFields =
+    required === undefined || (Array.isArray(required) && required.length === 0)
+
+  if (
+    tool.operation === "static" &&
+    tool.inputSchema.type === "object" &&
+    tool.inputSchema.additionalProperties === false &&
+    hasNoProperties &&
+    hasNoRequiredFields
+  ) {
+    return { ...tool.inputSchema, additionalProperties: true }
+  }
+
+  return tool.inputSchema
+}
+
 export async function createProviderMock(
   scenario: ProviderScenario,
 ): Promise<ProviderMock> {
@@ -247,7 +275,7 @@ export async function createProviderMock(
       {
         description: tool.description,
         inputSchema: fromJsonSchema<Record<string, unknown>>(
-          tool.inputSchema as JsonSchemaType,
+          inputSchemaFor(tool) as JsonSchemaType,
         ),
       },
       async (args) => executeTool(tool, store, args),

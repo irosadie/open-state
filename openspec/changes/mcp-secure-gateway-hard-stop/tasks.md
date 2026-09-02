@@ -1,0 +1,6 @@
+- [x] 1. Add structured hard-stop metadata and distinct safe mapping/provider failure codes to secure gateway responses.
+- [x] 2. Update secure MCP initialization instructions and tool descriptions to prohibit fallback capabilities, broader scopes, and transitions after failure.
+- [x] 3. Add idempotency-key fields to secure `start_workflow` and `propose_event` tools and route them through backward-compatible orchestrator methods.
+- [x] 4. Persist and replay workflow/event outcomes using the tenant-scoped idempotency ledger.
+- [x] 5. Add backend/provider-mock regression tests for hard-stop projections, state-only authorization, repeated state-changing operations, and static provider calls carrying context.
+- [x] 6. Validate the OpenSpec change and run targeted Go/provider-mock tests, vet, and build.

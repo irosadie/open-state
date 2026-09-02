@@ -186,7 +186,11 @@ func handleInvokeCapability(ctx context.Context, deps Dependencies, tenant strin
 // by MCPGatewayService from the current state and project binding.
 func handleGatewayInvokeCapability(ctx context.Context, deps Dependencies, tenant string, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if deps.Gateway == nil {
-		return toolUnavailable("enforced MCP gateway is not configured")
+		return mcp.NewToolResultJSON(secureGatewayFailure(
+			capability.ErrorKindUnavailable,
+			"capability.gateway_unavailable",
+			"enforced MCP gateway is not configured",
+		))
 	}
 	args := getArgs(req)
 	payload := map[string]any{}
@@ -204,17 +208,45 @@ func handleGatewayInvokeCapability(ctx context.Context, deps Dependencies, tenan
 	if err != nil {
 		var ce *capability.CapabilityError
 		if errors.As(err, &ce) {
-			return mcp.NewToolResultJSON(map[string]any{
-				"ok": false, "invoked": false, "kind": ce.Kind, "code": ce.Code, "message": ce.Message,
-			})
+			return mcp.NewToolResultJSON(secureGatewayFailure(ce.Kind, ce.Code, ce.Message))
 		}
-		return mcp.NewToolResultJSON(map[string]any{
-			"ok": false, "invoked": false, "kind": "UNAVAILABLE", "code": "capability.gateway_unavailable", "message": "capability gateway is unavailable",
-		})
+		return mcp.NewToolResultJSON(secureGatewayFailure(
+			capability.ErrorKindUnavailable,
+			"capability.gateway_unavailable",
+			"capability gateway is unavailable",
+		))
 	}
 	return mcp.NewToolResultJSON(map[string]any{
 		"ok": true, "invoked": true, "instanceId": result.InstanceID, "stateId": result.StateID,
 		"capability": result.CapabilityName, "status": result.Status, "reused": result.Reused, "data": result.Data,
+		"nextAction": "CONTINUE",
+	})
+}
+
+// secureGatewayFailure is deliberately prescriptive. An LLM must be able to
+// distinguish a blocked gateway call from a successful provider result without
+// interpreting a safe error message as permission to search another scope.
+func secureGatewayFailure(kind capability.ErrorKind, code, message string) map[string]any {
+	return map[string]any{
+		"ok":         false,
+		"invoked":    false,
+		"hardStop":   true,
+		"nextAction": "STOP",
+		"kind":       kind,
+		"code":       code,
+		"message":    message,
+	}
+}
+
+func secureMutationFailure(code, message string) (*mcp.CallToolResult, error) {
+	return mcp.NewToolResultJSON(map[string]any{
+		"ok":         false,
+		"invoked":    false,
+		"hardStop":   true,
+		"nextAction": "STOP",
+		"kind":       capability.ErrorKindValidation,
+		"code":       code,
+		"message":    message,
 	})
 }
 
@@ -483,38 +515,99 @@ func handleProposeEvent(ctx context.Context, deps Dependencies, tenantID string,
 	args := getArgs(req)
 	instanceID := str(args, "instance")
 	eventType := str(args, "type")
+	correlationID := strings.TrimSpace(str(args, "correlationId"))
+	idempotencyKey := strings.TrimSpace(str(args, "idempotencyKey"))
+	if deps.GatewayMode == appservices.MCPGatewayModeSecure {
+		if correlationID == "" {
+			return secureMutationFailure("state.correlation_required", "correlationId is required for secure event proposals")
+		}
+		if idempotencyKey == "" {
+			return secureMutationFailure("state.idempotency_required", "idempotencyKey is required for secure event proposals")
+		}
+	}
 	payload := map[string]any{}
 	if raw, ok := args["payload"]; ok {
 		if m, ok := raw.(map[string]any); ok {
 			payload = m
 		}
 	}
-	evt, err := deps.Orchestrator.ProposeEvent(ctx, tenantID, instanceID, eventType, payload, "")
+	var (
+		evt    *entities.Event
+		reused bool
+		err    error
+	)
+	if idempotencyKey != "" {
+		idempotent, ok := deps.Orchestrator.(IdempotentOrchestratorPort)
+		if !ok {
+			if deps.GatewayMode == appservices.MCPGatewayModeSecure {
+				return secureMutationFailure("state.idempotency_unavailable", "secure event idempotency is not configured")
+			}
+		} else {
+			evt, reused, err = idempotent.ProposeEventWithIdempotency(ctx, tenantID, instanceID, eventType, payload, correlationID, idempotencyKey)
+		}
+	}
+	if evt == nil && err == nil {
+		evt, err = deps.Orchestrator.ProposeEvent(ctx, tenantID, instanceID, eventType, payload, correlationID)
+	}
 	if err != nil {
 		recordRuntimeTraceError(ctx, deps, tenantID, instanceID, entities.RuntimeTraceStageEventHandling, err)
 		return toolError(err)
+	}
+	eventID := evt.EventID
+	if eventID == "" {
+		eventID = evt.ID
 	}
 	recordRuntimeTrace(ctx, deps, tenantID, instanceID, appservices.TraceRecordInput{
 		Stage:  entities.RuntimeTraceStageEventHandling,
 		Status: entities.RuntimeTraceStatusSucceeded,
 		Attributes: map[string]any{
-			"event_id":   evt.ID,
+			"event_id":   eventID,
 			"event_type": eventType,
 		},
 	})
 	return mcp.NewToolResultJSON(map[string]any{
 		"ok":        true,
-		"eventId":   evt.ID,
+		"eventId":   eventID,
 		"eventType": evt.Type,
 		"sequence":  evt.Sequence,
+		"reused":    reused,
 	})
 }
 
 func handleStartWorkflow(ctx context.Context, deps Dependencies, tenantID, workflowID, versionID, correlation string) (*mcp.CallToolResult, error) {
+	return handleStartWorkflowWithIdempotency(ctx, deps, tenantID, workflowID, versionID, correlation, "")
+}
+
+func handleStartWorkflowRequest(ctx context.Context, deps Dependencies, tenantID string, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(req)
+	return handleStartWorkflowWithIdempotency(ctx, deps, tenantID, str(args, "workflow"), str(args, "version"), str(args, "correlation"), strings.TrimSpace(str(args, "idempotencyKey")))
+}
+
+func handleStartWorkflowWithIdempotency(ctx context.Context, deps Dependencies, tenantID, workflowID, versionID, correlation, idempotencyKey string) (*mcp.CallToolResult, error) {
 	if deps.Orchestrator == nil {
 		return toolUnavailable("orchestrator not configured")
 	}
-	inst, err := deps.Orchestrator.StartWorkflow(ctx, tenantID, workflowID, versionID, correlation)
+	if deps.GatewayMode == appservices.MCPGatewayModeSecure && idempotencyKey == "" {
+		return secureMutationFailure("state.idempotency_required", "idempotencyKey is required for secure workflow starts")
+	}
+	var (
+		inst   *entities.WorkflowInstance
+		reused bool
+		err    error
+	)
+	if idempotencyKey != "" {
+		idempotent, ok := deps.Orchestrator.(IdempotentOrchestratorPort)
+		if !ok {
+			if deps.GatewayMode == appservices.MCPGatewayModeSecure {
+				return secureMutationFailure("state.idempotency_unavailable", "secure workflow start idempotency is not configured")
+			}
+		} else {
+			inst, reused, err = idempotent.StartWorkflowWithIdempotency(ctx, tenantID, workflowID, versionID, correlation, idempotencyKey)
+		}
+	}
+	if inst == nil && err == nil {
+		inst, err = deps.Orchestrator.StartWorkflow(ctx, tenantID, workflowID, versionID, correlation)
+	}
 	if err != nil {
 		return toolError(err)
 	}
@@ -531,6 +624,7 @@ func handleStartWorkflow(ctx context.Context, deps Dependencies, tenantID, workf
 		"ok":         true,
 		"instanceId": inst.ID,
 		"status":     inst.Status,
+		"reused":     reused,
 	})
 }
 

@@ -26,12 +26,17 @@ Examples:
 
 Each workflow consists of states, transitions, events, guards, policies, context requirements, and capability references.
 
-The platform sits between the user's conversation and external AI/tooling systems:
+The platform sits between the user's conversation and external AI/tooling
+systems. The LLM connects to OpenState's State MCP, which is the authoritative
+state controller and, in secure gateway mode, the only MCP endpoint exposed to
+the LLM:
 
 ```text
 User
   ↓
-LLM
+3rd-party LLM
+  ↓
+State MCP (OpenState control plane / gateway)
   ↓
 Conversation Orchestrator
   ├── Workflow Resolver
@@ -40,15 +45,21 @@ Conversation Orchestrator
   ├── Policy Engine
   ├── Event Engine
   └── Capability Resolver
-        ├── MCP
-        └── RAG
+        ├── RAG (optional external service)
+        └── Internal MCP Gateway
+              ↓
+          Registered Provider MCP
   ↓
-LLM
+3rd-party LLM
   ↓
 User
 ```
 
-RAG and MCP are **not owned by this platform**.
+RAG and external Provider MCPs are **not owned by this platform**. State MCP is
+an OpenState-owned integration surface that enforces workflow state and routes
+authorized capabilities to registered Provider MCPs. Provider endpoints,
+credentials, aliases, catalogs, and raw provider responses remain outside the
+LLM contract.
 
 The platform only integrates with them through well-defined contracts.
 
@@ -65,10 +76,11 @@ The responsibilities are strictly separated:
 | Component          | Responsibility                                                                |
 | ------------------ | ----------------------------------------------------------------------------- |
 | LLM                | Understand language, infer intent, generate responses, propose events/actions |
+| State MCP          | Expose the state contract and enforce the provider gateway                   |
 | State Orchestrator | Authoritative workflow/state decision                                         |
 | State Builder      | Define workflows visually                                                     |
 | RAG                | Retrieve knowledge                                                            |
-| MCP                | Execute external capabilities/tools                                           |
+| Provider MCP       | Execute external capabilities/tools behind the State MCP gateway             |
 | PostgreSQL         | Persistent source of truth                                                    |
 | Redis              | Cache/hot runtime coordination                                                |
 | Event Bus          | Asynchronous event transport                                                  |
@@ -753,9 +765,11 @@ Transitions
 
 # 16. Capability Model
 
-The State Builder does NOT own MCP connections.
+The State Builder does NOT own provider MCP connections or provider execution.
 
-The Builder only references capabilities.
+The Builder references logical capabilities. Provider MCP connections are
+registered and managed per project in the Admin Console. Their discovered tool
+catalogs are bound to logical capabilities before a workflow can use them.
 
 Example:
 
@@ -771,9 +785,9 @@ Registry:
 ```text
 payment.create
     ↓
-provider = MCP
-server = payment-service
-function = create_payment
+project MCP binding
+    ├── connection = payment-service
+    └── discovered tool = create_payment
 ```
 
 This separation is mandatory.
@@ -782,7 +796,7 @@ This separation is mandatory.
 
 # 17. Capability Resolution
 
-Runtime:
+Runtime in secure gateway mode:
 
 ```text
 State
@@ -791,9 +805,11 @@ required capability
   ↓
 Capability Registry
   ↓
-provider
+Project MCP Binding
+  ↓ registered connection + discovered tool
+Internal MCP Gateway
   ↓
-MCP
+Provider MCP
 ```
 
 The State Builder never stores:
@@ -803,6 +819,11 @@ The State Builder never stores:
 * tokens
 * connection pools
 * network configuration
+* provider endpoints
+* provider authentication headers
+
+The LLM receives only the logical capability and its schema. It never selects a
+provider URL, provider alias, or concrete provider tool in secure mode.
 
 Those belong to the runtime/integration layer.
 
@@ -872,23 +893,36 @@ Those belong to RAG.
 
 # 20. MCP Integration
 
-MCP remains standalone.
+External Provider MCPs remain independently deployable and are integrated
+through OpenState's internal capability gateway. State MCP is the platform's
+external MCP surface for the LLM.
 
-The Orchestrator may invoke MCP through its capability abstraction.
+The recommended production flow is:
 
 Example:
 
 ```text
-PAYMENT
+LLM
+    ↓ State MCP: invoke_capability
+State Engine validates current state and capability
     ↓
-payment.status
+Capability Registry + project MCP binding
     ↓
-Capability Registry
+Internal MCP Gateway
     ↓
-MCP
-    ↓
-payment.status()
+Registered Provider MCP: payment.status()
 ```
+
+In secure mode, `invoke_capability` accepts only workflow instance context,
+logical capability, correlation/idempotency fields, and capability input.
+OpenState derives the project binding, provider connection, and exact
+discovered tool internally. Provider URLs, credentials, aliases, catalogs, and
+raw provider errors are never returned to the LLM.
+
+An advisory mode may temporarily support the legacy two-MCP host flow, where
+the LLM connects to a Provider MCP and reports its normalized result back to
+State MCP. Advisory mode is not a security boundary and must not be used when
+OpenState is required to be the mandatory gatekeeper.
 
 MCP results may produce events.
 
@@ -2209,7 +2243,8 @@ Therefore runtime behavior is reproducible.
 
 # 59. Capability Registry
 
-Registry belongs to the Orchestrator.
+The logical capability registry belongs to the Orchestrator. A capability is
+not a provider endpoint and is not directly selectable by the LLM.
 
 Conceptual structure:
 
@@ -2224,6 +2259,20 @@ Capability
 ├── status
 └── version
 ```
+
+The executable MCP route is resolved through a project-scoped binding:
+
+```text
+ProjectCapabilityMCPBinding
+├── project_id
+├── capability_id
+├── connection_id
+└── discovered_tool_name
+```
+
+Any retained `provider_id` or `provider_tool` metadata is server-side
+compatibility metadata. Secure gateway requests must not supply or override
+provider routing fields.
 
 Provider types may include:
 
@@ -2240,7 +2289,7 @@ MCP is the primary integration.
 
 # 60. Capability Binding
 
-Capabilities may be bound at:
+Logical capabilities may be authorized at:
 
 ```text
 tenant
@@ -2261,6 +2310,24 @@ State Permission
 ```
 
 The most restrictive policy wins.
+
+When the capability is implemented by an external MCP, its executable provider
+binding is always selected within the active project:
+
+```text
+Tenant
+  ↓
+Project
+  ↓
+Logical Capability
+  ↓
+Registered MCP Connection
+  ↓
+Discovered + enabled Provider Tool
+```
+
+The State Builder selects the logical capability. It does not expose provider
+URLs, credentials, or arbitrary tool names to the workflow author or LLM.
 
 ---
 
@@ -2284,6 +2351,10 @@ Actual credentials belong to secure infrastructure.
 
 Environment variables, secret manager, Vault, cloud secret store, etc. may be used.
 
+Provider authentication is configured on the project MCP connection and is
+resolved only by the internal gateway. The LLM never receives provider
+credentials or authentication headers.
+
 ---
 
 # 62. Capability Security
@@ -2293,18 +2364,28 @@ Before invocation:
 ```text
 authenticate
 ↓
-authorize tenant
+resolve tenant and project from authenticated State MCP context
 ↓
-authorize workflow
+load current workflow instance and state
 ↓
-authorize state
+authorize capability for active state
+↓
+resolve project MCP binding
+↓
+verify connection and discovered tool health
 ↓
 validate input schema
 ↓
-rate limit
+rate limit and idempotency check
 ↓
-invoke
+invoke Provider MCP internally
+↓
+record evidence and result
 ```
+
+The secure gateway must fail closed when any state, capability, binding,
+connection, tool, credential, or health check is missing or invalid. Provider
+routing is never trusted from the LLM request.
 
 ---
 
@@ -4332,32 +4413,35 @@ Exact expected flow:
 # 153. Critical Runtime Flow — MCP Action
 
 ```text
-LLM requests capability
+LLM calls State MCP: invoke_capability
         ↓
-Orchestrator receives request
+State MCP authenticates API key and derives tenant/project
         ↓
-Validate active state
+Load workflow instance and current state
         ↓
-Check capability allowed
+Check capability is declared and allowed by active state
         ↓
-Check tenant permission
+Validate input schema and idempotency
         ↓
-Validate input schema
+Resolve capability registry and project MCP binding
         ↓
-Check idempotency
+Resolve registered connection and discovered tool
         ↓
-Resolve capability registry
+Invoke Provider MCP internally
         ↓
-Resolve MCP provider
+Normalize result and record capability evidence
         ↓
-Invoke MCP
+Return safe result to LLM
         ↓
-Normalize result
+LLM proposes event through State MCP
         ↓
-Generate event/result
-        ↓
-Process event
+State Engine validates and processes event
 ```
+
+The secure gateway request contains no provider URL, provider alias, concrete
+provider tool, credential, or authentication header. A provider result alone
+never authorizes a transition; the State MCP evidence and state engine remain
+authoritative.
 
 ---
 
@@ -4827,29 +4911,39 @@ This lets enterprise users replace infrastructure.
 
 ---
 
-# 170. LLM Integration Boundary (3rd-Party via MCP)
+# 170. LLM Integration Boundary (3rd-Party via State MCP)
 
 The platform does **not** call an LLM internally. In the primary architecture,
-the **LLM is a 3rd-party system** (owned by the customer/client) that consumes the
-platform's **MCP server** as its integration surface.
+the **LLM is a 3rd-party system** (owned by the customer/client) that consumes
+OpenState's **State MCP** as its only integration surface in secure gateway
+mode.
 
 ```text
 3rd-party LLM (customer-owned)
-    ↓  invokes MCP tools
-MCP Server (platform output)
+    ↓  invokes State MCP tools
+State MCP (platform output)
     ↓
 State Orchestrator
+    ↓ internal capability gateway when required
+Registered Provider MCP
 ```
 
 Consequences:
 
-* The platform exposes a **stable MCP tool contract** (`resolve_intent`,
-  `get_active_workflow`, `get_context`, `invoke_capability`, ...) that any
-  LLM/RAG client can call.
+* The platform exposes a **stable State MCP tool contract** (`list_intents`,
+  `resolve_intent`, `get_active_workflow`, `get_context`,
+  `invoke_capability`, ...) that any LLM client can call.
+* In secure mode, the LLM calls `invoke_capability` with a logical capability;
+  State MCP resolves the active state and project binding, then invokes the
+  exact Provider MCP tool internally.
+* Provider MCP connections are registered per project. Their credentials,
+  endpoints, aliases, catalogs, and tool routing are never exposed to the LLM.
 * Intent classification, entity extraction, event proposal, and response
   generation are performed by the **3rd-party LLM**, not the platform.
 * The platform does **not** hardcode or manage an internal LLM provider; it
   remains LLM-agnostic by exposing MCP rather than consuming an LLM SDK.
+* Advisory mode may retain a direct two-MCP compatibility flow during
+  migration, but it is not an enforcement or security boundary.
 * A future `LLMProvider` abstraction (platform-initiated LLM calls) is **out of
   scope** unless a built-in LLM feature is later required; it is not part of the
   current architecture.
@@ -4878,9 +4972,13 @@ Use:
 CapabilityProvider
 ```
 
-MCP is one implementation.
+The internal gateway uses `CapabilityProvider` to invoke the registered
+Provider MCP connection. MCP is one provider implementation; State MCP is the
+stable external contract consumed by the LLM.
 
-This ensures the core engine remains MCP-agnostic while MCP remains the primary production integration.
+This ensures the core engine remains MCP-agnostic while the gateway keeps
+provider transport, authentication, discovery, resilience, and routing behind
+the project-scoped binding.
 
 ---
 
@@ -4967,10 +5065,16 @@ RAG:
 standalone
 ```
 
-MCP:
+State MCP:
 
 ```text
-standalone
+public control plane and secure gateway
+```
+
+Provider MCPs:
+
+```text
+independently deployable data/side-effect services
 ```
 
 LLM:
@@ -5001,9 +5105,12 @@ PostgreSQL
 Redis
 Event Bus
 
-RAG
-MCP
-LLM
+3rd-party LLM
+    ↓
+State MCP gateway
+    ↓ internal
+Registered Provider MCPs
+RAG (optional external service)
 ```
 
 Each component scales independently where necessary.
@@ -5151,7 +5258,7 @@ The platform must NOT become:
 ```text
 ❌ a vector database
 ❌ a RAG implementation
-❌ an MCP server implementation
+❌ a general-purpose Provider MCP implementation
 ❌ an LLM provider
 ❌ an ERP
 ❌ an order management system
@@ -5172,9 +5279,9 @@ The final mental model should remain:
                          USER
                            │
                            ▼
-                          LLM
+                  3rd-party LLM
                            │
-                    intent / action
+                    State MCP tools
                            │
                            ▼
               ┌────────────────────────┐
@@ -5194,15 +5301,19 @@ The final mental model should remain:
                 ┌─────────┼──────────┐
                 │         │          │
                 ▼         ▼          ▼
-              Memory     RAG        MCP
-                         │          │
-                         │          │
-                         └────┬─────┘
-                              ▼
-                             LLM
-                              │
-                              ▼
-                             USER
+              RAG (optional)  Internal MCP Gateway
+                                     │
+                                     ▼
+                             Registered Provider MCPs
+                                     │
+                                     ▼
+                              capability result
+                                     │
+                                     ▼
+                               State MCP / LLM
+                                     │
+                                     ▼
+                                    USER
 ```
 
 ---
@@ -5238,9 +5349,15 @@ RAG
     owns:
         knowledge retrieval
 
-MCP
-    owns:
+    State MCP
+        owns:
+        external state-control contract
+        gateway authorization and provider routing
+
+    Provider MCP
+        owns:
         external capability execution
+        provider-specific data and side effects
 
 LLM
     owns:
@@ -5273,9 +5390,14 @@ That separation is the foundation of the entire system.
 
 **The LLM can suggest.
 The State Engine decides.
-The MCP executes.
+The State MCP gates.
+The Provider MCP executes.
 The RAG informs.
 PostgreSQL remembers.**
+
+In secure gateway mode, the LLM never connects directly to a Provider MCP and
+never chooses a provider endpoint, alias, or concrete tool. OpenState validates
+the active state and project binding before every provider invocation.
 
 That rule must remain true throughout the entire implementation.
 
@@ -5544,13 +5666,14 @@ User returns:
 
 System does NOT blindly trust the LLM.
 
-It invokes:
+The LLM requests the logical capability through State MCP. The secure gateway
+validates the active state and project binding, then invokes internally:
 
 ```text
 payment.status
 ```
 
-MCP returns:
+Provider MCP returns:
 
 ```text
 SUCCESS
@@ -5575,7 +5698,7 @@ Throughout the entire process:
 
 ```text
 RAG remains standalone.
-MCP remains standalone.
+Provider MCPs remain independently deployable behind the State MCP gateway.
 LLM never owns state.
 PostgreSQL remains authoritative.
 Workflow version remains immutable.

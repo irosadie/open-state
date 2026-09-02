@@ -1,0 +1,11 @@
+{
+  "extends": "doctor.json",
+  "provider": { "name": "doctor-provider-mock-timeout" },
+  "tools": [
+    {
+      "name": "schedule.check",
+      "delayMs": 250,
+      "result": { "schedule_available": true, "schedule_id": "sch-timeout-001", "doctor_id": "doc-001" }
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "extends": "doctor.json",
+  "provider": { "name": "doctor-provider-mock-happy" },
+  "tools": [
+    {
+      "name": "schedule.check",
+      "result": {
+        "doctor_id": "doc-001",
+        "doctor_name": "Dr. Andi Kurniawan, Internal Medicine Specialist",
+        "requested_date": "2026-09-02",
+        "requested_time": "10:00",
+        "schedule_available": true,
+        "reason": "The requested consultation slot is available.",
+        "practice_hours": "09:00 - 17:00",
+        "schedule_id": "sch-happy-001",
+        "quota_remaining": 5
+      }
+    },
+    {
+      "name": "queue.check",
+      "result": {
+        "doctor_id": "doc-001",
+        "schedule_id": "sch-happy-001",
+        "time": "10:00",
+        "queue_available": true,
+        "current_queue": 2,
+        "max_queue": 10,
+        "quota_remaining": 5
+      }
+    }
+  ],
+  "data": {
+    "schedules": [
+      {
+        "schedule_id": "sch-happy-001",
+        "doctor_id": "doc-001",
+        "doctor_name": "Dr. Andi Kurniawan, Internal Medicine Specialist",
+        "date": "2026-09-02",
+        "time": "10:00",
+        "available": true,
+        "quota_remaining": 5
+      },
+      {
+        "schedule_id": "sch-happy-002",
+        "doctor_id": "doc-001",
+        "doctor_name": "Dr. Andi Kurniawan, Internal Medicine Specialist",
+        "date": "2026-09-02",
+        "time": "11:00",
+        "available": true,
+        "quota_remaining": 3
+      }
+    ],
+    "reservations": [],
+    "appointments": [],
+    "payments": [],
+    "notifications": []
+  }
+}

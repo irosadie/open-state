@@ -169,6 +169,14 @@ func (r *instanceRepo) UpdateWithVersion(ctx context.Context, inst *engine.Workf
 	if err != nil {
 		return err
 	}
+	stateStatus := entities.StateInstanceActive
+	if inst.Status == engine.InstanceCompleted {
+		stateStatus = entities.StateInstanceCompleted
+	}
+	state, err = r.a.instances.UpdateStateInstanceStatus(ctx, inst.TenantID, state.ID, stateStatus, state.Version)
+	if err != nil {
+		return err
+	}
 
 	if err := r.a.q.SetCurrentStateInstance(ctx, db.SetCurrentStateInstanceParams{
 		ID:                     mustUUID(inst.ID),

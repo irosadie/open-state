@@ -1,0 +1,23 @@
+{
+  "extends": "doctor.json",
+  "provider": { "name": "doctor-provider-mock-payment-failed" },
+  "tools": [
+    {
+      "name": "doctor.payment.create",
+      "error": { "code": "payment_declined", "message": "The mock payment provider rejected this doctor appointment payment." }
+    },
+    {
+      "name": "doctor.payment.verify",
+      "error": { "code": "payment_verification_failed", "message": "The mock payment provider could not verify this doctor appointment payment." }
+    }
+  ],
+  "data": {
+    "schedules": [
+      { "schedule_id": "sch-payment-001", "doctor_id": "doc-001", "doctor_name": "Dr. Andi Kurniawan, Internal Medicine Specialist", "date": "2026-09-02", "time": "10:00", "available": true, "quota_remaining": 5 }
+    ],
+    "reservations": [],
+    "appointments": [],
+    "payments": [],
+    "notifications": []
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "extends": "doctor.json",
+  "provider": { "name": "doctor-provider-mock-notification-failed" },
+  "tools": [
+    {
+      "name": "doctor.notification.send",
+      "error": { "code": "notification_delivery_failed", "message": "The mock notification provider could not deliver the appointment confirmation." }
+    },
+    {
+      "name": "notification.send_confirmation",
+      "error": { "code": "notification_delivery_failed", "message": "The mock notification provider could not deliver the appointment confirmation." }
+    }
+  ],
+  "data": {
+    "schedules": [
+      { "schedule_id": "sch-notification-001", "doctor_id": "doc-001", "doctor_name": "Dr. Andi Kurniawan, Internal Medicine Specialist", "date": "2026-09-02", "time": "10:00", "available": true, "quota_remaining": 5 }
+    ],
+    "reservations": [],
+    "appointments": [],
+    "payments": [],
+    "notifications": []
+  }
+}

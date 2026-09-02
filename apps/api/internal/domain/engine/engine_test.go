@@ -77,8 +77,8 @@ func cloneInstance(i *WorkflowInstance) *WorkflowInstance {
 }
 
 type fakeEventRepo struct {
-	events     []*Event
-	processed  map[string]bool
+	events    []*Event
+	processed map[string]bool
 }
 
 func (f *fakeEventRepo) Append(_ context.Context, evt *Event) error {
@@ -244,6 +244,36 @@ func TestProcessEventHappyPath(t *testing.T) {
 	}
 	if inst2.CurrentStateID != "confirm" {
 		t.Errorf("expected confirm, got %q", inst2.CurrentStateID)
+	}
+}
+
+func TestProcessEventTerminalMarksInstanceCompleted(t *testing.T) {
+	repos := newFakeRepos()
+	def := &WorkflowDefinition{
+		Slug: "terminal", ProjectID: "project", EntryNodeID: "start",
+		Nodes: []WorkflowNode{
+			{ID: "start", Kind: NodeKindStart, Name: "START"},
+			{ID: "done", Kind: NodeKindEnd, Name: "DONE", IsTerminal: true},
+		},
+		Transitions: []TransitionDefinition{{
+			ID: "finish", SourceStateID: "start", Event: "finish", TargetStateID: "done", Priority: 1,
+		}},
+	}
+	if err := repos.Workflows.Save(context.Background(), def); err != nil {
+		t.Fatalf("save workflow: %v", err)
+	}
+	eng := NewEngine(repos)
+	inst, err := eng.StartWorkflow(context.Background(), "tenant", "project", "conversation", def, "workflow.started")
+	if err != nil {
+		t.Fatalf("start workflow: %v", err)
+	}
+
+	completed, _, err := eng.ProcessEvent(context.Background(), "tenant", inst.ID, &Event{ID: "finish-1", Type: "finish", Source: SourceMCP})
+	if err != nil {
+		t.Fatalf("finish workflow: %v", err)
+	}
+	if completed.Status != InstanceCompleted {
+		t.Fatalf("expected COMPLETED, got %s", completed.Status)
 	}
 }
 

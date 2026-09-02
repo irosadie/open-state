@@ -99,6 +99,10 @@ func requirementsForCapabilities(ctx context.Context, deps Dependencies, tenantI
 		if !bindingResolved && req.Status == "PENDING" {
 			req.Status = "MISSING_MAPPING"
 		}
+		if req.Status == "MISSING_MAPPING" || req.Status == "UNAVAILABLE" {
+			req.HardStop = true
+			req.NextAction = "STOP"
+		}
 		out = append(out, req)
 	}
 	return out, nil

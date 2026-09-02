@@ -155,6 +155,17 @@ describe("MCP provider mock", () => {
         expect(doctors[0]).toMatchObject({
           specialization: "Internal Medicine",
         })
+
+        const contextualLookup = await client.callTool({
+          arguments: { specialty: "Cardiology", location: "Jakarta" },
+          name: "doctor.lookup",
+        })
+        expect(contextualLookup.isError).not.toBe(true)
+        expect(
+          structuredData(contextualLookup.structuredContent),
+        ).toMatchObject({
+          doctor: { id: "doc-001" },
+        })
       })
     })
   })
@@ -370,6 +381,403 @@ describe("MCP provider mock", () => {
           name: "doctor.book",
         })
         expect(duplicate.isError).toBe(true)
+      })
+    })
+  })
+
+  test("runs the complete doctor happy path with dynamic identifiers", async () => {
+    await withApp("doctor-happy.json", async (app) => {
+      await withClient(app, async (client) => {
+        const { tools } = await client.listTools()
+        expect(tools.map((tool) => tool.name)).toContain("schedule.check")
+        expect(tools.map((tool) => tool.name)).toContain("booking.reserve")
+
+        const lookup = await client.callTool({
+          arguments: {},
+          name: "doctor.lookup",
+        })
+        expect(structuredData(lookup.structuredContent)).toMatchObject({
+          doctor: { id: "doc-001", specialization: "Internal Medicine" },
+        })
+
+        const catalog = await client.callTool({
+          arguments: {},
+          name: "catalog.doctor_list",
+        })
+        expect(arrayData(catalog.structuredContent, "doctors")).toHaveLength(5)
+
+        const availability = await client.callTool({
+          arguments: {},
+          name: "schedule.check",
+        })
+        const availabilityData = structuredData(availability.structuredContent)
+        expect(availabilityData).toMatchObject({
+          schedule_available: true,
+          schedule_id: "sch-happy-001",
+        })
+        const scheduleId = stringData(
+          availability.structuredContent,
+          "schedule_id",
+        )
+
+        const queue = await client.callTool({
+          arguments: {},
+          name: "queue.check",
+        })
+        expect(structuredData(queue.structuredContent)).toMatchObject({
+          queue_available: true,
+          schedule_id: scheduleId,
+        })
+
+        const reservation = await client.callTool({
+          arguments: { schedule_id: scheduleId },
+          name: "booking.reserve",
+        })
+        const reservationId = stringData(
+          reservation.structuredContent,
+          "reservation_id",
+        )
+
+        const conflict = await client.callTool({
+          arguments: { schedule_id: scheduleId },
+          name: "booking.reserve",
+        })
+        expect(conflict.isError).toBe(true)
+        expect(conflict.content[0]).toMatchObject({
+          text: expect.stringContaining("schedule_conflict"),
+        })
+
+        const confirmed = await client.callTool({
+          arguments: { reservation_id: reservationId },
+          name: "booking.confirm",
+        })
+        const bookingId = stringData(confirmed.structuredContent, "booking_id")
+        expect(structuredData(confirmed.structuredContent)).toMatchObject({
+          status: "CONFIRMED",
+          payment_status: "PENDING",
+        })
+
+        const payment = await client.callTool({
+          arguments: { booking_id: bookingId },
+          name: "doctor.payment.create",
+        })
+        const paymentId = stringData(payment.structuredContent, "payment_id")
+        expect(paymentId).toBe("PAY-DOC-0001")
+
+        const duplicatePayment = await client.callTool({
+          arguments: { booking_id: bookingId },
+          name: "doctor.payment.create",
+        })
+        expect(duplicatePayment.isError).toBe(true)
+
+        const verified = await client.callTool({
+          arguments: { payment_id: paymentId },
+          name: "doctor.payment.verify",
+        })
+        expect(structuredData(verified.structuredContent)).toMatchObject({
+          status: "PAID",
+          booking_id: bookingId,
+        })
+
+        const notification = await client.callTool({
+          arguments: {
+            booking_id: bookingId,
+            message: "Your doctor appointment is confirmed.",
+          },
+          name: "doctor.notification.send",
+        })
+        expect(structuredData(notification.structuredContent)).toMatchObject({
+          status: "DELIVERED",
+          booking_id: bookingId,
+        })
+
+        const cancelled = await client.callTool({
+          arguments: { booking_id: bookingId },
+          name: "booking.cancel",
+        })
+        expect(structuredData(cancelled.structuredContent)).toMatchObject({
+          status: "CANCELLED",
+        })
+
+        const scheduleAfterCancel = await client.callTool({
+          arguments: {},
+          name: "doctor.schedule",
+        })
+        expect(
+          arrayData(scheduleAfterCancel.structuredContent, "schedules")[0],
+        ).toMatchObject({
+          schedule_id: scheduleId,
+          available: true,
+        })
+
+        const repeatedCancel = await client.callTool({
+          arguments: { booking_id: bookingId },
+          name: "booking.cancel",
+        })
+        expect(repeatedCancel.isError).toBe(true)
+
+        const directBooking = await client.callTool({
+          arguments: { schedule_id: "sch-happy-002" },
+          name: "doctor.book",
+        })
+        expect(structuredData(directBooking.structuredContent)).toMatchObject({
+          status: "CONFIRMED",
+        })
+        const duplicateDirectBooking = await client.callTool({
+          arguments: { schedule_id: "sch-happy-002" },
+          name: "doctor.book",
+        })
+        expect(duplicateDirectBooking.isError).toBe(true)
+      })
+    })
+  })
+
+  test("covers doctor catalog and availability outcomes", async () => {
+    await withApp("doctor-no-results.json", async (app) => {
+      await withClient(app, async (client) => {
+        const lookup = await client.callTool({
+          arguments: {},
+          name: "doctor.lookup",
+        })
+        expect(structuredData(lookup.structuredContent)).toMatchObject({
+          doctor: null,
+          found: false,
+        })
+
+        const search = await client.callTool({
+          arguments: {},
+          name: "doctor.search",
+        })
+        expect(arrayData(search.structuredContent, "doctors")).toHaveLength(0)
+
+        const recommendations = await client.callTool({
+          arguments: {},
+          name: "doctor.recommend",
+        })
+        expect(
+          arrayData(recommendations.structuredContent, "recommendations"),
+        ).toHaveLength(0)
+
+        const schedule = await client.callTool({
+          arguments: {},
+          name: "doctor.schedule",
+        })
+        expect(arrayData(schedule.structuredContent, "schedules")).toHaveLength(
+          0,
+        )
+      })
+    })
+
+    await withApp("doctor-unavailable.json", async (app) => {
+      await withClient(app, async (client) => {
+        const schedule = await client.callTool({
+          arguments: {},
+          name: "schedule.check",
+        })
+        expect(structuredData(schedule.structuredContent)).toMatchObject({
+          schedule_available: false,
+        })
+        expect(
+          arrayData(schedule.structuredContent, "alternatives"),
+        ).toHaveLength(2)
+
+        const unavailableReservation = await client.callTool({
+          arguments: { schedule_id: "sch-unavailable-001" },
+          name: "booking.reserve",
+        })
+        expect(unavailableReservation.isError).toBe(true)
+        expect(unavailableReservation.content[0]).toMatchObject({
+          text: expect.stringContaining("slot_unavailable"),
+        })
+      })
+    })
+
+    await withApp("doctor-queue-full.json", async (app) => {
+      await withClient(app, async (client) => {
+        const queue = await client.callTool({
+          arguments: {},
+          name: "queue.check",
+        })
+        expect(structuredData(queue.structuredContent)).toMatchObject({
+          queue_available: false,
+          next_available: "sch-queue-002",
+        })
+      })
+    })
+
+    await withApp("doctor-happy.json", async (app) => {
+      await withClient(app, async (client) => {
+        const missingSchedule = await client.callTool({
+          arguments: { schedule_id: "sch-missing" },
+          name: "booking.reserve",
+        })
+        expect(missingSchedule.isError).toBe(true)
+        expect(missingSchedule.content[0]).toMatchObject({
+          text: expect.stringContaining("schedule_not_found"),
+        })
+
+        const schedule = await client.callTool({
+          arguments: {},
+          name: "doctor.schedule",
+        })
+        expect(
+          arrayData(schedule.structuredContent, "schedules")[0],
+        ).toMatchObject({
+          schedule_id: "sch-happy-001",
+          available: true,
+        })
+      })
+    })
+  })
+
+  test("preserves a pre-existing doctor appointment on conflict", async () => {
+    await withApp("doctor-conflict.json", async (app) => {
+      await withClient(app, async (client) => {
+        const reservation = await client.callTool({
+          arguments: { schedule_id: "sch-conflict-001" },
+          name: "booking.reserve",
+        })
+        expect(reservation.isError).toBe(true)
+        expect(reservation.content[0]).toMatchObject({
+          text: expect.stringContaining("schedule_conflict"),
+        })
+
+        const directBooking = await client.callTool({
+          arguments: { schedule_id: "sch-conflict-001" },
+          name: "doctor.book",
+        })
+        expect(directBooking.isError).toBe(true)
+        expect(directBooking.content[0]).toMatchObject({
+          text: expect.stringContaining("schedule_conflict"),
+        })
+
+        const existingPayment = await client.callTool({
+          arguments: { booking_id: "BKGD-0401" },
+          name: "doctor.payment.create",
+        })
+        expect(structuredData(existingPayment.structuredContent)).toMatchObject(
+          {
+            booking_id: "BKGD-0401",
+            status: "PENDING",
+          },
+        )
+      })
+    })
+  })
+
+  test("exposes independent doctor payment and notification failures", async () => {
+    await withApp("doctor-payment-failed.json", async (app) => {
+      await withClient(app, async (client) => {
+        const reservation = await client.callTool({
+          arguments: { schedule_id: "sch-payment-001" },
+          name: "booking.reserve",
+        })
+        const reservationId = stringData(
+          reservation.structuredContent,
+          "reservation_id",
+        )
+        const appointment = await client.callTool({
+          arguments: { reservation_id: reservationId },
+          name: "booking.confirm",
+        })
+        const bookingId = stringData(
+          appointment.structuredContent,
+          "booking_id",
+        )
+
+        const payment = await client.callTool({
+          arguments: { booking_id: bookingId },
+          name: "doctor.payment.create",
+        })
+        expect(payment.isError).toBe(true)
+        expect(payment.content[0]).toMatchObject({
+          text: expect.stringContaining("payment_declined"),
+        })
+
+        const retry = await client.callTool({
+          arguments: { booking_id: bookingId },
+          name: "doctor.payment.create",
+        })
+        expect(retry.content[0]).toMatchObject({
+          text: expect.stringContaining("payment_declined"),
+        })
+      })
+    })
+
+    await withApp("doctor-notification-failed.json", async (app) => {
+      await withClient(app, async (client) => {
+        const booking = await client.callTool({
+          arguments: { schedule_id: "sch-notification-001" },
+          name: "doctor.book",
+        })
+        const bookingId = stringData(booking.structuredContent, "booking_id")
+        const notification = await client.callTool({
+          arguments: {
+            booking_id: bookingId,
+            message: "Your doctor appointment is confirmed.",
+          },
+          name: "doctor.notification.send",
+        })
+        expect(notification.isError).toBe(true)
+        expect(notification.content[0]).toMatchObject({
+          text: expect.stringContaining("notification_delivery_failed"),
+        })
+
+        const aliasNotification = await client.callTool({
+          arguments: {
+            booking_id: bookingId,
+            message: "Your doctor appointment is confirmed.",
+          },
+          name: "notification.send_confirmation",
+        })
+        expect(aliasNotification.isError).toBe(true)
+      })
+    })
+  })
+
+  test("keeps provider error, timeout, and malformed output observable", async () => {
+    await withApp("doctor-provider-error.json", async (app) => {
+      await withClient(app, async (client) => {
+        const result = await client.callTool({
+          arguments: {},
+          name: "doctor.lookup",
+        })
+        expect(result.isError).toBe(true)
+        expect(result.content[0]).toMatchObject({
+          text: expect.stringContaining("doctor_catalog_unavailable"),
+        })
+      })
+    })
+
+    await withApp("doctor-invalid-output.json", async (app) => {
+      await withClient(app, async (client) => {
+        const { tools } = await client.listTools()
+        expect(tools.map((tool) => tool.name)).toContain("doctor.lookup")
+        const result = await client.callTool({
+          arguments: {},
+          name: "doctor.lookup",
+        })
+        expect(structuredData(result.structuredContent)).toMatchObject({
+          doctor: "this should be an object",
+          status: "intentionally-invalid",
+        })
+      })
+    })
+
+    await withApp("doctor-timeout.json", async (app) => {
+      await withClient(app, async (client) => {
+        const call = client.callTool({
+          arguments: {},
+          name: "schedule.check",
+        })
+        const timedOut = await Promise.race([
+          call.then(() => false),
+          Bun.sleep(25).then(() => true),
+        ])
+        expect(timedOut).toBe(true)
+        expect(structuredData((await call).structuredContent)).toMatchObject({
+          schedule_id: "sch-timeout-001",
+        })
       })
     })
   })

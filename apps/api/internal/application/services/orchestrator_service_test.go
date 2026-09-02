@@ -16,9 +16,11 @@ import (
 type fakeInstanceRepo struct {
 	instances    map[string]*entities.WorkflowInstance
 	createStatus entities.WorkflowInstanceStatus
+	createCalls  int
 }
 
 func (f *fakeInstanceRepo) Create(_ context.Context, tenantID string, input repositories.CreateWorkflowInstanceInput) (*entities.WorkflowInstance, error) {
+	f.createCalls++
 	status := f.createStatus
 	if status == "" {
 		status = entities.WorkflowInstanceRunning
@@ -96,10 +98,15 @@ func (f *fakeInstanceRepo) IncrementRetry(context.Context, string, string, int) 
 
 // fakeEventRepo is a minimal in-memory IEventRepository for orchestrator tests.
 type fakeEventRepo struct {
-	events []entities.Event
+	events      []entities.Event
+	idempotency map[string]*entities.IdempotencyRecord
 }
 
 func (f *fakeEventRepo) Append(_ context.Context, _ string, input repositories.AppendEventInput) (*entities.Event, error) {
+	var idempotencyKey sql.NullString
+	if input.IdempotencyKey != nil {
+		idempotencyKey = sql.NullString{String: *input.IdempotencyKey, Valid: true}
+	}
 	evt := &entities.Event{
 		ID:                 "evt-1",
 		EventID:            input.EventID,
@@ -109,6 +116,7 @@ func (f *fakeEventRepo) Append(_ context.Context, _ string, input repositories.A
 		Timestamp:          input.Timestamp,
 		Payload:            input.Payload,
 		Sequence:           int64(len(f.events) + 1),
+		IdempotencyKey:     idempotencyKey,
 	}
 	f.events = append(f.events, *evt)
 	return evt, nil
@@ -118,8 +126,13 @@ func (f *fakeEventRepo) ListEventsByInstance(_ context.Context, _ string, _ stri
 	return f.events, nil
 }
 
-func (f *fakeEventRepo) FindEventByID(context.Context, string, string) (*entities.Event, error) {
-	return nil, nil
+func (f *fakeEventRepo) FindEventByID(_ context.Context, _ string, id string) (*entities.Event, error) {
+	for i := range f.events {
+		if f.events[i].ID == id || f.events[i].EventID == id {
+			return &f.events[i], nil
+		}
+	}
+	return nil, domain.NewNotFound("event not found")
 }
 func (f *fakeEventRepo) ListEventsByTenant(context.Context, string) ([]entities.Event, error) {
 	return nil, nil
@@ -142,11 +155,27 @@ func (f *fakeEventRepo) ClaimOutbox(context.Context, string, int) ([]entities.Ou
 func (f *fakeEventRepo) MarkOutboxPublished(context.Context, string, string) (*entities.OutboxEvent, error) {
 	return nil, nil
 }
-func (f *fakeEventRepo) UpsertIdempotency(context.Context, string, repositories.UpsertIdempotencyInput) (*entities.IdempotencyRecord, error) {
-	return nil, nil
+func (f *fakeEventRepo) UpsertIdempotency(_ context.Context, tenantID string, input repositories.UpsertIdempotencyInput) (*entities.IdempotencyRecord, error) {
+	if f.idempotency == nil {
+		f.idempotency = map[string]*entities.IdempotencyRecord{}
+	}
+	record := &entities.IdempotencyRecord{
+		ID:             input.IdempotencyKey,
+		TenantID:       tenantID,
+		IdempotencyKey: input.IdempotencyKey,
+		Scope:          input.Scope,
+		ResultStatus:   input.ResultStatus,
+		Payload:        input.Payload,
+	}
+	f.idempotency[input.IdempotencyKey] = record
+	return record, nil
 }
-func (f *fakeEventRepo) FindIdempotency(context.Context, string, string) (*entities.IdempotencyRecord, error) {
-	return nil, nil
+func (f *fakeEventRepo) FindIdempotency(_ context.Context, tenantID, key string) (*entities.IdempotencyRecord, error) {
+	record, ok := f.idempotency[key]
+	if !ok || record.TenantID != tenantID {
+		return nil, domain.NewNotFound("idempotency record not found")
+	}
+	return record, nil
 }
 
 // fakeCapabilityEvidenceRepo models the tenant/instance/state/idempotency
@@ -226,6 +255,38 @@ func newOrchestratorForTest() (*OrchestratorService, *fakeInstanceRepo, *fakeEve
 	evtRepo := &fakeEventRepo{}
 	svc := NewOrchestratorService(instRepo, evtRepo, &fakeContextRepo{}, &fakeCapRepo{}, nil)
 	return svc, instRepo, evtRepo
+}
+
+func TestOrchestratorStartWorkflowWithIdempotencyReusesInstance(t *testing.T) {
+	svc, instances, _ := newOrchestratorForTest()
+	ctx := context.Background()
+
+	first, reused, err := svc.StartWorkflowWithIdempotency(ctx, "tenant-1", "wf-1", "wv-1", "conv-1", "start-1")
+	if err != nil || reused {
+		t.Fatalf("first start: instance=%#v reused=%v err=%v", first, reused, err)
+	}
+	second, reused, err := svc.StartWorkflowWithIdempotency(ctx, "tenant-1", "wf-1", "wv-1", "conv-1", "start-1")
+	if err != nil || !reused || second.ID != first.ID || instances.createCalls != 1 {
+		t.Fatalf("retry start: instance=%#v reused=%v calls=%d err=%v", second, reused, instances.createCalls, err)
+	}
+}
+
+func TestOrchestratorProposeEventWithIdempotencyReusesEvent(t *testing.T) {
+	svc, _, events := newOrchestratorForTest()
+	ctx := context.Background()
+	created, err := svc.StartWorkflow(ctx, "tenant-1", "wf-1", "wv-1", "conv-1")
+	if err != nil {
+		t.Fatalf("start workflow: %v", err)
+	}
+
+	first, reused, err := svc.ProposeEventWithIdempotency(ctx, "tenant-1", created.ID, "doctor.specialty.selected", map[string]any{"specialty": "cardiology"}, "conv-1", "event-1")
+	if err != nil || reused {
+		t.Fatalf("first proposal: event=%#v reused=%v err=%v", first, reused, err)
+	}
+	second, reused, err := svc.ProposeEventWithIdempotency(ctx, "tenant-1", created.ID, "doctor.specialty.selected", map[string]any{"specialty": "cardiology"}, "conv-1", "event-1")
+	if err != nil || !reused || second.ID != first.ID || len(events.events) != 1 {
+		t.Fatalf("retry proposal: event=%#v reused=%v events=%d err=%v", second, reused, len(events.events), err)
+	}
 }
 
 func TestOrchestratorStartAndSuspendResume(t *testing.T) {
@@ -589,6 +650,12 @@ func capabilityGateOrchestrator() (*OrchestratorService, *fakeEngineInstanceRepo
 	persisted := &fakeInstanceRepo{instances: map[string]*entities.WorkflowInstance{
 		"inst-1": {ID: "inst-1", TenantID: "tenant-1", WorkflowID: "wf", WorkflowVersionID: "wv-1", Status: entities.WorkflowInstanceRunning, Version: 1},
 	}}
+	engineInstances.sync = func(updated *engine.WorkflowInstance) {
+		if persistedInstance, ok := persisted.instances[updated.ID]; ok {
+			persistedInstance.Status = entities.WorkflowInstanceStatus(updated.Status)
+			persistedInstance.Version = updated.Version
+		}
+	}
 	evidence := &fakeCapabilityEvidenceRepo{}
 	svc := NewEngineOrchestratorService(persisted, &fakeEventRepo{}, &fakeContextRepo{}, capRepo, eng, nil, evidence)
 	return svc, engineInstances, engineEvents, evidence
@@ -657,6 +724,9 @@ func TestOrchestratorMCPGateAcceptsEvidenceAndIsTenantScoped(t *testing.T) {
 	}
 	if current.CurrentStateID != "end" || len(engineEvents.appended) != 1 {
 		t.Fatalf("expected one accepted transition, state=%s events=%d", current.CurrentStateID, len(engineEvents.appended))
+	}
+	if current.Status != engine.InstanceCompleted {
+		t.Fatalf("expected transitioned instance to be COMPLETED, got %s", current.Status)
 	}
 }
 

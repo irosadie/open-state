@@ -1,0 +1,33 @@
+{
+  "extends": "doctor.json",
+  "provider": { "name": "doctor-provider-mock-no-results" },
+  "tools": [
+    {
+      "name": "doctor.lookup",
+      "result": { "doctor": null, "found": false, "reason": "No doctor matched the request." }
+    },
+    {
+      "name": "catalog.doctor_list",
+      "result": { "doctors": [], "total": 0, "reason": "No doctors are registered for this search." }
+    },
+    {
+      "name": "doctor.search",
+      "result": { "doctors": [], "total": 0, "reason": "No doctor matched the name, specialty, or location." }
+    },
+    {
+      "name": "doctor.recommend",
+      "result": { "recommendations": [], "reason": "No recommendation is available for the requested need." }
+    },
+    {
+      "name": "schedule.check",
+      "result": { "schedule_available": false, "reason": "No doctor schedule is available because no doctor matched." }
+    }
+  ],
+  "data": {
+    "schedules": [],
+    "reservations": [],
+    "appointments": [],
+    "payments": [],
+    "notifications": []
+  }
+}

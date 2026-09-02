@@ -117,7 +117,19 @@ func TestMCPGatewayRejectsUnhealthyBindingBeforeProvider(t *testing.T) {
 	service := newGatewayServiceForTest(provider, &fakeCapabilityEvidenceRepo{}, entities.ProjectCapabilityMCPBindingToolDisabled)
 	_, err := service.Execute(context.Background(), gatewayRequest())
 	var capabilityErr *domaincap.CapabilityError
-	if !errors.As(err, &capabilityErr) || capabilityErr.Kind != domaincap.ErrorKindUnavailable || provider.calls != 0 {
+	if !errors.As(err, &capabilityErr) || capabilityErr.Kind != domaincap.ErrorKindUnavailable || capabilityErr.Code != "capability.mapping_unavailable" || provider.calls != 0 {
+		t.Fatalf("err=%v calls=%d", err, provider.calls)
+	}
+}
+
+func TestMCPGatewayReportsMissingProjectBinding(t *testing.T) {
+	provider := &gatewayProviderFake{result: domainservices.MCPToolCallResult{Data: map[string]any{"available": true}}}
+	service := newGatewayServiceForTest(provider, &fakeCapabilityEvidenceRepo{}, entities.ProjectCapabilityMCPBindingActive)
+	service.bindings = &fakeProjectCapabilityMCPBindingRepository{}
+
+	_, err := service.Execute(context.Background(), gatewayRequest())
+	var capabilityErr *domaincap.CapabilityError
+	if !errors.As(err, &capabilityErr) || capabilityErr.Kind != domaincap.ErrorKindUnavailable || capabilityErr.Code != "capability.mapping_missing" || provider.calls != 0 {
 		t.Fatalf("err=%v calls=%d", err, provider.calls)
 	}
 }

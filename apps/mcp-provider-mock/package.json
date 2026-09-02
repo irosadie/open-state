@@ -10,7 +10,8 @@
     "lint": "biome check src test",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:curl": "bash ./test/curl-smoke.sh"
+    "test:curl": "bash ./test/curl-smoke.sh",
+    "test:curl:doctor": "MCP_PROVIDER_MOCK_SMOKE_DOMAIN=doctor bash ./test/curl-smoke.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.0.0",

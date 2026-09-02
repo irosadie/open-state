@@ -24,6 +24,13 @@ provider errors remain server-side. A missing or unhealthy binding, disabled
 connection/tool, invalid input/output, provider failure, or duplicate failed
 idempotency key fails closed and cannot satisfy the state transition gate.
 
+Every failed secure `invoke_capability` response is an explicit hard stop with
+`ok: false`, `invoked: false`, `hardStop: true`, and `nextAction: "STOP"`.
+The client must not search another scope, choose another capability/provider,
+call a diagnostic context tool as a fallback, or propose an event. Secure
+`start_workflow` and `propose_event` calls require stable idempotency keys;
+retries reuse the same key and return the original outcome.
+
 ## Local provider mock
 
 Run the provider mock on `http://127.0.0.1:8031/mcp`, register the connection in

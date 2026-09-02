@@ -89,7 +89,7 @@ RETURNING id, tenant_id, event_id, payload, topic, status, attempt_count, publis
 INSERT INTO idempotency_records (tenant_id, idempotency_key, scope, result_status, payload)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (tenant_id, idempotency_key) DO UPDATE
-SET result_status = EXCLUDED.result_status, payload = EXCLUDED.payload, updated_at = NOW()
+SET scope = EXCLUDED.scope, result_status = EXCLUDED.result_status, payload = EXCLUDED.payload, updated_at = NOW()
 RETURNING id, tenant_id, idempotency_key, scope, result_status, payload, created_at, updated_at;
 
 -- name: FindIdempotencyRecord :one

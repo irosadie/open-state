@@ -89,6 +89,14 @@ type OrchestratorPort interface {
 	ListAllowedCapabilities(ctx context.Context, tenantID string, scopeType entities.BindingScopeType, scopeID string) ([]entities.Capability, error)
 }
 
+// IdempotentOrchestratorPort is the optional durable retry surface used by the
+// secure MCP tools. Keeping it separate preserves compatibility with legacy
+// adapters that still implement OrchestratorPort only.
+type IdempotentOrchestratorPort interface {
+	StartWorkflowWithIdempotency(ctx context.Context, tenantID, workflowID, workflowVersionID, correlationKey, idempotencyKey string) (*entities.WorkflowInstance, bool, error)
+	ProposeEventWithIdempotency(ctx context.Context, tenantID, instanceID, eventType string, payload map[string]any, correlationID, idempotencyKey string) (*entities.Event, bool, error)
+}
+
 // ContextCompilerPort is the application-layer seam the get_context tool delegates to.
 type ContextCompilerPort interface {
 	Compile(ctx context.Context, args appservices.CompileArgs) (*dtos.CompiledContext, error)
@@ -112,7 +120,7 @@ func NewServer(deps Dependencies) *server.MCPServer {
 	}
 	instructions := `OpenState is the mandatory state controller and gatekeeper for every configured intent and workflow. Always call list_intents and resolve_intent before starting work, then call get_current_state before proposing a transition. If requiredCapabilities contains a provider requirement, use only the listed project-scoped provider server alias and exact tool name, report the normalized result to report_capability_result, and wait for the gatekeeper response before proposing a transition. A MISSING_MAPPING or UNAVAILABLE requirement is a hard stop: do not guess an endpoint, server, tool, or substitute another MCP. Provider endpoints and credentials are never returned by OpenState and remain managed by the MCP host.`
 	if mode == appservices.MCPGatewayModeSecure {
-		instructions = `OpenState is the mandatory state controller and enforced gateway for every configured intent and workflow. Always call list_intents and resolve_intent before starting work, then call get_current_state. When the current state declares a capability, call invoke_capability with only the workflow instance, logical capability, correlationId, idempotencyKey, and capability input. OpenState resolves the project binding and calls the provider internally. Never connect to a provider MCP directly, never select a provider server or tool, and never guess a replacement. A MISSING_MAPPING, UNAVAILABLE, timeout, or validation failure is a hard stop; wait for OpenState before proposing a transition. Provider endpoints, credentials, aliases, catalogs, and raw provider errors are never returned to the client.`
+		instructions = `OpenState is the mandatory state controller and enforced gateway for every configured intent and workflow. Always call list_intents and resolve_intent before starting work, then call get_current_state. If resolve_intent returns any required capability with hardStop=true, nextAction=STOP, status=MISSING_MAPPING, or status=UNAVAILABLE, stop and report that setup is incomplete; do not start the workflow. Start a workflow and propose an event only with a stable idempotencyKey; reuse the same key for a transport retry. When proposing an event, copy the exact requiredContext key names returned by get_current_state into the payload, including dotted keys such as doctor.specialty; never rename them. When the current state declares a capability, call invoke_capability with only the workflow instance, logical capability declared by that state, correlationId, idempotencyKey, and capability input. OpenState resolves the project binding and calls the provider internally. If invoke_capability returns ok=false, hardStop=true, or nextAction=STOP, stop immediately: do not retry with a different key, do not call get_allowed_capabilities or get_context to find a fallback, do not escalate to workflow or tenant scope, do not select another capability/provider/tool, and do not call propose_event. Never connect to a provider MCP directly, never select a provider server or tool, and never guess a replacement. A missing mapping, unavailable provider, timeout, validation failure, or provider rejection is a hard stop; report the safe message and wait for an operator or a new user action. Provider endpoints, credentials, aliases, catalogs, and raw provider errors are never returned to the client.`
 	}
 	srv := server.NewMCPServer("openstate", "0.1.0", server.WithInstructions(instructions))
 	deps.GatewayMode = mode
@@ -182,7 +190,7 @@ func registerTools(srv *server.MCPServer, deps Dependencies) {
 	// server resolves the provider target internally from the active binding.
 	if deps.GatewayMode == appservices.MCPGatewayModeSecure {
 		invokeTool := mcp.NewTool("invoke_capability",
-			mcp.WithDescription("Invoke a capability through the enforced OpenState gateway. OpenState derives the current state, project binding, provider connection, and exact tool; provider routing fields are not accepted."),
+			mcp.WithDescription("Invoke only a logical capability declared by the current workflow state through the enforced OpenState gateway. OpenState derives the project binding, provider connection, and exact tool; provider routing fields are not accepted. If the result has ok=false, hardStop=true, or nextAction=STOP, stop immediately: never select a fallback capability or broader scope and never propose an event."),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
 			mcp.WithString("capability", mcp.Required(), mcp.Description("Logical capability declared by the current state")),
 			mcp.WithString("correlationId", mcp.Required(), mcp.Description("Correlation identifier for this capability operation")),
@@ -214,7 +222,7 @@ func registerTools(srv *server.MCPServer, deps Dependencies) {
 func registerOrchestratorTools(srv *server.MCPServer, deps Dependencies) {
 	// get_current_state
 	srv.AddTool(mcp.NewTool("get_current_state",
-		mcp.WithDescription("Return the current state and allowed events for a workflow instance."),
+		mcp.WithDescription("Return the current state, exact requiredContext keys, and allowed events for a workflow instance. Use those requiredContext keys verbatim in the next event payload."),
 		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
 	), authorizedTool(deps, entities.MCPAPIScopeStateRead, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
@@ -223,7 +231,7 @@ func registerOrchestratorTools(srv *server.MCPServer, deps Dependencies) {
 
 	// get_allowed_capabilities
 	srv.AddTool(mcp.NewTool("get_allowed_capabilities",
-		mcp.WithDescription("List capabilities authorized for a scope."),
+		mcp.WithDescription("Diagnostic read-only listing of capabilities authorized for a scope. In secure runtime this never authorizes invocation and MUST NOT be used to select a fallback after invoke_capability fails."),
 		mcp.WithString("scopeType", mcp.Required(), mcp.Description("TENANT | WORKFLOW | STATE")),
 		mcp.WithString("scopeId", mcp.Required(), mcp.Description("Scope id")),
 		mcp.WithString("project", mcp.Description("Allowed project id; defaults to the API key default project")),
@@ -238,9 +246,11 @@ func registerOrchestratorTools(srv *server.MCPServer, deps Dependencies) {
 
 	// propose_event
 	srv.AddTool(mcp.NewTool("propose_event",
-		mcp.WithDescription("Propose an event for a workflow instance; the engine validates and transitions."),
+		mcp.WithDescription("Propose an event for a workflow instance; the engine validates and transitions. Copy requiredContext keys from get_current_state verbatim, including dotted names. In secure runtime, provide a stable idempotencyKey and never call this after a failed or hard-stopped capability invocation."),
 		mcp.WithString("instance", mcp.Required(), mcp.Description("Workflow instance id")),
 		mcp.WithString("type", mcp.Required(), mcp.Description("Event type")),
+		stringArgument("correlationId", deps.GatewayMode == appservices.MCPGatewayModeSecure, "Correlation identifier for this event"),
+		stringArgument("idempotencyKey", deps.GatewayMode == appservices.MCPGatewayModeSecure, "Stable key preventing duplicate event proposals"),
 		mcp.WithObject("payload", mcp.Description("Event payload")),
 	), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return handleProposeEvent(ctx, deps, principal.TenantID, req)
@@ -273,13 +283,13 @@ func registerOrchestratorTools(srv *server.MCPServer, deps Dependencies) {
 
 	// start_workflow
 	srv.AddTool(mcp.NewTool("start_workflow",
-		mcp.WithDescription("Start a new workflow instance."),
-		mcp.WithString("workflow", mcp.Required(), mcp.Description("Workflow id")),
+		mcp.WithDescription("Start a new workflow instance using the workflowId returned by resolve_intent. Do not pass workflowSlug. In secure runtime, provide a stable idempotencyKey and reuse it for a retry so only one instance is created."),
+		mcp.WithString("workflow", mcp.Required(), mcp.Description("Workflow UUID returned as workflowId by resolve_intent; do not pass a slug such as order-doctor")),
 		mcp.WithString("version", mcp.Description("Workflow version id (optional)")),
 		mcp.WithString("correlation", mcp.Description("Business/conversation correlation")),
+		stringArgument("idempotencyKey", deps.GatewayMode == appservices.MCPGatewayModeSecure, "Stable key preventing duplicate workflow instances"),
 	), authorizedTool(deps, entities.MCPAPIScopeStateWrite, func(ctx context.Context, principal entities.APIKeyPrincipal, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := getArgs(req)
-		return handleStartWorkflow(ctx, deps, principal.TenantID, str(args, "workflow"), str(args, "version"), str(args, "correlation"))
+		return handleStartWorkflowRequest(ctx, deps, principal.TenantID, req)
 	}))
 
 	// suspend_workflow
@@ -338,7 +348,7 @@ func registerOrchestratorTools(srv *server.MCPServer, deps Dependencies) {
 // registerContextTool registers the context compiler backed get_context tool.
 func registerContextTool(srv *server.MCPServer, deps Dependencies) {
 	srv.AddTool(mcp.NewTool("get_context",
-		mcp.WithDescription("Return the compiled, PII-redacted runtime context for a turn."),
+		mcp.WithDescription("Return the compiled, PII-redacted runtime context for a turn. This is diagnostic context only; it never authorizes a provider call or a fallback capability in secure runtime."),
 		mcp.WithString("conversation", mcp.Required(), mcp.Description("Conversation id")),
 		mcp.WithString("instance", mcp.Description("Workflow instance id (optional)")),
 		mcp.WithString("ownerType", mcp.Description("Memory owner type (e.g. CUSTOMER)")),
@@ -354,4 +364,12 @@ func registerContextTool(srv *server.MCPServer, deps Dependencies) {
 func str(args map[string]any, key string) string {
 	s, _ := args[key].(string)
 	return s
+}
+
+func stringArgument(name string, required bool, description string) mcp.ToolOption {
+	opts := []mcp.PropertyOption{mcp.Description(description)}
+	if required {
+		opts = append(opts, mcp.Required())
+	}
+	return mcp.WithString(name, opts...)
 }

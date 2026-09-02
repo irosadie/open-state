@@ -433,6 +433,20 @@ export class ProviderScenarioStore {
     if (!schedule) {
       return error("schedule_not_found", "doctor schedule was not found")
     }
+
+    const hasActiveReservation = this.recordsFor("reservations").some(
+      (item) => item.schedule_id === scheduleId && item.status !== "CANCELLED",
+    )
+    const hasActiveAppointment = this.recordsFor("appointments").some(
+      (item) => item.schedule_id === scheduleId && item.status !== "CANCELLED",
+    )
+    if (hasActiveReservation || hasActiveAppointment) {
+      return error(
+        "schedule_conflict",
+        "doctor schedule is already reserved or booked",
+      )
+    }
+
     if (schedule.available !== true) {
       return error("slot_unavailable", "doctor schedule is not available")
     }
@@ -499,6 +513,14 @@ export class ProviderScenarioStore {
       schedule.available = true
       schedule.quota_remaining = 1
     }
+    const reservation = this.recordsFor("reservations").find(
+      (item) =>
+        item.schedule_id === appointment.schedule_id &&
+        item.status === "CONFIRMED",
+    )
+    if (reservation) {
+      reservation.status = "CANCELLED"
+    }
     return copyRecord(appointment)
   }
 
@@ -509,6 +531,20 @@ export class ProviderScenarioStore {
     if (!schedule) {
       return error("schedule_not_found", "doctor schedule was not found")
     }
+
+    const hasActiveReservation = this.recordsFor("reservations").some(
+      (item) => item.schedule_id === scheduleId && item.status !== "CANCELLED",
+    )
+    const hasActiveAppointment = this.recordsFor("appointments").some(
+      (item) => item.schedule_id === scheduleId && item.status !== "CANCELLED",
+    )
+    if (hasActiveReservation || hasActiveAppointment) {
+      return error(
+        "schedule_conflict",
+        "doctor schedule is already reserved or booked",
+      )
+    }
+
     if (schedule.available !== true) {
       return error("slot_unavailable", "doctor schedule is not available")
     }
@@ -535,6 +571,9 @@ export class ProviderScenarioStore {
     )
     if (!appointment) {
       return error("booking_not_found", "doctor appointment was not found")
+    }
+    if (appointment.status !== "CONFIRMED") {
+      return error("invalid_transition", "doctor appointment is not confirmed")
     }
     const payments = this.recordsFor("payments")
     if (payments.some((item) => item.booking_id === bookingId)) {
@@ -583,6 +622,9 @@ export class ProviderScenarioStore {
     )
     if (!appointment) {
       return error("booking_not_found", "doctor appointment was not found")
+    }
+    if (appointment.status !== "CONFIRMED") {
+      return error("invalid_transition", "doctor appointment is not confirmed")
     }
 
     const notifications = this.recordsFor("notifications")

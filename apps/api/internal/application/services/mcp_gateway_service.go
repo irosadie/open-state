@@ -174,24 +174,24 @@ func (s *MCPGatewayService) Execute(ctx context.Context, req GatewayInvocationRe
 	binding, err := s.bindings.FindByCapability(ctx, req.TenantID, projectID, resolved.ID)
 	if err != nil {
 		if isNotFound(err) {
-			return nil, gatewayUnavailable("capability has no project MCP binding")
+			return nil, gatewayFailure("capability.mapping_missing", "capability has no project MCP binding")
 		}
-		return nil, gatewayUnavailable("project MCP binding is unavailable")
+		return nil, gatewayFailure("capability.mapping_unavailable", "project MCP binding is unavailable")
 	}
 	if binding == nil || binding.Health != entities.ProjectCapabilityMCPBindingActive {
-		return nil, gatewayUnavailable("capability provider binding is unavailable")
+		return nil, gatewayFailure("capability.mapping_unavailable", "capability provider binding is unavailable")
 	}
 	connection, err := s.connections.FindByID(ctx, req.TenantID, projectID, binding.ConnectionID)
 	if err != nil || connection == nil || connection.Status != entities.MCPConnectionEnabled {
-		return nil, gatewayUnavailable("capability provider connection is unavailable")
+		return nil, gatewayFailure("capability.provider_unavailable", "capability provider connection is unavailable")
 	}
 	catalogSnapshot, err := s.catalog.Get(ctx, req.TenantID, projectID, binding.ConnectionID)
 	if err != nil || catalogSnapshot == nil {
-		return nil, gatewayUnavailable("capability provider catalog is unavailable")
+		return nil, gatewayFailure("capability.catalog_unavailable", "capability provider catalog is unavailable")
 	}
 	tool := findBoundTool(catalogSnapshot.Tools, binding)
 	if tool == nil || !tool.Enabled || tool.Availability != entities.MCPToolPresent || tool.Fingerprint != binding.BoundToolFingerprint {
-		return nil, gatewayUnavailable("capability provider tool is unavailable")
+		return nil, gatewayFailure("capability.tool_unavailable", "capability provider tool is unavailable")
 	}
 
 	release := s.lockIdempotency(req.TenantID, projectID, inst.ID, stateID, resolved.ID, req.IdempotencyKey)
@@ -392,7 +392,11 @@ func safeGatewayError(err error) error {
 }
 
 func gatewayUnavailable(message string) error {
-	return domaincap.NewCapabilityError(domaincap.ErrorKindUnavailable, "capability.gateway_unavailable", message)
+	return gatewayFailure("capability.gateway_unavailable", message)
+}
+
+func gatewayFailure(code, message string) error {
+	return domaincap.NewCapabilityError(domaincap.ErrorKindUnavailable, code, message)
 }
 
 func gatewayUnauthorized(message string) error {

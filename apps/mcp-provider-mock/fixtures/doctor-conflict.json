@@ -1,0 +1,28 @@
+{
+  "extends": "doctor.json",
+  "provider": { "name": "doctor-provider-mock-conflict" },
+  "tools": [
+    {
+      "name": "schedule.check",
+      "result": {
+        "doctor_id": "doc-001",
+        "schedule_id": "sch-conflict-001",
+        "requested_date": "2026-09-02",
+        "requested_time": "10:00",
+        "schedule_available": false,
+        "reason": "The requested schedule is already reserved by another patient."
+      }
+    }
+  ],
+  "data": {
+    "schedules": [
+      { "schedule_id": "sch-conflict-001", "doctor_id": "doc-001", "doctor_name": "Dr. Andi Kurniawan, Internal Medicine Specialist", "date": "2026-09-02", "time": "10:00", "available": false, "quota_remaining": 0 }
+    ],
+    "reservations": [],
+    "appointments": [
+      { "booking_id": "BKGD-0401", "status": "CONFIRMED", "doctor_id": "doc-001", "schedule_id": "sch-conflict-001", "date": "2026-09-02", "time": "10:00", "payment_status": "PENDING" }
+    ],
+    "payments": [],
+    "notifications": []
+  }
+}
